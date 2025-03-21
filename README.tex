@@ -1,0 +1,100 @@
+% Created 2025-03-21 Fri 14:12
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\author{aishift}
+\date{\today}
+\title{Mimi president}
+\hypersetup{
+ pdfauthor={aishift},
+ pdftitle={Mimi president},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 31.0.50 (Org mode 9.7.11)}, 
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{Problem}
+\label{sec:org77751ae}
+
+The rapidly developing Cyber Valley project has diverse sources of truth represented in the following resources:
+
+\begin{itemize}
+\item X.com tweets
+\item Telegram group chat messages
+\item Logseq knowledge base git repositories
+\item GitHub issues
+\end{itemize}
+
+Searching all of them becomes a time-consuming process and requires a simple way of querying all of them at one time.
+\section{Solution}
+\label{sec:org17065b9}
+
+\subsection{Announce}
+\label{sec:org8be009c}
+
+Develop RAG over all resources mentioned in the problem statement and provide an LLM-driven chat bot, which allows interactive and free-form querying of all of them at once.
+\subsection{Implementation details}
+\label{sec:org42e3bcf}
+
+\subsubsection{Embedding model}
+\label{sec:orgc90df8e}
+
+We keep in mind that in the future it could be great to change the chosen model, but it requires complete recalculation for the whole dataset (because of different dimensions and algorithms in general). To handle this, we will store all source data "as is", so making embeddings will be a question of computation.
+For the POC we will stick to the OpenAI \href{https://platform.openai.com/docs/guides/embeddings\#embedding-models}{text-embedding-3-small} which is pretty cheap and should work well enough.
+
+\begin{center}
+\includegraphics[width=.9\linewidth]{img/embedding-model-pricing.png}
+\end{center}
+\subsubsection{LLM chat bot}
+\label{sec:org63002f1}
+
+Our solution is completely model-agnostic, so any provider could be used and switched on the fly.
+\subsubsection{Data store}
+\label{sec:org5bcc9ce}
+
+We choose \href{https://docs.turso.tech/introduction}{Turso} as our DBMS; it works perfectly with vector search, scales greatly on HDD drives, and has zero network latency because it's built on \href{https://github.com/tursodatabase/libsql/}{libSQL}.
+\subsubsection{Programming language}
+\label{sec:org3b0a361}
+
+We will use Python \& \href{https://www.langchain.com/langchain}{LangChain} for the project because it'll just need glue between IO operations. Rust wouldn't make a visible difference in speed or durability and lacks ready-to-use packages for fast idea testing.
+\subsubsection{Parsing}
+\label{sec:org19fe494}
+
+\begin{enumerate}
+\item X.com
+\label{sec:orgda10bfc}
+
+We don't know for sure the general required number of accounts, their requirements, and their publicity. So for the start and completely for free, it's possible to use Google news RSS. As an example, here is the RSS feed generated for \href{https://x.com/levelsio}{@levelsio} - \url{https://news.google.com/rss/search?q=site:twitter.com/levelsio+when:7}
+\item Telegram groups
+\label{sec:orgfccc705}
+
+We offer to use the \href{https://core.telegram.org/\#telegram-api}{Telegram Client API}. It requires its own Telegram account but in exchange has access to the whole history of messages (in super groups where it's allowed). The algorithm for adding support for a new group will be the same as adding a new participant to the group. Then we will download all message history (with a given threshold or fully), then listen to new messages and process them as well.
+\item GitHub
+\label{sec:org42688db}
+
+We can use the \href{https://docs.github.com/en/webhooks/webhook-events-and-payloads}{Webhooks API} to get updates on commits to the LogSeq files and issues.
+\end{enumerate}
+\section{Feature improvements}
+\label{sec:org07ffb24}
+
+\begin{itemize}
+\item Embed media (pictures, video, and audio) as well
+\item Query and embed provided URLs in the text info
+\item Include URLs to the initial sources found with RAG
+\item Allow querying only given resources e.g., "What are the statuses of the current projects with aishift in GitHub issues"
+\end{itemize}
+\end{document}
