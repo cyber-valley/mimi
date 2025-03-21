@@ -11,64 +11,63 @@
     - [[#data-store][Data store]]
     - [[#programming-language][Programming language]]
     - [[#parsing][Parsing]]
-- [[#feature-improves][Feature improves]]
+- [[#feature-improvements][Feature improvements]]
 
 * Problem
 
-Rapidly developing Cyber Valley project has a diverse sources of truth represented in the following resources:
+The rapidly developing Cyber Valley project has diverse sources of truth represented in the following resources:
 
 - X.com tweets
 - Telegram group chat messages
 - Logseq knowledge base git repositories
 - GitHub issues
 
-Searching all of them becomes a time consuming process and requires a simple way of querying all of them at one time.
+Searching all of them becomes a time-consuming process and requires a simple way of querying all of them at one time.
 
 * Solution
 
 ** Announce
 
-Develop RAG over all mentioned in the problem statement resources and provide LLM driven chat bot, which allows interactively and in a free form query all of them at once.
+Develop RAG over all resources mentioned in the problem statement and provide an LLM-driven chat bot, which allows interactive and free-form querying of all of them at once.
 
 ** Implementation details
 
 *** Embedding model
 
-We keep in mind, that in the future it could be great to change chosen model, but it requires complete recalculation for the whole dataset (because of different dimensions and algorithms in general). To handle it we will store all source data "as is", so making embedding will be the question of computation.
-
-For the POC we will stick to the OpenAi [[https://platform.openai.com/docs/guides/embeddings#embedding-models][text-embedding-3-small]] which is pretty cheap and should work good enough.
+We keep in mind that in the future it could be great to change the chosen model, but it requires complete recalculation for the whole dataset (because of different dimensions and algorithms in general). To handle this, we will store all source data "as is", so making embeddings will be a question of computation.
+For the POC we will stick to the OpenAI [[https://platform.openai.com/docs/guides/embeddings#embedding-models][text-embedding-3-small]] which is pretty cheap and should work well enough.
 
 [[file:img/embedding-model-pricing.png]]
 
 *** LLM chat bot
 
-Our solution completely model agnostic, so any provider could be used and switched on the fly
+Our solution is completely model-agnostic, so any provider could be used and switched on the fly.
 
 *** Data store
 
-We choose [[https://docs.turso.tech/introduction][Turso]] as our DBM, it works perfectly with vector search and greatly scales on HDD drives and has zero network latency because it's built on [[https://github.com/tursodatabase/libsql/][libSQL]].
+We choose [[https://docs.turso.tech/introduction][Turso]] as our DBMS; it works perfectly with vector search, scales greatly on HDD drives, and has zero network latency because it's built on [[https://github.com/tursodatabase/libsql/][libSQL]].
 
 *** Programming language
 
-We will use Python & [[https://www.langchain.com/langchain][LangChain]] for the project because it'll be need just a glue between io operations. Rust wouldn't make a visible difference in speed or durability and lacks of ready to use packages for the fast ideas testing.
+We will use Python & [[https://www.langchain.com/langchain][LangChain]] for the project because it'll just need glue between IO operations. Rust wouldn't make a visible difference in speed or durability and lacks ready-to-use packages for fast idea testing.
 
 *** Parsing
 
 **** X.com
 
-We don't know for sure the general required amount of accounts and their requirement and their publicity. So for the start and completely for free it's possible to use Google news RSS. As an example here is the RSS feed generated for the [[https://x.com/levelsio][@levelsio]] - https://news.google.com/rss/search?q=site:twitter.com/levelsio+when:7
+We don't know for sure the general required number of accounts, their requirements, and their publicity. So for the start and completely for free, it's possible to use Google news RSS. As an example, here is the RSS feed generated for [[https://x.com/levelsio][@levelsio]] - https://news.google.com/rss/search?q=site:twitter.com/levelsio+when:7
 
 **** Telegram groups
 
-We offer to use [[https://core.telegram.org/#telegram-api][Telegram Client API]]. It requires own telegram account but in exchange it has access to the whole history of messages (in super groups where it's allowed). Algorithm of the adding support of the new group will be the same as adding new participant to the group. Then we will download all messages history (with the given threshold or fully), then listen to new messages and process them as well.
+We offer to use the [[https://core.telegram.org/#telegram-api][Telegram Client API]]. It requires its own Telegram account but in exchange has access to the whole history of messages (in super groups where it's allowed). The algorithm for adding support for a new group will be the same as adding a new participant to the group. Then we will download all message history (with a given threshold or fully), then listen to new messages and process them as well.
 
 **** GitHub
 
-We can use [[https://docs.github.com/en/webhooks/webhook-events-and-payloads][Webhooks API]] to get updates on commits to the LogSeq files and issues.
+We can use the [[https://docs.github.com/en/webhooks/webhook-events-and-payloads][Webhooks API]] to get updates on commits to the LogSeq files and issues.
 
-* Feature improves
+* Feature improvements
 
-- Embed media (pictures, video and audio) as well
+- Embed media (pictures, video, and audio) as well
 - Query and embed provided URLs in the text info
 - Include URLs to the initial sources found with RAG
-- Allow querying only given resources e.g. "What's statuses of the current projects with aishift in GitHub issues"
+- Allow querying only given resources e.g., "What are the statuses of the current projects with aishift in GitHub issues"
