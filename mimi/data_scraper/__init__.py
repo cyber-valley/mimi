@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, Future
 from typing import NoReturn
 
 from mimi import DataOrigin, DataSink

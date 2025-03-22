@@ -1,9 +1,9 @@
 import argparse
 import functools
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from enum import StrEnum, auto
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from queue import Queue
 from typing import assert_never
@@ -67,7 +67,9 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                 ),
             )
             args = parser.parse_args()
-            poll_interval = timedelta(seconds=args.poll_interval) if args.poll_interval else None
+            poll_interval = (
+                timedelta(seconds=args.poll_interval) if args.poll_interval else None
+            )
             context = XScraperContext(
                 user_tweets_json_directory=args.user_tweets_json_directory,
                 accounts_to_follow=args.accounts_to_follow,
