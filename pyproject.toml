@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "requests>=2.32.3",
     "rss-parser>=2.1.0",
+    "telethon",
     "tenacity>=9.0.0",
 ]
 
@@ -16,7 +17,6 @@ dev = [
     "coverage>=7.6.12",
     "mypy>=1.15.0",
     "ruff>=0.9.4",
-    "types-requests>=2.32.0.20250306",
 ]
 
 [tool.ruff.lint]
@@ -106,8 +106,9 @@ untyped_calls_exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = []
+module = ["telethon.*"]
 follow_untyped_imports = true
 
 [tool.uv.sources]
 result = { git = "https://github.com/montasaurus/result" }
+telethon = { url = "https://github.com/LonamiWebs/Telethon/archive/v2.zip", subdirectory = "client" }
