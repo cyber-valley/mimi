@@ -97,7 +97,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
 
 
 def _consume_queue(queue: Queue[DataScraperMessage]) -> None:
-    while True:
+    while not queue.empty():
         log.info(queue.get())
 
 
