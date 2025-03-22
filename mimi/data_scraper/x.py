@@ -24,6 +24,10 @@ goole_news_rss_url_template = Template(
 )
 
 
+class XScraperStopped(Exception):  # noqa: N818
+    pass
+
+
 @dataclass
 class XScraperContext:
     user_tweets_json_directory: Path
@@ -32,22 +36,29 @@ class XScraperContext:
 
 
 def scrape(context: XScraperContext, sink: DataSink[DataScraperMessage]) -> NoReturn:
-    # Process static files
+    log.info(
+        "Starting scraping X.com static files at %s", context.user_tweets_json_directory
+    )
+    posts_counter = 0
     for path in context.user_tweets_json_directory.glob("**/*.json"):
         for message in _parse_user_tweets(json.loads(path.read_text())):
             sink.put(message)
+            posts_counter += 1
+    log.info("Produced %s posts from static X.com files", posts_counter)
 
-    # Start polling RSS feeds
+    log.info("Strting polling X.com accounts %s", context.accounts_to_follow)
     while True:
         for account in context.accounts_to_follow:
             log.info("Starting parsing of %s", account)
             feed_url = goole_news_rss_url_template.substitute(account=account)
+            posts_count = 0
             for message in _parse_rss_feed(feed_url):
                 sink.put(message)
-            log.info("Finished parsing of %s", account)
+                posts_count += 1
+            log.info("Finished parsing of %s with %s posts", account, posts_count)
 
         if not context.poll_interval:
-            break
+            raise XScraperStopped
 
         time.sleep(context.poll_interval.total_seconds())
 
@@ -95,9 +106,11 @@ def _parse_rss_feed(url: str) -> Iterable[DataScraperMessage]:
     for item in parser.channel.items:
         try:
             pub_date = datetime.strptime(
-                item.pub_date, "%a, %d %b %Y %H:%M:%S %Z"
+                item.pub_date.content, "%a, %d %b %Y %H:%M:%S %Z"
             ).replace(tzinfo=UTC)
         except ValueError:
             log.exception("Failed to parse publication date %s", item.pub_date)
             continue
-        yield XMessage(data=item.title, scraped_at=datetime.now(UTC), pub_date=pub_date)
+        yield XMessage(
+            data=item.title.content, scraped_at=datetime.now(UTC), pub_date=pub_date
+        )

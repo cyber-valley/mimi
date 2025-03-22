@@ -1,7 +1,7 @@
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from multiprocessing.pool import ThreadPool
+from concurrent.futures import ThreadPoolExecutor, Future
 from typing import NoReturn
 
 from mimi import DataOrigin, DataSink
@@ -19,14 +19,12 @@ class DataScraperMessage:
     pub_date: datetime
 
 
-DataScraper = Callable[[DataSink[DataScraperMessage]], Awaitable[NoReturn]]
+DataScraper = Callable[[DataSink[DataScraperMessage]], NoReturn]
 
 
 def run_scrapers(
-    pool: ThreadPool,
+    executor: ThreadPoolExecutor,
     sink: DataSink[DataScraperMessage],
     scrapers: Iterable[DataScraper],
-) -> NoReturn:
-    for scraper in scrapers:
-        pool.apply_async(scraper, (sink,))
-    raise ScraperStoppedError
+) -> list[Future[NoReturn]]:
+    return [executor.submit(scraper, sink) for scraper in scrapers]
