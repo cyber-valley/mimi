@@ -1,7 +1,7 @@
-from enum import Enum, auto
+from enum import StrEnum, auto
 
 
-class DataOrigin(Enum):
+class DataOrigin(StrEnum):
     TELEGRAM = auto()
     X = auto()
     GITHUB = auto()
