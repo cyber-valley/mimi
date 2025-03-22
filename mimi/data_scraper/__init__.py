@@ -1,4 +1,4 @@
-from asyncio import gather
+from multiprocessing.pool import ThreadPool
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,8 +21,11 @@ class DataScraperMessage:
 DataScraper = Callable[[DataSink[DataScraperMessage]], Awaitable[NoReturn]]
 
 
-async def run_scrapers(
-    sink: DataSink[DataScraperMessage], scrapers: Iterable[DataScraper]
+def run_scrapers(
+    pool: ThreadPool,
+    sink: DataSink[DataScraperMessage],
+    scrapers: Iterable[DataScraper]
 ) -> NoReturn:
-    await gather(*[scraper(sink) for scraper in scrapers])
+    for scraper in scrapers:
+        pool.apply_async(scraper, (sink,))
     raise ScraperStoppedError
