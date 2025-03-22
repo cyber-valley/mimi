@@ -2,7 +2,6 @@ from .data_sink import DatsSink
 from .data_scraper import DataScraperMessage, DataScraperMessage
 
 
-# TODO: Accept Sqlite connections
 def run_embedding_pipeline(sink: DataSink[DataScraperMessage]) -> NoReturn:
     """
     Listens to updates from the `sink` and for each:
