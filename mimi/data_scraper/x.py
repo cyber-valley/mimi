@@ -62,6 +62,10 @@ def _parse_user_tweets(data: dict[str, Any]) -> Iterable[DataScraperMessage]:
 
     if text := data.get("full_text"):
         assert isinstance(text, str)
+        if not text:
+            log.warning("Got tweet with empty text")
+            return
+
         created_at = data.get("created_at")
         if created_at is None:
             log.error("Failed to find created date in user tweet")
