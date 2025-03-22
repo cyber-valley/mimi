@@ -1,0 +1,21 @@
+#+title: Parsing X.com
+#+author: aishift
+
+* Naive approach
+
+Download JSON from x.com with browser (look for the ~UserTweets~ XHR request)
+
+Post texts could be extracted with the following command:
+
+#+begin_src bash
+cat mastercyb.json \
+    | jq -rc '..
+          | objects
+          | .legacy
+          | select(.full_text != null)
+          | { full_text: .full_text, created_at: .created_at } ' \
+    | wc -l
+#+end_src
+
+#+RESULTS:
+: 101

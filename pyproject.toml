@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "requests>=2.32.3",
+    "rss-parser>=2.1.0",
+    "tenacity>=9.0.0",
+]
 
 [dependency-groups]
 dev = [
@@ -12,6 +16,7 @@ dev = [
     "coverage>=7.6.12",
     "mypy>=1.15.0",
     "ruff>=0.9.4",
+    "types-requests>=2.32.0.20250306",
 ]
 
 [tool.ruff.lint]

@@ -16,6 +16,7 @@ class DataScraperMessage:
     data: str
     origin: DataOrigin
     scraped_at: datetime
+    pub_date: datetime
 
 
 DataScraper = Callable[[DataSink[DataScraperMessage]], Awaitable[NoReturn]]
