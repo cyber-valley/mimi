@@ -1,5 +1,7 @@
-from .data_sink import DatsSink
-from .data_scraper import DataScraperMessage, DataScraperMessage
+from typing import NoReturn
+
+from .data_scraper import DataScraperMessage
+from .data_sink import DataSink
 
 
 def run_embedding_pipeline(sink: DataSink[DataScraperMessage]) -> NoReturn:
@@ -10,4 +12,4 @@ def run_embedding_pipeline(sink: DataSink[DataScraperMessage]) -> NoReturn:
     - Calculates and saves embedding
     - Checks delta between now and `scraped_at` to track late delivery
     """
-    raise NotImplemented
+    raise NotImplementedError
