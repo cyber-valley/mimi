@@ -28,7 +28,7 @@ goole_news_rss_url_template = Template(
 class XScraperContext:
     user_tweets_json_directory: Path
     accounts_to_follow: list[str]
-    poll_interval: timedelta
+    poll_interval: None | timedelta
 
 
 def scrape(context: XScraperContext, sink: DataSink[DataScraperMessage]) -> NoReturn:
@@ -45,6 +45,9 @@ def scrape(context: XScraperContext, sink: DataSink[DataScraperMessage]) -> NoRe
             for message in _parse_rss_feed(feed_url):
                 sink.put(message)
             log.info("Finished parsing of %s", account)
+
+        if not context.poll_interval:
+            break
 
         time.sleep(context.poll_interval.total_seconds())
 
