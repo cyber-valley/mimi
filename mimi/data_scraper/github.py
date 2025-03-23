@@ -1,8 +1,11 @@
 import http.server
 import json
 import logging
+import os
 import subprocess
 from abc import ABC, abstractmethod
+from collections.abc import Collection, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NoReturn
@@ -19,10 +22,16 @@ class GithubScraperStopped(Exception):  # noqa: N818
 
 
 @dataclass
+class GithubRepository:
+    owner: str
+    name: str
+
+
+@dataclass
 class GithubScraperContext:
     port: int
     repository_base_path: Path
-    repositories_to_follow: set[str]
+    repositories_to_follow: set[GithubRepository]
     host: str = field(default="localhost")
 
 
@@ -32,6 +41,10 @@ def scrape(
     if not context.repository_base_path.exists():
         log.info("Creating repository base path")
         context.repository_base_path.mkdir(parents=True)
+
+    log.info("Syncying git repositories")
+    with _set_directory(context.repository_base_path):
+        _sync_github_repositories(context.repositories_to_follow)
 
     # This is required for the context injection
     # to the handler
@@ -45,6 +58,29 @@ def scrape(
     log.info("Starting github webhook server on %s:%s", context.host, context.port)
     httpd.serve_forever()
     raise GithubScraperStopped
+
+
+def _sync_github_repositories(
+    repositories_to_follow: Collection[GithubRepository],
+) -> None:
+    for repository in repositories_to_follow:
+        repository_owner_path = Path(repository.owner)
+        repository_owner_path.mkdir(exist_ok=True)
+        repository_path = repository_owner_path / repository.name
+        if repository_path.exists():
+            with _set_directory(repository_path):
+                _git_pull()
+                # TODO: Sync only pulled files
+                _sync_project_files()
+        else:
+            with _set_directory(repository_owner_path):
+                _git_clone(f"https://github.com/{repository.owner}/{repository.name}")
+                with _set_directory(repository_path):
+                    _sync_project_files()
+
+
+def _sync_project_files() -> None:
+    pass
 
 
 class BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
@@ -100,14 +136,25 @@ class BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
         self.wfile.write(json.dumps({"status": "OK"}).encode("utf-8"))
 
 
-def update_repo(repository_path: Path) -> None:
+def _git_clone(url: str) -> None:
+    subprocess.run(["/usr/bin/git", "clone", url], check=True, capture_output=False)  # noqa: S603
+    log.info("[git clone %s] finished")
+
+
+def _git_pull() -> None:
+    subprocess.run(  # noqa: S603
+        ["/usr/bin/git", "pull"],
+        check=True,
+        capture_output=True,
+    )
+    log.info("[git pull] finished")
+
+
+@contextmanager
+def _set_directory(path: Path) -> Iterator[None]:
+    origin = Path().absolute()
     try:
-        subprocess.run(  # noqa: S603
-            ["/usr/bin/git", "pull"],
-            cwd=repository_path,
-            check=True,
-            capture_output=True,
-        )
-        log.info("Git pull successful")
-    except subprocess.CalledProcessError:
-        log.exception("Git pull failed")
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(origin)
