@@ -23,7 +23,7 @@ class GithubScraperStopped(Exception):  # noqa: N818
 
 
 @dataclass
-class GithubRepository:
+class GitRepository:
     owner: str
     name: str
 
@@ -57,7 +57,6 @@ def scrape(
         def _sink(self) -> DataSink[DataScraperMessage]:
             return sink
 
-
     server_address = (context.host, context.port)
     httpd = http.server.HTTPServer(server_address, GithubWebhookHandler)
     log.info("Starting github webhook server on %s:%s", context.host, context.port)
@@ -75,8 +74,7 @@ def _sync_github_repositories(
 
 
 def _scrape_git_repository(
-    sink: DataSink[DataScraperMessage],
-    repository: GithubRepository
+    sink: DataSink[DataScraperMessage], repository: GitRepository
 ) -> None:
     repository_owner_path = Path(repository.owner)
     repository_owner_path.mkdir(exist_ok=True)
@@ -93,9 +91,7 @@ def _scrape_git_repository(
             _scrape_files(sink, pulled_files)
     else:
         with _set_directory(repository_owner_path):
-            _git(
-                "clone", f"https://github.com/{repository.owner}/{repository.name}"
-            )
+            _git("clone", f"https://github.com/{repository.owner}/{repository.name}")
             repository_files = [Path(file) for file in _git("ls-files")]
             with _set_directory(repository_path):
                 _scrape_files(sink, repository_files)
@@ -126,11 +122,9 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
     @abstractmethod
     def _context(self) -> GithubScraperContext: ...
 
-
     @property
     @abstractmethod
     def _sink(self) -> DataSink[DataScraperMessage]: ...
-
 
     def do_POST(self) -> None:  # noqa: N802
         if self.path == "/webhook":
@@ -160,9 +154,11 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
         match self.headers.get("X-GitHub-Event"):
             case "push":
                 log.info("Received push event. Payload=%s", payload)
-                repository = GitRepository(payload["full_name"].split("/"))
+                repository = GitRepository(*payload["full_name"].split("/"))
                 if repository not in self._content.repositories_to_follow:
-                    log.warning("Got push event for the unfollowed repository %s", repository)
+                    log.warning(
+                        "Got push event for the unfollowed repository %s", repository
+                    )
                 with _set_directory(self._context.repository_base_path):
                     _scrape_git_repository(self._sink, repository)
             case "issues":
