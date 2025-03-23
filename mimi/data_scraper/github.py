@@ -33,6 +33,8 @@ def scrape(
         log.info("Creating repository base path")
         context.repository_base_path.mkdir(parents=True)
 
+    # This is required for the context injection
+    # to the handler
     class GithubWebhookHandler(BaseGithubWebhookHandler):
         @property
         def _context(self) -> GithubScraperContext:
@@ -48,7 +50,7 @@ def scrape(
 class BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
     @property
     @abstractmethod
-    def _contexttt(self) -> GithubScraperContext: ...
+    def _context(self) -> GithubScraperContext: ...
 
     def do_POST(self) -> None:  # noqa: N802
         if self.path == "/webhook":
