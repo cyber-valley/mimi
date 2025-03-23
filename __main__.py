@@ -10,6 +10,7 @@ from typing import assert_never
 
 from mimi import DataOrigin, data_scraper
 from mimi.data_scraper import DataScraperMessage
+from mimi.data_scraper.telegram import TelegramScraperContext
 from mimi.data_scraper.x import XScraperContext
 
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +41,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
         help="Source of the data being scraped",
     )
     args, _ = parser.parse_known_args()
+    should_raise = True
     match args.data_origin:
         case DataOrigin.X:
             parser.add_argument(
@@ -70,14 +72,41 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             poll_interval = (
                 timedelta(seconds=args.poll_interval) if args.poll_interval else None
             )
-            context = XScraperContext(
-                user_tweets_json_directory=args.user_tweets_json_directory,
-                accounts_to_follow=args.accounts_to_follow,
-                poll_interval=poll_interval,
+            scraper = functools.partial(
+                data_scraper.x.scrape,
+                XScraperContext(
+                    user_tweets_json_directory=args.user_tweets_json_directory,
+                    accounts_to_follow=args.accounts_to_follow,
+                    poll_interval=poll_interval,
+                ),
             )
-            scraper = functools.partial(data_scraper.x.scrape, context)
+            should_raise = poll_interval is not None
         case DataOrigin.TELEGRAM:
-            raise NotImplementedError
+            parser.add_argument(
+                "--group-names",
+                "-n",
+                nargs="+",
+                help="List of telegram groups to search",
+            )
+            parser.add_argument(
+                "--history-depth",
+                "-h",
+                required=True,
+                help="Amount of existing messages to process on the start",
+            )
+            parser.add_argument(
+                "--process-new", "-p", action=argparse.BooleanOptionalAction
+            )
+            args = parser.parse_args()
+            scraper = functools.partial(
+                data_scraper.telegram.scrape,
+                TelegramScraperContext(
+                    group_names=args.group_names,
+                    history_depth=args.history_depth,
+                    process_new=args.process_new,
+                ),
+            )
+            should_raise = args.process_new is not None
         case DataOrigin.GITHUB:
             raise NotImplementedError
         case _:
@@ -90,8 +119,11 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
         for future in futures:
             try:
                 future.result()
-            except data_scraper.x.XScraperStopped:
-                if poll_interval is not None:
+            except (
+                data_scraper.x.XScraperStopped,
+                data_scraper.telegram.TelegramScraperStopped,
+            ):
+                if should_raise:
                     raise
 
     sink.shutdown()
