@@ -11,7 +11,8 @@ dependencies = [
     "telethon",
     "tenacity>=9.0.0",
     "langchain-openai",
-    "langchain_core"
+    "langchain_core",
+    "langgraph>=0.3.18",
 ]
 
 [dependency-groups]
