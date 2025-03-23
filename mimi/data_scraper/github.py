@@ -43,9 +43,11 @@ def scrape(
         log.info("Creating repository base path")
         context.repository_base_path.mkdir(parents=True)
 
-    log.info("Starting syncing %s github repositories", len(context.repositories_to_follow))
+    log.info(
+        "Starting syncing %s github repositories", len(context.repositories_to_follow)
+    )
     with _set_directory(context.repository_base_path):
-        for repository in repositories_to_follow:
+        for repository in context.repositories_to_follow:
             _scrape_git_repository(sink, repository)
 
     # This is required for the context injection
