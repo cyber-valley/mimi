@@ -43,8 +43,10 @@ def scrape(
         log.info("Creating repository base path")
         context.repository_base_path.mkdir(parents=True)
 
+    log.info("Starting syncing %s github repositories", len(context.repositories_to_follow))
     with _set_directory(context.repository_base_path):
-        _sync_github_repositories(sink, context.repositories_to_follow)
+        for repository in repositories_to_follow:
+            _scrape_git_repository(sink, repository)
 
     # This is required for the context injection
     # to the handler
@@ -62,15 +64,6 @@ def scrape(
     log.info("Starting github webhook server on %s:%s", context.host, context.port)
     httpd.serve_forever()
     raise GithubScraperStopped
-
-
-def _sync_github_repositories(
-    sink: DataSink[DataScraperMessage],
-    repositories_to_follow: Collection[GitRepository],
-) -> None:
-    log.info("Starting syncing %s github repositories", len(repositories_to_follow))
-    for repository in repositories_to_follow:
-        _scrape_git_repository(sink, repository)
 
 
 def _scrape_git_repository(
