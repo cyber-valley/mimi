@@ -1,17 +1,20 @@
 import asyncio
-import functools
 import logging
+from collections.abc import AsyncIterator, Collection
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import NoReturn
 
-from telethon import Client, events
+from result import Err, Ok, Result
+from telethon import Client
+from telethon.events import Event, NewMessage
+from telethon.types import Message
 
 from mimi import DataOrigin, DataSink
 
 from . import DataScraperMessage
 
 log = logging.getLogger(__name__)
-TelegramMessage = functools.partial(DataScraperMessage, origin=DataOrigin.TELEGRAM)
 
 
 class TelegramScraperStopped(Exception):  # noqa: N818
@@ -25,28 +28,89 @@ class TelegramScraperContext:
     api_hash: str
     bot_api_token: str
     group_names: set[str]
+    history_depth: int
+    process_new: bool
 
 
 def scrape(
     context: TelegramScraperContext, sink: DataSink[DataScraperMessage]
 ) -> NoReturn:
-    asyncio.run(_start_client(context, sink))
+    asyncio.run(_scrape(context, sink))
 
 
-async def _start_client(
+async def _scrape(
     context: TelegramScraperContext, sink: DataSink[DataScraperMessage]
 ) -> NoReturn:
+    log.info("Starting Telegram scraper")
     client = Client(context.client_name, context.api_id, context.api_hash)
     await client.interactive_login(context.bot_api_token)
 
-    @client.on(events.NewMessage)
-    async def handle_new_message(event: events.NewMessage) -> None:
-        chat = await event.get_chat()
-        if chat.name not in context.group_names:
-            return
-        log.info(event)
+    log.info("Downloading history")
+    update_counter = 0
+    async for message in _download_updates(
+        client, context.group_names, context.history_depth
+    ):
+        sink.put(message)
+        update_counter += 1
 
-    client.start()
-    client.run_until_disconnected()
+    log.info("Downloaded %s updates", update_counter)
+
+    if context.process_new:
+        log.info("Starting Telegram new messages listening")
+        await _process_updates(client, sink, context.group_names)
 
     raise TelegramScraperStopped
+
+
+async def _download_updates(
+    client: Client, group_names: Collection[str], depth: int
+) -> AsyncIterator[DataScraperMessage]:
+    async for dialog in client.get_dialogs():
+        if dialog.chat.name not in group_names:
+            continue
+        log.info("Processing %s chat with depth %s", dialog.chat.name, depth)
+        async for message in client.get_messages(dialog.chat, limit=depth):
+            match _convert_to_internal_message(message):
+                case Ok(msg):
+                    yield msg
+                case Err(text):
+                    log.warning(text)
+
+
+async def _process_updates(
+    client: Client, sink: DataSink[DataScraperMessage], group_names: Collection[str]
+) -> NoReturn:
+    @client.on(NewMessage)
+    async def _(event: Event) -> None:
+        assert isinstance(event, NewMessage)
+        if event.chat.name not in group_names:
+            return
+
+        log.info("Got new message from %s: %s", event.chat.name, event)
+
+        match _convert_to_internal_message(event):
+            case Ok(msg):
+                sink.put(msg)
+            case Err(text):
+                log.warning(text)
+
+    await client.run_until_disconnected()
+
+    raise TelegramScraperStopped
+
+
+def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage, str]:
+    if not message.text:
+        return Err("Empty message text")
+
+    if not message.date:
+        return Err("Empty message date")
+
+    return Ok(
+        DataScraperMessage(
+            data=message.text,
+            origin=DataOrigin.TELEGRAM,
+            pub_date=message.date,
+            scraped_at=datetime.now(UTC),
+        )
+    )
