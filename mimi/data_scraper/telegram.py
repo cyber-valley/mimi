@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator, Collection
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -26,10 +27,12 @@ class TelegramScraperContext:
     group_names: set[str]
     history_depth: int
     process_new: bool
-    client_name: str = field(default_factory=lambda: environ["TELEGRAM_CLIENT_NAME"])
-    api_id: int = field(default_factory=lambda: int(environ["TELEGRAM_API_ID"]))
-    api_hash: str = field(default_factory=lambda: environ["TELEGRAM_API_HASH"])
-    bot_api_token: str = field(default_factory=lambda: environ["TELEGRAM_BOT_API_TOKEN"])
+    client_name: str = field(default_factory=lambda: os.environ["TELEGRAM_CLIENT_NAME"])
+    api_id: int = field(default_factory=lambda: int(os.environ["TELEGRAM_API_ID"]))
+    api_hash: str = field(default_factory=lambda: os.environ["TELEGRAM_API_HASH"])
+    bot_api_token: str = field(
+        default_factory=lambda: os.environ["TELEGRAM_BOT_API_TOKEN"]
+    )
 
 
 def scrape(
