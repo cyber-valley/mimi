@@ -10,6 +10,8 @@ dependencies = [
     "rss-parser>=2.1.0",
     "telethon",
     "tenacity>=9.0.0",
+    "langchain-openai",
+    "langchain_core"
 ]
 
 [dependency-groups]
