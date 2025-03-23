@@ -81,6 +81,10 @@ def run_embedding_pipeline(
             # TODO: Store sha256 hash of `DataScraperMessage.identifier` (introduced in c6ca26e@main)
             # To make it working addition field should be added to the table
             # We don't want to use metadata because it's difficult to query it
+            # TODO: Because of the previous todo it'll be better to create single
+            # `.sql` script for the whole migrations i.e. copy and modify
+            # `CREATE TABLE` query from `SQLiteVec` realisation and
+            # implement own `create_tables_if_not_exists` in this module
             # FIXME: It's better to store datetimes as UNIX timestampt
             # without floating point part
             vectorstore.add_texts(
