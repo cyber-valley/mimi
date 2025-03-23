@@ -111,7 +111,7 @@ untyped_calls_exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["telethon.*"]
+module = ["telethon.*", "langchain.core.*"]
 follow_untyped_imports = true
 
 [tool.uv.sources]
