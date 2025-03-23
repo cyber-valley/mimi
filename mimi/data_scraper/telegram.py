@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Collection
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import NoReturn
 
@@ -23,13 +23,13 @@ class TelegramScraperStopped(Exception):  # noqa: N818
 
 @dataclass
 class TelegramScraperContext:
-    client_name: str
-    api_id: int
-    api_hash: str
-    bot_api_token: str
     group_names: set[str]
     history_depth: int
     process_new: bool
+    client_name: str = field(default_factory=lambda: environ["TELEGRAM_CLIENT_NAME"])
+    api_id: int = field(default_factory=lambda: int(environ["TELEGRAM_API_ID"]))
+    api_hash: str = field(default_factory=lambda: environ["TELEGRAM_API_HASH"])
+    bot_api_token: str = field(default_factory=lambda: environ["TELEGRAM_BOT_API_TOKEN"])
 
 
 def scrape(
