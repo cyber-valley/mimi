@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 
 def get_chat_model() -> BaseChatModel:
     return ChatOpenAI(
-        api_key=os.environ["OPENROUTER_API_KEY"],
+        api_key=os.environ["OPENROUTER_API_KEY"],  # type: ignore[arg-type]
         base_url=os.environ["OPENROUTER_BASE_URL"],
         model=os.environ["OPENROUTER_MODEL"],
     )
