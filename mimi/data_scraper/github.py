@@ -88,16 +88,20 @@ def _scrape_git_repository(
                     "diff", "--name-only", "--diff-filter=AM", "HEAD@{1}", "HEAD"
                 )
             ]
-            _scrape_files(sink, pulled_files)
+            _scrape_files(sink, repository, pulled_files)
     else:
         with _set_directory(repository_owner_path):
             _git("clone", f"https://github.com/{repository.owner}/{repository.name}")
             repository_files = [Path(file) for file in _git("ls-files")]
             with _set_directory(repository_path):
-                _scrape_files(sink, repository_files)
+                _scrape_files(sink, repository, repository_files)
 
 
-def _scrape_files(sink: DataSink[DataScraperMessage], files: Collection[Path]) -> None:
+def _scrape_files(
+    sink: DataSink[DataScraperMessage],
+    repository: GitRepository,
+    files: Collection[Path],
+) -> None:
     for file in files:
         if not file.exists():
             log.error("Profived file %s not found", file)
@@ -105,6 +109,7 @@ def _scrape_files(sink: DataSink[DataScraperMessage], files: Collection[Path]) -
         sink.put(
             DataScraperMessage(
                 data=file.read_text(),
+                identifier=f"{repository.owner}/{repository.name}@{file}",
                 origin=DataOrigin.GITHUB,
                 scraped_at=datetime.now(UTC),
                 pub_date=_get_last_commit_date(file),
@@ -155,7 +160,7 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
             case "push":
                 log.info("Received push event. Payload=%s", payload)
                 repository = GitRepository(*payload["full_name"].split("/"))
-                if repository not in self._content.repositories_to_follow:
+                if repository not in self._context.repositories_to_follow:
                     log.warning(
                         "Got push event for the unfollowed repository %s", repository
                     )
