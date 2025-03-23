@@ -42,7 +42,6 @@ def scrape(
         log.info("Creating repository base path")
         context.repository_base_path.mkdir(parents=True)
 
-    log.info("Syncying git repositories")
     with _set_directory(context.repository_base_path):
         _sync_github_repositories(context.repositories_to_follow)
 
@@ -63,6 +62,7 @@ def scrape(
 def _sync_github_repositories(
     repositories_to_follow: Collection[GithubRepository],
 ) -> None:
+    log.info("Starting syncing %s github repositories", len(repositories_to_follow))
     for repository in repositories_to_follow:
         repository_owner_path = Path(repository.owner)
         repository_owner_path.mkdir(exist_ok=True)
