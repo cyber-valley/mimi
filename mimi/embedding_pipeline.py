@@ -40,6 +40,7 @@ def create_vectorstore(context: EmbeddingPipelineContext) -> SQLiteVec:
     # XXX: Why do we need `check_same_thread`
     # Looks like given connection will be used only in one thread
     # FIXME: Needless cast to `str`, `pathlib.Path` implements `os.PathLike`
+    # FIXME: Use `SQLiteVec.create_connection` instead
     conn = sqlite3.connect(str(context.db_path), check_same_thread=False)
 
     # FIXME: Remove `message_` prefix in the table's name
@@ -77,8 +78,9 @@ def run_embedding_pipeline(
 
         # FIXME: Remove general use try expect, retry on the function will handle
         try:
-            # TODO: Store sha256 hash in metadata as well so it'll be possible to update
-            # existing values
+            # TODO: Store sha256 hash of `DataScraperMessage.identifier` (introduced in c6ca26e@main)
+            # To make it working addition field should be added to the table
+            # We don't want to use metadata because it's difficult to query it
             # FIXME: It's better to store datetimes as UNIX timestampt
             # without floating point part
             vectorstore.add_texts(
