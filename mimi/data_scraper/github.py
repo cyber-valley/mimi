@@ -169,7 +169,7 @@ def _git(*args: str) -> list[str]:
         text=True,
         capture_output=True,
     )
-    log.info("[git pull] finished")
+    log.info("Command [git %s] finished", " ".join(args))
     return result.stdout.strip().split("\n")
 
 
