@@ -147,13 +147,6 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
             payload = json.loads(post_data.decode("utf-8"))
         except json.JSONDecodeError:
             self.send_response(400)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(
-                json.dumps(
-                    {"status": "Error", "message": "Invalid JSON payload"}
-                ).encode("utf-8")
-            )
             return
 
         match self.headers.get("X-GitHub-Event"):
