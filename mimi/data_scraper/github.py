@@ -48,7 +48,7 @@ def scrape(
 
     # This is required for the context injection
     # to the handler
-    class GithubWebhookHandler(BaseGithubWebhookHandler):
+    class GithubWebhookHandler(_BaseGithubWebhookHandler):
         @property
         def _context(self) -> GithubScraperContext:
             return context
@@ -109,7 +109,7 @@ def _get_last_commit_date(path: Path) -> datetime:
     return datetime.fromisoformat(iso_date)
 
 
-class BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
+class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
     @property
     @abstractmethod
     def _context(self) -> GithubScraperContext: ...
