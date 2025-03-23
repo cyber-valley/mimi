@@ -7,10 +7,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import NoReturn
 
-from mimi import DataSink
+from mimi import DataOrigin, DataSink
 
 from . import DataScraperMessage
 
@@ -36,14 +37,14 @@ class GithubScraperContext:
 
 
 def scrape(
-    context: GithubScraperContext, _sink: DataSink[DataScraperMessage]
+    context: GithubScraperContext, sink: DataSink[DataScraperMessage]
 ) -> NoReturn:
     if not context.repository_base_path.exists():
         log.info("Creating repository base path")
         context.repository_base_path.mkdir(parents=True)
 
     with _set_directory(context.repository_base_path):
-        _sync_github_repositories(context.repositories_to_follow)
+        _sync_github_repositories(sink, context.repositories_to_follow)
 
     # This is required for the context injection
     # to the handler
@@ -60,6 +61,7 @@ def scrape(
 
 
 def _sync_github_repositories(
+    sink: DataSink[DataScraperMessage],
     repositories_to_follow: Collection[GithubRepository],
 ) -> None:
     log.info("Starting syncing %s github repositories", len(repositories_to_follow))
@@ -69,18 +71,42 @@ def _sync_github_repositories(
         repository_path = repository_owner_path / repository.name
         if repository_path.exists():
             with _set_directory(repository_path):
-                _git_pull()
-                # TODO: Sync only pulled files
-                _sync_project_files()
+                _git("pull")
+                pulled_files = [
+                    Path(file)
+                    for file in _git(
+                        "diff", "--name-only", "--diff-filter=AM", "HEAD@{1}", "HEAD"
+                    )
+                ]
+                _sync_files(sink, pulled_files)
         else:
             with _set_directory(repository_owner_path):
-                _git_clone(f"https://github.com/{repository.owner}/{repository.name}")
+                _git(
+                    "clone", f"https://github.com/{repository.owner}/{repository.name}"
+                )
+                repository_files = [Path(file) for file in _git("ls-files")]
                 with _set_directory(repository_path):
-                    _sync_project_files()
+                    _sync_files(sink, repository_files)
 
 
-def _sync_project_files() -> None:
-    pass
+def _sync_files(sink: DataSink[DataScraperMessage], files: Collection[Path]) -> None:
+    for file in files:
+        if not file.exists():
+            log.error("Profived file %s not found", file)
+            continue
+        sink.put(
+            DataScraperMessage(
+                data=file.read_text(),
+                origin=DataOrigin.GITHUB,
+                scraped_at=datetime.now(UTC),
+                pub_date=_get_last_commit_date(file),
+            )
+        )
+
+
+def _get_last_commit_date(path: Path) -> datetime:
+    iso_date, *_ = _git("log", "-n", "1", "--format=%ad", "--date=iso", str(path))
+    return datetime.fromisoformat(iso_date)
 
 
 class BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
@@ -136,18 +162,15 @@ class BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
         self.wfile.write(json.dumps({"status": "OK"}).encode("utf-8"))
 
 
-def _git_clone(url: str) -> None:
-    subprocess.run(["/usr/bin/git", "clone", url], check=True, capture_output=False)  # noqa: S603
-    log.info("[git clone %s] finished")
-
-
-def _git_pull() -> None:
-    subprocess.run(  # noqa: S603
-        ["/usr/bin/git", "pull"],
+def _git(*args: str) -> list[str]:
+    result = subprocess.run(  # noqa: S603
+        ["/usr/bin/git", *args],
         check=True,
+        text=True,
         capture_output=True,
     )
     log.info("[git pull] finished")
+    return result.stdout.strip().split("\n")
 
 
 @contextmanager
