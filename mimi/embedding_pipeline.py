@@ -3,7 +3,7 @@ import logging
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC
 from enum import Enum, auto
 from typing import NoReturn, assert_never
 
@@ -30,7 +30,7 @@ class EmbeddingPipelineContext:
 
 
 @tenacity.retry(
-    retry=tenacity.retry_if_exception_type(_should_not_be_raised),
+    retry=tenacity.retry_if_not_exception_type(sqlite3.OperationalError),
     wait=tenacity.wait_exponential(multiplier=1, max=10),
 )
 def run_embedding_pipeline(
@@ -67,7 +67,9 @@ def run_embedding_pipeline(
 
         rowids = _find_rowids(identifier_hash, connection)
         if rowids:
-            _delete_embeddings(embedding_table_name, rowids, identifier_hash, connection)
+            _delete_embeddings(
+                embedding_table_name, rowids, identifier_hash, connection
+            )
             log.info("Deleted %s embeddings", len(rowids))
 
         rowids = vectorstore.add_texts(
@@ -76,10 +78,6 @@ def run_embedding_pipeline(
         )
         _save_identifier_to_rowid(rowids, identifier_hash, connection)
         log.debug("Saved %s embeddings", len(rowids))
-
-
-def _should_not_be_raised(exception: Exception) -> bool:
-    return not isinstance(exception, sqlite3.OperationalError)
 
 
 def _find_rowids(identifier_hash: bytes, connection: sqlite3.Connection) -> list[str]:
