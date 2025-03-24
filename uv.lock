@@ -555,6 +555,7 @@ dependencies = [
     { name = "langchain-community" },
     { name = "langchain-core" },
     { name = "langchain-openai" },
+    { name = "langchain-text-splitters" },
     { name = "langgraph" },
     { name = "requests" },
     { name = "result" },
@@ -575,15 +576,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "langchain" },
-    { name = "langchain-community" },
-    { name = "langchain-core" },
-    { name = "langchain-openai" },
+    { name = "langchain", specifier = ">=0.3.21" },
+    { name = "langchain-community", specifier = ">=0.3.20" },
+    { name = "langchain-core", specifier = ">=0.3.47" },
+    { name = "langchain-openai", specifier = ">=0.3.9" },
+    { name = "langchain-text-splitters", specifier = ">=0.3.7" },
     { name = "langgraph", specifier = ">=0.3.18" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "result", git = "https://github.com/montasaurus/result" },
     { name = "rss-parser", specifier = ">=2.1.0" },
-    { name = "sqlite-vec" },
+    { name = "sqlite-vec", specifier = ">=0.1.6" },
     { name = "telethon", url = "https://github.com/LonamiWebs/Telethon/archive/v2.zip", subdirectory = "client" },
     { name = "tenacity", specifier = ">=9.0.0" },
 ]
