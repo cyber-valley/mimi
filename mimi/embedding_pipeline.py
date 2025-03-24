@@ -2,7 +2,7 @@ import hashlib
 import logging
 import sqlite3
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum, auto
 from typing import NoReturn, assert_never
@@ -27,13 +27,10 @@ class EmbeddingPipelineContext:
     db_file: str
     embedding_type: EmbeddingType
     embedding_model_name: str
-    vector_dimension: int = field(default=1536)
-    delta_threshold: float = field(default=1.0)
 
 
-# TODO @inspektorkek handle embedding chunk size
 @tenacity.retry(
-    retry=tenacity.retry_if_exception_type(sqlite3.OperationalError),
+    retry=tenacity.retry_if_exception_type(_should_not_be_raised),
     wait=tenacity.wait_exponential(multiplier=1, max=10),
 )
 def run_embedding_pipeline(
@@ -43,7 +40,6 @@ def run_embedding_pipeline(
     Listens to updates from the `sink` and for each:
     - Saves raw data into the database
     - Calculates and saves embedding
-    - Checks delta between now and `scraped_at` to track late delivery
     """
     embedding_table_name: str = "embedding"
 
@@ -58,7 +54,6 @@ def run_embedding_pipeline(
     _create_tables_if_not_exists(connection)
     vectorstore = SQLiteVec(embedding_table_name, connection, embeddings)
 
-    processed_count = 0
     while True:
         message = sink.get()
         metadata = {
@@ -72,39 +67,19 @@ def run_embedding_pipeline(
 
         rowids = _find_rowids(identifier_hash, connection)
         if rowids:
-            _delete_embedding(embedding_table_name, rowids, identifier_hash, connection)
-            log.debug("Deleted embedding for message")
+            _delete_embeddings(embedding_table_name, rowids, identifier_hash, connection)
+            log.info("Deleted %s embeddings", len(rowids))
 
         rowids = vectorstore.add_texts(
             texts=splits,
             metadatas=[metadata for _ in splits],
         )
         _save_identifier_to_rowid(rowids, identifier_hash, connection)
-        log.debug("Saved embedding for message")
+        log.debug("Saved %s embeddings", len(rowids))
 
-        now = datetime.now(UTC)
-        delay = (now - message.scraped_at).total_seconds()
-        log.debug("Message delivered with %.2fs delay", delay)
 
-        if message.scraped_at < message.pub_date:
-            log.error(
-                "Scraped time (%.2fs) is earlier than publication time (%.2fs)!",
-                message.scraped_at.timestamp(),
-                message.pub_date.timestamp(),
-            )
-
-        log.error(
-            "Delay %.2fs is less than threshold %.2fs!", delay, context.delta_threshold
-        ) if delay < context.delta_threshold else None
-
-        processed_count += 1
-        if processed_count % 100 == 0:
-            log.info(
-                "Processed %d messages. Last message delivered with %.2fs delay",
-                processed_count,
-                delay,
-            )
-            processed_count = 0
+def _should_not_be_raised(exception: Exception) -> bool:
+    return not isinstance(exception, sqlite3.OperationalError)
 
 
 def _find_rowids(identifier_hash: bytes, connection: sqlite3.Connection) -> list[str]:
@@ -112,15 +87,15 @@ def _find_rowids(identifier_hash: bytes, connection: sqlite3.Connection) -> list
         row["rowid"]
         for row in connection.execute(
             """
-        SELECT rowid FROM identifier_to_rowid
-        WHERE hash = ?
-        """,
+            SELECT rowid FROM identifier_to_rowid
+            WHERE hash = ?
+            """,
             (identifier_hash,),
         )
     ]
 
 
-def _delete_embedding(
+def _delete_embeddings(
     table_name: str,
     rowids: Iterable[str],
     identifier_hash: bytes,
@@ -128,19 +103,18 @@ def _delete_embedding(
 ) -> None:
     connection.executemany(
         f"""
-            DELETE FROM {table_name}
-            WHERE rowid = ?;
+        DELETE FROM {table_name}
+        WHERE rowid = ?
         """,  # noqa: S608
         ((rowid,) for rowid in rowids),
     )
     connection.executemany(
         """
-            DELETE FROM identifier_to_rowid
-            WHERE hash = ?;
+        DELETE FROM identifier_to_rowid
+        WHERE hash = ?
         """,
         (identifier_hash,),
     )
-
     connection.commit()
 
 
@@ -162,7 +136,6 @@ def _create_tables_if_not_exists(connection: sqlite3.Connection) -> None:
             rowid INTEGER,
             hash BLOB PRIMARY KEY
         )
-        ;
         """
     )
     connection.commit()
