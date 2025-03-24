@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
@@ -8,6 +9,8 @@ import tenacity
 from tenacity import retry
 
 from mimi import DataOrigin, DataSink
+
+log = logging.getLogger(__name__)
 
 
 class ScraperStoppedError(Exception):
@@ -31,5 +34,9 @@ def run_scrapers(
     sink: DataSink[DataScraperMessage],
     scrapers: Iterable[DataScraper],
 ) -> list[Future[NoReturn]]:
-    wrap_retry = retry(wait=tenacity.wait_exponential(multiplier=1, max=10))
+    wrap_retry = retry(
+        before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
+        after=tenacity.after_log(log, logging.INFO),
+        wait=tenacity.wait_exponential(multiplier=1, max=10),
+    )
     return [executor.submit(wrap_retry(scraper), sink) for scraper in scrapers]
