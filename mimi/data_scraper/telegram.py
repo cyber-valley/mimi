@@ -8,6 +8,7 @@ from typing import NoReturn
 
 from result import Err, Ok, Result
 from telethon import Client
+import telethon._impl.tl as tl
 from telethon.events import Event, NewMessage
 from telethon.types import Message
 
@@ -81,7 +82,7 @@ async def _download_updates(
             )
             continue
         log.info(
-            "Processing %s chat with type %s with depth %s",
+            "Processing %s chat with type %s and depth %s",
             dialog.chat.name,
             type(dialog.chat),
             depth,
@@ -91,8 +92,15 @@ async def _download_updates(
                 case Ok(msg):
                     yield msg
                 case Err(text):
+                    t = await client(tl.functions.channels.get_forum_topics_by_id(
+                        channel=dialog.chat,
+                        topics=[message.replied_message_id]
+                    ))
+                    log.info("Got response %s", t.stringify())
                     log.warning(
-                        "Failed to parse message with %s. %s", text, type(message)
+                        "Failed to parse message with %s and reply_to %s",
+                        text,
+                        message.replied_message_id,
                     )
 
 
