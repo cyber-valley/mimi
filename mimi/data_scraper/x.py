@@ -91,7 +91,9 @@ def _parse_user_tweets(data: dict[str, Any]) -> Iterable[DataScraperMessage]:
             log.exception("Failed to parse publication date")
             return
 
-        yield XMessage(data=text, scraped_at=datetime.now(UTC), pub_date=pub_date)
+        yield XMessage(
+            data=text, identifier=text, scraped_at=datetime.now(UTC), pub_date=pub_date
+        )
 
 
 @tenacity.retry(
@@ -112,5 +114,8 @@ def _parse_rss_feed(url: str) -> Iterable[DataScraperMessage]:
             log.exception("Failed to parse publication date %s", item.pub_date)
             continue
         yield XMessage(
-            data=item.title.content, scraped_at=datetime.now(UTC), pub_date=pub_date
+            data=item.title.content,
+            identifier=item.title.content,
+            scraped_at=datetime.now(UTC),
+            pub_date=pub_date,
         )

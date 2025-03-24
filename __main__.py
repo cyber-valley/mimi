@@ -108,7 +108,39 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             )
             should_raise = args.process_new is not None
         case DataOrigin.GITHUB:
-            raise NotImplementedError
+            parser.add_argument(
+                "--port",
+                "-p",
+                type=int,
+                default=8000,
+                help="Port for the webhook server to listen on.",
+            )
+            parser.add_argument(
+                "--repository-base-path",
+                "-b",
+                type=Path,
+                required=True,
+                help="Base path for storing the repositories.",
+            )
+            parser.add_argument(
+                "--repositories-to-follow",
+                "-r",
+                nargs="+",
+                required=True,
+                help="List of GitHub repositories to follow (owner/repo).",
+            )
+            args = parser.parse_args()
+            scraper = functools.partial(
+                data_scraper.github.scrape,
+                data_scraper.github.GithubScraperContext(
+                    port=args.port,
+                    repository_base_path=args.repository_base_path,
+                    repositories_to_follow={
+                        data_scraper.github.GitRepository(*repo.split("/"))
+                        for repo in args.repositories_to_follow
+                    },
+                ),
+            )
         case _:
             assert_never(args.data_origin)
 

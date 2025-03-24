@@ -112,6 +112,7 @@ def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage,
     return Ok(
         DataScraperMessage(
             data=message.text,
+            identifier=f"{message.chat.id}:{message.id}",
             origin=DataOrigin.TELEGRAM,
             pub_date=message.date,
             scraped_at=datetime.now(UTC),
