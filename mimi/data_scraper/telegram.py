@@ -24,15 +24,20 @@ class TelegramScraperStopped(Exception):  # noqa: N818
 
 @dataclass
 class TelegramScraperContext:
-    group_names: set[str]
+    group_ids: set[int]
     history_depth: int
     process_new: bool
     client_name: str = field(default_factory=lambda: os.environ["TELEGRAM_CLIENT_NAME"])
     api_id: int = field(default_factory=lambda: int(os.environ["TELEGRAM_API_ID"]))
     api_hash: str = field(default_factory=lambda: os.environ["TELEGRAM_API_HASH"])
-    bot_api_token: str = field(
-        default_factory=lambda: os.environ["TELEGRAM_BOT_API_TOKEN"]
-    )
+
+    # We don't want to expose private data
+    # or mess with special logging formatter
+    def __repr__(self) -> str:
+        return object.__repr__(self)
+
+    def __post_init__(self) -> None:
+        assert self.group_ids, "Group ids shouldn't be empty."
 
 
 def scrape(
@@ -46,12 +51,13 @@ async def _scrape(
 ) -> NoReturn:
     log.info("Starting Telegram scraper")
     client = Client(context.client_name, context.api_id, context.api_hash)
-    await client.interactive_login(context.bot_api_token)
+    await client.connect()
+    await client.interactive_login()
 
     log.info("Downloading history")
     update_counter = 0
     async for message in _download_updates(
-        client, context.group_names, context.history_depth
+        client, context.group_ids, context.history_depth
     ):
         sink.put(message)
         update_counter += 1
@@ -60,33 +66,43 @@ async def _scrape(
 
     if context.process_new:
         log.info("Starting Telegram new messages listening")
-        await _process_updates(client, sink, context.group_names)
+        await _process_updates(client, sink, context.group_ids)
 
     raise TelegramScraperStopped
 
 
 async def _download_updates(
-    client: Client, group_names: Collection[str], depth: int
+    client: Client, group_ids: Collection[int], depth: int
 ) -> AsyncIterator[DataScraperMessage]:
     async for dialog in client.get_dialogs():
-        if dialog.chat.name not in group_names:
+        if dialog.chat.id not in group_ids:
+            log.debug(
+                "Got unconfigured chat %s with id %s", dialog.chat.name, dialog.chat.id
+            )
             continue
-        log.info("Processing %s chat with depth %s", dialog.chat.name, depth)
+        log.info(
+            "Processing %s chat with type %s with depth %s",
+            dialog.chat.name,
+            type(dialog.chat),
+            depth,
+        )
         async for message in client.get_messages(dialog.chat, limit=depth):
             match _convert_to_internal_message(message):
                 case Ok(msg):
                     yield msg
                 case Err(text):
-                    log.warning(text)
+                    log.warning(
+                        "Failed to parse message with %s. %s", text, type(message)
+                    )
 
 
 async def _process_updates(
-    client: Client, sink: DataSink[DataScraperMessage], group_names: Collection[str]
+    client: Client, sink: DataSink[DataScraperMessage], group_ids: Collection[int]
 ) -> NoReturn:
     @client.on(NewMessage)
     async def _(event: Event) -> None:
         assert isinstance(event, NewMessage)
-        if event.chat.name not in group_names:
+        if event.chat.id not in group_ids:
             return
 
         log.info("Got new message from %s: %s", event.chat.name, event)
