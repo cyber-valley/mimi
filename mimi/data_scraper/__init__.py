@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import NoReturn
 
+import tenacity
+from tenacity import retry
+
 from mimi import DataOrigin, DataSink
 
 
@@ -28,4 +31,8 @@ def run_scrapers(
     sink: DataSink[DataScraperMessage],
     scrapers: Iterable[DataScraper],
 ) -> list[Future[NoReturn]]:
-    return [executor.submit(scraper, sink) for scraper in scrapers]
+    wrap_retry = retry(wait=tenacity.wait_exponential(multiplier=1, max=10))
+    return [
+        executor.submit(wrap_retry(scraper), sink)
+        for scraper in scrapers
+    ]
