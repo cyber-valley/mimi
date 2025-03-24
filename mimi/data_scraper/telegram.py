@@ -7,8 +7,9 @@ from datetime import UTC, datetime
 from typing import NoReturn
 
 from result import Err, Ok, Result
-from telethon import Client
-import telethon._impl.tl as tl
+from telethon import Client, types
+from telethon._impl import tl
+from telethon._impl.session import ChannelRef
 from telethon.events import Event, NewMessage
 from telethon.types import Message
 
@@ -88,22 +89,34 @@ async def _download_updates(
             dialog.chat.id,
             depth,
         )
-        log.info("Is megagroup %s", dialog.chat.is_megagroup)
-        async for message in client.get_messages(dialog.chat, limit=depth):
-            match _convert_to_internal_message(message):
-                case Ok(msg):
-                    yield msg
-                case Err(text):
-                    t = await client(tl.functions.channels.get_forum_topics_by_id(
-                        channel=dialog.chat.ref._to_input_channel(),
-                        topics=[message.replied_message_id]
-                    ))
-                    log.info("Got response %s", t.stringify())
-                    log.warning(
-                        "Failed to parse message %s with %s and reply_to %s",
-                        text,
-                        message.replied_message_id,
-                    )
+        if isinstance(dialog.chat, types.Group) and dialog.chat.is_megagroup:
+            # XXX: There is no limit for the forum topics amount
+            # so I assume that 100 will be enough
+            messages = await client.get_messages(dialog.chat, limit=100)
+            channel_ref = dialog.chat.ref
+            assert isinstance(channel_ref, ChannelRef)
+            forum_topics = await client(
+                tl.functions.channels.get_forum_topics_by_id(
+                    channel=channel_ref._to_input_channel(),  # noqa: SLF001
+                    topics=[
+                        message.replied_message_id
+                        for message in messages
+                        if message.replied_message_id is not None
+                    ],
+                )
+            )
+            log.info("Got response %s", forum_topics)
+        else:
+            async for message in client.get_messages(dialog.chat, limit=depth):
+                match _convert_to_internal_message(message):
+                    case Ok(msg):
+                        yield msg
+                    case Err(text):
+                        log.warning(
+                            "Failed to parse message %s with text %s",
+                            message.id,
+                            text,
+                        )
 
 
 async def _process_updates(
