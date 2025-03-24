@@ -85,15 +85,14 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             should_raise = poll_interval is not None
         case DataOrigin.TELEGRAM:
             parser.add_argument(
-                "--group-names",
-                "-n",
+                "--group-ids",
+                "-g",
                 nargs="+",
                 help="List of telegram groups to search.",
             )
             parser.add_argument(
                 "--history-depth",
-                "-h",
-                required=True,
+                default=200,
                 help="Amount of existing messages to process on the start.",
             )
             parser.add_argument(
@@ -106,7 +105,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             scraper = functools.partial(
                 data_scraper.telegram.scrape,
                 TelegramScraperContext(
-                    group_names=args.group_names,
+                    group_ids=set(map(int, args.group_ids)),
                     history_depth=args.history_depth,
                     process_new=args.process_new,
                 ),
