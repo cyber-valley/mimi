@@ -1,3 +1,4 @@
+import os
 import argparse
 import functools
 import logging
@@ -14,7 +15,7 @@ from mimi.data_scraper.github import GithubScraperContext
 from mimi.data_scraper.telegram import TelegramScraperContext
 from mimi.data_scraper.x import XScraperContext
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.INFO))
 log = logging.getLogger(__name__)
 
 
@@ -130,18 +131,23 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                 required=True,
                 help="List of GitHub repositories to follow (owner/repo).",
             )
+            parser.add_argument(
+                "--run-server", default=False, help="Listen to GitHub webhooks."
+            )
             args = parser.parse_args()
             scraper = functools.partial(
                 data_scraper.github.scrape,
                 GithubScraperContext(
                     port=args.port,
+                    run_server=args.run_server,
                     repository_base_path=args.repository_base_path,
                     repositories_to_follow={
                         data_scraper.github.GitRepository(*repo.split("/"))
                         for repo in args.repositories_to_follow
-                    },
+                    }
                 ),
             )
+            should_raise = args.run_server
         case _:
             assert_never(args.data_origin)
 
@@ -155,6 +161,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             except (
                 data_scraper.x.XScraperStopped,
                 data_scraper.telegram.TelegramScraperStopped,
+                data_scraper.github.GithubScraperStopped,
             ):
                 if should_raise:
                     raise

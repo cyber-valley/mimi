@@ -35,6 +35,7 @@ class GithubScraperContext:
     port: int
     repository_base_path: Path
     repositories_to_follow: set[GitRepository]
+    run_server: bool
     host: str = field(default="localhost")
 
 
@@ -51,6 +52,9 @@ def scrape(
     with _set_directory(context.repository_base_path):
         for repository in context.repositories_to_follow:
             _scrape_git_repository(sink, repository)
+
+    if not context.run_server:
+        raise GithubScraperStopped
 
     # This is required for the context injection
     # to the handler
@@ -114,7 +118,9 @@ def _scrape_files(
                 )
             )
         except UnicodeDecodeError:
-            log.exception("Failed to read text of %s in %s", file, repository)
+            log.error("Failed to read text of %s in %s", file, repository)
+        except IsADirectoryError:
+            log.error("Got directory %s instead of file in %s", file, repository)
 
 
 def _get_last_commit_date(path: Path) -> datetime:
@@ -189,7 +195,7 @@ def _git(*args: str) -> Result[list[str], int]:
     except subprocess.CalledProcessError as e:
         return Err(e.returncode)
 
-    log.info("Command [%s] finished", " ".join(command))
+    log.debug("Command [%s] finished", " ".join(command))
     return Ok(result.stdout.strip().split("\n"))
 
 
