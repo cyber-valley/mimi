@@ -1,14 +1,16 @@
 import hashlib
 import logging
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum, auto
 from typing import NoReturn, assert_never
 
 import tenacity
-from langchain_community.vectorstores.sqlitevec import SQLiteVec, serialize_f32
+from langchain_community.vectorstores.sqlitevec import SQLiteVec
 from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .data_scraper import DataScraperMessage
 from .data_sink import DataSink
@@ -51,45 +53,34 @@ def run_embedding_pipeline(
         case _:
             assert_never(context.embedding_type)
 
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     connection = SQLiteVec.create_connection(db_file=context.db_file)
-    _create_tables_if_not_exists(connection=connection)
-    vectorstore = SQLiteVec(
-        table=embedding_table_name, connection=connection, embedding=embeddings
-    )
+    _create_tables_if_not_exists(connection)
+    vectorstore = SQLiteVec(embedding_table_name, connection, embeddings)
 
     processed_count = 0
     while True:
         message = sink.get()
-        identifier_hash = hashlib.sha256(message.data.encode()).digest()
+        metadata = {
+            "origin": message.origin,
+            "scraped_at": int(message.scraped_at.replace(tzinfo=UTC).timestamp()),
+            "pub_date": int(message.pub_date.replace(tzinfo=UTC).timestamp()),
+        }
+        splits = text_splitter.split_text(message.data)
+        identifier_hash = hashlib.sha256(message.identifier.encode()).digest()
         log.debug("Processing message from %s", message.origin)
 
-        rowid = _find_rowid(identifier_hash=identifier_hash, connection=connection)
-        if rowid is None:
-            rowid, *_ = vectorstore.add_texts(
-                texts=[message.data],
-                metadatas=[
-                    {
-                        "origin": message.origin,
-                        "scraped_at": int(
-                            message.scraped_at.replace(tzinfo=UTC).timestamp()
-                        ),
-                        "pub_date": int(
-                            message.pub_date.replace(tzinfo=UTC).timestamp()
-                        ),
-                    }
-                ],
-            )
-            _save_identifier_to_rowid(
-                rowid=rowid, identifier_hash=identifier_hash, connection=connection
-            )
+        rowids = _find_rowids(identifier_hash, connection)
+        if rowids:
+            _delete_embedding(embedding_table_name, rowids, identifier_hash, connection)
+            log.debug("Deleted embedding for message")
 
-            log.debug("Saved embedding for message")
-        else:
-            text_embedding = embeddings.embed_documents([message.data])
-            assert len(text_embedding) == 1, f"{len(text_embedding)=}"
-            _update_embedding(
-                embedding_table_name, rowid, message.data, text_embedding[0], connection
-            )
+        rowids = vectorstore.add_texts(
+            texts=splits,
+            metadatas=[metadata for _ in splits],
+        )
+        _save_identifier_to_rowid(rowids, identifier_hash, connection)
+        log.debug("Saved embedding for message")
 
         now = datetime.now(UTC)
         delay = (now - message.scraped_at).total_seconds()
@@ -116,44 +107,49 @@ def run_embedding_pipeline(
             processed_count = 0
 
 
-def _find_rowid(identifier_hash: bytes, connection: sqlite3.Connection) -> str | None:
-    row = connection.execute(
-        """
+def _find_rowids(identifier_hash: bytes, connection: sqlite3.Connection) -> list[str]:
+    return [
+        row["rowid"]
+        for row in connection.execute(
+            """
         SELECT rowid FROM identifier_to_rowid
         WHERE hash = ?
         """,
-        (identifier_hash,),
-    ).fetchone()
-
-    if row is None:
-        return None
-
-    return str(row[0])
+            (identifier_hash,),
+        )
+    ]
 
 
-def _update_embedding(
+def _delete_embedding(
     table_name: str,
-    rowid: str,
-    text: str,
-    text_embedding: list[float],
+    rowids: Iterable[str],
+    identifier_hash: bytes,
     connection: sqlite3.Connection,
 ) -> None:
-    connection.execute(
+    connection.executemany(
         f"""
-            UPDATE {table_name} SET text = ?, text_embedding = ?
-            WHERE rowid = ?
-        """,
-        (text, serialize_f32(text_embedding), rowid),
+            DELETE FROM {table_name}
+            WHERE rowid = ?;
+        """,  # noqa: S608
+        ((rowid,) for rowid in rowids),
     )
+    connection.executemany(
+        """
+            DELETE FROM identifier_to_rowid
+            WHERE hash = ?;
+        """,
+        (identifier_hash,),
+    )
+
     connection.commit()
 
 
 def _save_identifier_to_rowid(
-    rowid: str, identifier_hash: bytes, connection: sqlite3.Connection
+    rowids: Iterable[str], identifier_hash: bytes, connection: sqlite3.Connection
 ) -> None:
-    connection.execute(
+    connection.executemany(
         "INSERT INTO identifier_to_rowid(rowid, hash) VALUES (?,?)",
-        (rowid, identifier_hash),
+        ((rowid, identifier_hash) for rowid in rowids),
     )
     connection.commit()
 
