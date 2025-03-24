@@ -82,23 +82,25 @@ async def _download_updates(
             )
             continue
         log.info(
-            "Processing %s chat with type %s and depth %s",
+            "Processing %s chat with type %s, id %s and depth %s",
             dialog.chat.name,
             type(dialog.chat),
+            dialog.chat.id,
             depth,
         )
+        log.info("Is megagroup %s", dialog.chat.is_megagroup)
         async for message in client.get_messages(dialog.chat, limit=depth):
             match _convert_to_internal_message(message):
                 case Ok(msg):
                     yield msg
                 case Err(text):
                     t = await client(tl.functions.channels.get_forum_topics_by_id(
-                        channel=dialog.chat,
+                        channel=dialog.chat.ref._to_input_channel(),
                         topics=[message.replied_message_id]
                     ))
                     log.info("Got response %s", t.stringify())
                     log.warning(
-                        "Failed to parse message with %s and reply_to %s",
+                        "Failed to parse message %s with %s and reply_to %s",
                         text,
                         message.replied_message_id,
                     )
