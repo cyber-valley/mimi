@@ -1,7 +1,7 @@
-import os
 import argparse
 import functools
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from enum import StrEnum, auto
@@ -144,7 +144,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                     repositories_to_follow={
                         data_scraper.github.GitRepository(*repo.split("/"))
                         for repo in args.repositories_to_follow
-                    }
+                    },
                 ),
             )
             should_raise = args.run_server

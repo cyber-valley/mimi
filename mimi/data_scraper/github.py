@@ -108,19 +108,27 @@ def _scrape_files(
             log.error("Profived file %s not found", file)
             continue
         try:
-            sink.put(
-                DataScraperMessage(
-                    data=file.read_text(),
-                    identifier=f"{repository.owner}/{repository.name}@{file}",
-                    origin=DataOrigin.GITHUB,
-                    scraped_at=datetime.now(UTC),
-                    pub_date=_get_last_commit_date(file),
-                )
-            )
+            data = file.read_text()
         except UnicodeDecodeError:
-            log.error("Failed to read text of %s in %s", file, repository)
+            log.warning("Failed to read text of %s in %s", file, repository)
+            continue
         except IsADirectoryError:
-            log.error("Got directory %s instead of file in %s", file, repository)
+            log.warning(
+                "Got directory %s instead of file in %s",
+                file,
+                repository,
+            )
+            continue
+
+        sink.put(
+            DataScraperMessage(
+                data=data,
+                identifier=f"{repository.owner}/{repository.name}@{file}",
+                origin=DataOrigin.GITHUB,
+                scraped_at=datetime.now(UTC),
+                pub_date=_get_last_commit_date(file),
+            )
+        )
 
 
 def _get_last_commit_date(path: Path) -> datetime:
