@@ -32,7 +32,4 @@ def run_scrapers(
     scrapers: Iterable[DataScraper],
 ) -> list[Future[NoReturn]]:
     wrap_retry = retry(wait=tenacity.wait_exponential(multiplier=1, max=10))
-    return [
-        executor.submit(wrap_retry(scraper), sink)
-        for scraper in scrapers
-    ]
+    return [executor.submit(wrap_retry(scraper), sink) for scraper in scrapers]
