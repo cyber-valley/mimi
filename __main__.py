@@ -10,10 +10,11 @@ from typing import assert_never
 
 from mimi import DataOrigin, data_scraper
 from mimi.data_scraper import DataScraperMessage
+from mimi.data_scraper.github import GithubScraperContext
 from mimi.data_scraper.telegram import TelegramScraperContext
 from mimi.data_scraper.x import XScraperContext
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 
@@ -132,7 +133,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             args = parser.parse_args()
             scraper = functools.partial(
                 data_scraper.github.scrape,
-                data_scraper.github.GithubScraperContext(
+                GithubScraperContext(
                     port=args.port,
                     repository_base_path=args.repository_base_path,
                     repositories_to_follow={
