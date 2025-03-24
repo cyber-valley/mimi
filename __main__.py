@@ -88,16 +88,17 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                 "--group-names",
                 "-n",
                 nargs="+",
-                help="List of telegram groups to search",
+                help="List of telegram groups to search.",
             )
             parser.add_argument(
                 "--history-depth",
                 "-h",
                 required=True,
-                help="Amount of existing messages to process on the start",
+                help="Amount of existing messages to process on the start.",
             )
             parser.add_argument(
-                "--process-new", "-p", action=argparse.BooleanOptionalAction
+                "--process-new", "-p", action=argparse.BooleanOptionalAction,
+                help="Listen to the new messages."
             )
             args = parser.parse_args()
             scraper = functools.partial(
@@ -132,7 +133,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                 help="List of GitHub repositories to follow (owner/repo).",
             )
             parser.add_argument(
-                "--run-server", default=False, help="Listen to GitHub webhooks."
+                "--run-server", action=argparse.BooleanOptionalAction, help="Listen to GitHub webhooks."
             )
             args = parser.parse_args()
             scraper = functools.partial(
