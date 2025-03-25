@@ -2,7 +2,8 @@ import hashlib
 import inspect
 import logging
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC
 from enum import Enum, auto
@@ -55,14 +56,15 @@ def run_embedding_pipeline(
             assert_never(context.embedding_type)
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-
-    connection = _create_connection(db_file=context.db_file)
-    _create_tables_if_not_exists(connection)
+    connection = _create_connection(db_file=context.db_file, autocommit=False)
     vectorstore = SQLiteVec(
         embedding_table_name,
         _create_connection_proxy(connection, _TranscationlessConnectionProxy),
         embeddings,
     )
+    with _transaction(connection):
+        _create_tables_if_not_exists(connection)
+        vectorstore.create_table_if_not_exists()
 
     while True:
         message = sink.get()
@@ -133,15 +135,18 @@ def _process_message(
     log.debug("Processing message from %s", message.origin)
 
     rowids = _find_rowids(identifier_hash, connection)
-    if rowids:
-        _delete_embeddings(embedding_table_name, rowids, identifier_hash, connection)
-        log.info("Deleted %s embeddings", len(rowids))
+    with _transaction(connection):
+        if rowids:
+            _delete_embeddings(
+                embedding_table_name, rowids, identifier_hash, connection
+            )
+            log.info("Deleted %s embeddings", len(rowids))
 
-    rowids = vectorstore.add_texts(
-        texts=splits,
-        metadatas=[metadata for _ in splits],
-    )
-    _save_identifier_to_rowid(rowids, identifier_hash, connection)
+        rowids = vectorstore.add_texts(
+            texts=splits,
+            metadatas=[metadata for _ in splits],
+        )
+        _save_identifier_to_rowid(rowids, identifier_hash, connection)
     log.debug("Saved %s embeddings", len(rowids))
 
 
@@ -178,7 +183,6 @@ def _delete_embeddings(
         """,
         (identifier_hash,),
     )
-    connection.commit()
 
 
 def _save_identifier_to_rowid(
@@ -188,7 +192,6 @@ def _save_identifier_to_rowid(
         "INSERT INTO identifier_to_rowid(rowid, hash) VALUES (?,?)",
         ((rowid, identifier_hash) for rowid in rowids),
     )
-    connection.commit()
 
 
 def _create_tables_if_not_exists(connection: sqlite3.Connection) -> None:
@@ -201,4 +204,13 @@ def _create_tables_if_not_exists(connection: sqlite3.Connection) -> None:
         )
         """
     )
-    connection.commit()
+
+
+@contextmanager
+def _transaction(connection: sqlite3.Connection) -> Iterator[None]:
+    try:
+        yield
+        connection.commit()
+    except Exception:
+        log.exception("Transaction failed")
+        connection.rollback()
