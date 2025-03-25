@@ -8,9 +8,10 @@ from enum import Enum, auto
 from typing import NoReturn, assert_never
 
 import tenacity
+from langchain_community.vectorstores import VectorStore
 from langchain_community.vectorstores.sqlitevec import SQLiteVec
 from langchain_openai import OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter, TextSplitter
 
 from .data_scraper import DataScraperMessage
 from .data_sink import DataSink
@@ -56,28 +57,42 @@ def run_embedding_pipeline(
 
     while True:
         message = sink.get()
-        metadata = {
-            "origin": message.origin,
-            "scraped_at": int(message.scraped_at.replace(tzinfo=UTC).timestamp()),
-            "pub_date": int(message.pub_date.replace(tzinfo=UTC).timestamp()),
-        }
-        splits = text_splitter.split_text(message.data)
-        identifier_hash = hashlib.sha256(message.identifier.encode()).digest()
-        log.debug("Processing message from %s", message.origin)
-
-        rowids = _find_rowids(identifier_hash, connection)
-        if rowids:
-            _delete_embeddings(
-                embedding_table_name, rowids, identifier_hash, connection
-            )
-            log.info("Deleted %s embeddings", len(rowids))
-
-        rowids = vectorstore.add_texts(
-            texts=splits,
-            metadatas=[metadata for _ in splits],
+        _process_message(
+            text_splitter, connection, vectorstore, embedding_table_name, message
         )
-        _save_identifier_to_rowid(rowids, identifier_hash, connection)
-        log.debug("Saved %s embeddings", len(rowids))
+
+
+@tenacity.retry(
+    wait=tenacity.wait_exponential(multiplier=1, max=10),
+    stop=tenacity.stop_after_attempt(3),
+)
+def _process_message(
+    text_splitter: TextSplitter,
+    connection: sqlite3.Connection,
+    vectorstore: VectorStore,
+    embedding_table_name: str,
+    message: DataScraperMessage,
+) -> None:
+    metadata = {
+        "origin": message.origin,
+        "scraped_at": int(message.scraped_at.replace(tzinfo=UTC).timestamp()),
+        "pub_date": int(message.pub_date.replace(tzinfo=UTC).timestamp()),
+    }
+    splits = text_splitter.split_text(message.data)
+    identifier_hash = hashlib.sha256(message.identifier.encode()).digest()
+    log.debug("Processing message from %s", message.origin)
+
+    rowids = _find_rowids(identifier_hash, connection)
+    if rowids:
+        _delete_embeddings(embedding_table_name, rowids, identifier_hash, connection)
+        log.info("Deleted %s embeddings", len(rowids))
+
+    rowids = vectorstore.add_texts(
+        texts=splits,
+        metadatas=[metadata for _ in splits],
+    )
+    _save_identifier_to_rowid(rowids, identifier_hash, connection)
+    log.debug("Saved %s embeddings", len(rowids))
 
 
 def _find_rowids(identifier_hash: bytes, connection: sqlite3.Connection) -> list[str]:
