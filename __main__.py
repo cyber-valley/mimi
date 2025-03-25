@@ -12,7 +12,7 @@ from typing import assert_never
 from mimi import DataOrigin, data_scraper
 from mimi.data_scraper import DataScraperMessage
 from mimi.data_scraper.github import GithubScraperContext
-from mimi.data_scraper.telegram import TelegramScraperContext
+from mimi.data_scraper.telegram import TelegramScraperContext, PeersConfig
 from mimi.data_scraper.x import XScraperContext
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.INFO))
@@ -85,10 +85,16 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             should_raise = poll_interval is not None
         case DataOrigin.TELEGRAM:
             parser.add_argument(
-                "--group-ids",
+                "--groups-ids",
                 "-g",
                 nargs="+",
                 help="List of telegram groups to search.",
+            )
+            parser.add_argument(
+                "--forums-ids",
+                "-f",
+                nargs="+",
+                help="List of telegram forums to search.",
             )
             parser.add_argument(
                 "--history-depth",
@@ -105,7 +111,10 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             scraper = functools.partial(
                 data_scraper.telegram.scrape,
                 TelegramScraperContext(
-                    group_ids=set(map(int, args.group_ids)),
+                    peers_config=PeersConfig(
+                        groups_ids=set(map(int, args.groups_ids or [])),
+                        forums_ids=set(map(int, args.forums_ids or []))
+                    ),
                     history_depth=args.history_depth,
                     process_new=args.process_new,
                 ),
@@ -158,7 +167,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
     sink: Queue[DataScraperMessage] = Queue()
 
     with ThreadPoolExecutor() as pool:
-        futures = data_scraper.run_scrapers(pool, sink, [scraper])
+        futures = data_scraper.run_scrapers(pool, sink, [scraper], enable_retry=False)
         for future in futures:
             try:
                 future.result()

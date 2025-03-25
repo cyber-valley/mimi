@@ -33,10 +33,12 @@ def run_scrapers(
     executor: ThreadPoolExecutor,
     sink: DataSink[DataScraperMessage],
     scrapers: Iterable[DataScraper],
+    *,
+    enable_retry: bool = True
 ) -> list[Future[NoReturn]]:
     wrap_retry = retry(
         before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
         after=tenacity.after_log(log, logging.INFO),
         wait=tenacity.wait_exponential(multiplier=1, max=10),
     )
-    return [executor.submit(wrap_retry(scraper), sink) for scraper in scrapers]
+    return [executor.submit(wrap_retry(scraper) if enable_retry else scraper, sink) for scraper in scrapers]
