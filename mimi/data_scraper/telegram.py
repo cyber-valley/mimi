@@ -3,7 +3,7 @@ import logging
 import os
 from collections.abc import AsyncIterator, Collection
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn, assert_never, cast
 
 from result import Err, Ok, Result
@@ -62,10 +62,8 @@ async def _scrape(
     log.info("Starting Telegram scraper")
 
     client = TelegramClient(context.client_name, context.api_id, context.api_hash)
+    await client.start()
     await client.connect()
-
-    if not await client.is_user_authorized():
-        client.start()
 
     log.info("Downloading history")
     update_counter = 0
@@ -87,9 +85,10 @@ async def _scrape(
 async def _scrape_updates(
     client: TelegramClient, config: PeersConfig, depth: int
 ) -> AsyncIterator[DataScraperMessage]:
+    delay = timedelta(seconds=1)
     for stream in (
-        _scrape_groups(client, config.groups_ids, depth),
-        _scrape_forums(client, config.forums_ids, depth),
+        _scrape_groups(client, config.groups_ids, depth, delay),
+        _scrape_forums(client, config.forums_ids, depth, delay),
     ):
         async for message in stream:
             match _convert_to_internal_message(message):
@@ -105,17 +104,18 @@ async def _scrape_updates(
 
 
 async def _scrape_groups(
-    client: TelegramClient, ids: Collection[int], depth: int
+    client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
 ) -> AsyncIterator[Message]:
     for idx, group_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape group %s", idx + 1, len(ids), group_id)
         input_peer_group = await client.get_input_entity(PeerChat(group_id))
         async for message in client.iter_messages(input_peer_group, limit=depth):
             yield message
+        await asyncio.sleep(delay.total_seconds())
 
 
 async def _scrape_forums(
-    client: TelegramClient, ids: Collection[int], depth: int
+    client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
 ) -> AsyncIterator[Message]:
     for idx, forum_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape forum %s", idx + 1, len(ids), forum_id)
@@ -137,6 +137,7 @@ async def _scrape_forums(
         )
 
         for topic in topics_result.topics:
+            log.info("Starting scraping topic %s", topic.title)
             async for message in client.iter_messages(
                 input_peer_channel,
                 limit=depth,
@@ -144,6 +145,7 @@ async def _scrape_forums(
             ):
                 yield message
 
+        await asyncio.sleep(delay.total_seconds())
 
 async def _process_updates(
     client: TelegramClient,
@@ -159,6 +161,7 @@ async def _process_updates(
 
         match _convert_to_internal_message(event):
             case Ok(msg):
+                log.debug("Message sended to the sink")
                 sink.put(msg)
             case Err(text):
                 log.warning(text)
@@ -169,6 +172,7 @@ async def _process_updates(
 
 
 def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage, str]:
+    log.debug(message)
     if not message.message:
         return Err("Empty message text")
 
