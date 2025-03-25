@@ -8,8 +8,8 @@ from typing import NoReturn
 
 from result import Err, Ok, Result
 from telethon import Client, types
-from telethon._impl import tl
-from telethon._impl.session import ChannelRef
+from telethon._impl import tl, client
+from telethon._impl.session import ChannelRef, GroupRef
 from telethon.events import Event, NewMessage
 from telethon.types import Message
 
@@ -76,47 +76,32 @@ async def _scrape(
 async def _download_updates(
     client: Client, group_ids: Collection[int], depth: int
 ) -> AsyncIterator[DataScraperMessage]:
-    async for dialog in client.get_dialogs():
-        if dialog.chat.id not in group_ids:
-            log.debug(
-                "Got unconfigured chat %s with id %s", dialog.chat.name, dialog.chat.id
-            )
-            continue
-        log.info(
-            "Processing %s chat with type %s, id %s and depth %s",
-            dialog.chat.name,
-            type(dialog.chat),
-            dialog.chat.id,
-            depth,
-        )
-        if isinstance(dialog.chat, types.Group) and dialog.chat.is_megagroup:
-            # XXX: There is no limit for the forum topics amount
-            # so I assume that 100 will be enough
-            messages = await client.get_messages(dialog.chat, limit=100)
-            channel_ref = dialog.chat.ref
-            assert isinstance(channel_ref, ChannelRef)
-            forum_topics = await client(
-                tl.functions.channels.get_forum_topics_by_id(
-                    channel=channel_ref._to_input_channel(),  # noqa: SLF001
-                    topics=[
-                        message.replied_message_id
-                        for message in messages
-                        if message.replied_message_id is not None
-                    ],
+    for id in group_ids:
+        log.info("Starting to scrape group %s", id)
+        peer, *_ = await client.resolve_peers([ChannelRef(id)])
+        log.info("Resolved peer %s", peer)
+        forum_topics = await client(
+                tl.functions.channels.get_forum_topics(
+                    channel=peer.ref._to_input_channel(),  # noqa: SLF001
+                    q="",
+                    offset_date=0,
+                    offset_id=0,
+                    offset_topic=0,
+                    limit=100
                 )
             )
-            log.info("Got response %s", forum_topics)
-        else:
-            async for message in client.get_messages(dialog.chat, limit=depth):
-                match _convert_to_internal_message(message):
-                    case Ok(msg):
-                        yield msg
-                    case Err(text):
-                        log.warning(
-                            "Failed to parse message %s with text %s",
-                            message.id,
-                            text,
-                        )
+        log.info("Got response %s", forum_topics)
+
+        async for message in client.get_messages(dialog.chat, limit=depth):
+            match _convert_to_internal_message(message):
+                case Ok(msg):
+                    yield msg
+                case Err(text):
+                    log.warning(
+                        "Failed to parse message %s with text %s",
+                        message.id,
+                        text,
+                    )
 
 
 async def _process_updates(
