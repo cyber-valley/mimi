@@ -98,7 +98,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
             )
             parser.add_argument(
                 "--history-depth",
-                default=200,
+                default=5,
                 help="Amount of existing messages to process on the start.",
             )
             parser.add_argument(
