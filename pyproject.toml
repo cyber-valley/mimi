@@ -17,6 +17,7 @@ dependencies = [
     "langchain-core>=0.3.47",
     "langchain>=0.3.21",
     "sqlite-vec>=0.1.6",
+    "pytelegrambotapi>=4.26.0",
 ]
 
 [dependency-groups]
