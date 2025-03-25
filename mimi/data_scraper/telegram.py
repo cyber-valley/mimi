@@ -1,19 +1,17 @@
-import pprint
-import inspect
 import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator, Collection
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import NoReturn, assert_never
+from typing import Any, NoReturn, assert_never, cast
 
 from result import Err, Ok, Result
-from telethon import Client
-from telethon._impl import tl
-from telethon._impl.session import ChannelRef, GroupRef
-from telethon.events import Event, NewMessage
-from telethon.types import Message
+from telethon import TelegramClient
+from telethon.events.newmessage import NewMessage
+from telethon.tl.functions.channels import GetForumTopicsRequest
+from telethon.tl.types import PeerChannel, PeerChat, PeerUser
+from telethon.types import InputChannel, InputPeerChannel, Message
 
 from mimi import DataOrigin, DataSink
 
@@ -62,9 +60,12 @@ async def _scrape(
     context: TelegramScraperContext, sink: DataSink[DataScraperMessage]
 ) -> NoReturn:
     log.info("Starting Telegram scraper")
-    client = Client(context.client_name, context.api_id, context.api_hash)
+
+    client = TelegramClient(context.client_name, context.api_id, context.api_hash)
     await client.connect()
-    await client.interactive_login()
+
+    if not await client.is_user_authorized():
+        client.start()
 
     log.info("Downloading history")
     update_counter = 0
@@ -84,7 +85,7 @@ async def _scrape(
 
 
 async def _scrape_updates(
-    client: Client, config: PeersConfig, depth: int
+    client: TelegramClient, config: PeersConfig, depth: int
 ) -> AsyncIterator[DataScraperMessage]:
     for stream in (
         _scrape_groups(client, config.groups_ids, depth),
@@ -100,104 +101,57 @@ async def _scrape_updates(
                         message.id,
                         text,
                     )
+            await asyncio.sleep(1)
 
 
 async def _scrape_groups(
-    client: Client, ids: Collection[int], depth: int
+    client: TelegramClient, ids: Collection[int], depth: int
 ) -> AsyncIterator[Message]:
     for idx, group_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape group %s", idx + 1, len(ids), group_id)
-        # Because they have own abscrations it's tricky to handle error on each message
-        try:
-            async for message in client.get_messages(GroupRef(group_id), limit=depth):
-                yield message
-        # RPC Errors generated in runtime, so any exception should be
-        # catched and examined
-        except Exception as e:
-            if getattr(e, "_code", -1) == 400:
-                log.exception("Failed to get group's messages")
-                continue
-            raise
+        input_peer_group = await client.get_input_entity(PeerChat(group_id))
+        async for message in client.iter_messages(input_peer_group, limit=depth):
+            yield message
 
 
 async def _scrape_forums(
-    client: Client, ids: Collection[int], depth: int
+    client: TelegramClient, ids: Collection[int], depth: int
 ) -> AsyncIterator[Message]:
     for idx, forum_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape forum %s", idx + 1, len(ids), forum_id)
 
-        match await client.resolve_peers([ChannelRef(forum_id)]):
-            case [peer] if isinstance(peer.ref, ChannelRef):
-                try:
-                    forum_topics = await client(
-                        tl.functions.channels.get_forum_topics(
-                            channel=peer.ref._to_input_channel(),  # noqa: SLF001
-                            q="",
-                            offset_date=0,
-                            offset_id=0,
-                            offset_topic=0,
-                            limit=100,
-                        )
-                    )
-                # RPC Errors generated in runtime, so any exception should be
-                # catched and examined
-                except Exception as e:
-                    if getattr(e, "_code", -1) == 400:
-                        log.exception("Failed to get forum topics with")
-                        continue
-                    raise
-            case other:
-                log.error("Got unexcpected peers %s", other)
-                continue
+        input_peer_channel = await client.get_input_entity(PeerChannel(forum_id))
+        assert isinstance(input_peer_channel, InputPeerChannel), (
+            f"Got unexpected peer type f{input_peer_channel}"
+        )
 
-        assert hasattr(forum_topics, "count")
-        assert hasattr(forum_topics, "topics")
-        if forum_topics.count > len(forum_topics.topics):
-            log.warning(
-                "Not all topics were loaded (%s/%s).",
-                len(forum_topics.topics),
-                forum_topics.count,
+        topics_result = await client(
+            GetForumTopicsRequest(
+                channel=cast(InputChannel, input_peer_channel),
+                offset_date=None,
+                offset_id=0,
+                offset_topic=0,
+                limit=100,
+                q=None,
             )
+        )
 
-        for chat in forum_topics.chats:
-            log.info("Got chat %s from topics", chat.id)
-
-        for message, topic in zip(forum_topics.messages, forum_topics.topics):
-            log.info("Got topic %s and peer_id %s / %s", topic.title, message.peer_id, peer.ref)
-            try:
-                messages_response = await client(
-                    tl.functions.messages.get_replies(
-                        peer=peer.ref._to_input_channel(),
-                        msg_id=topic.id,
-                        offset_id=0,
-                        offset_date=0,
-                        add_offset=0,
-                        limit=depth,
-                        max_id=0,
-                        min_id=0,
-                        hash=0
-                    )
-                )
-            # RPC Errors generated in runtime, so any exception should be
-            # catched and examined
-            except Exception as e:
-                if getattr(e, "_code", -1) == 400:
-                    log.exception("Failed to get topic messages with")
-                    continue
-                raise
-
-            assert hasattr(messages_response, "messages")
-            log.info("Got %s message from topic", len(messages_response.messages))
-            for message in messages_response.messages:
+        for topic in topics_result.topics:
+            async for message in client.iter_messages(
+                input_peer_channel,
+                limit=depth,
+                reply_to=topic.id,
+            ):
                 yield message
 
 
 async def _process_updates(
-    client: Client, sink: DataSink[DataScraperMessage], peers_config: PeersConfig
+    client: TelegramClient,
+    sink: DataSink[DataScraperMessage],
+    peers_config: PeersConfig,
 ) -> NoReturn:
-    @client.on(NewMessage)
-    async def _(event: Event) -> None:
-        assert isinstance(event, NewMessage)
+    @client.on(NewMessage)  # type: ignore
+    async def _(event: Any) -> None:
         if event.chat.id not in peers_config.all_ids:
             return
 
@@ -214,23 +168,29 @@ async def _process_updates(
     raise TelegramScraperStopped
 
 
-def _convert_to_internal_message(message: Message | tl.types.MessageEmpty) -> Result[DataScraperMessage, str]:
-    match message:
-        case tl.types.MessageEmpty():
-            return Err("Empty message")
-        case Message(text) if not text:
-            return Err("Empty message text")
-        case Message(date) if not date:
-            return Err("Empty message date")
-        case Message(text):
-          return Ok(
-              DataScraperMessage(
-                  data=message.text,
-                  identifier=f"{message.chat.id}:{message.id}",
-                  origin=DataOrigin.TELEGRAM,
-                  pub_date=message.date,
-                  scraped_at=datetime.now(UTC),
-              )
-          )
-        case _:
-            assert_nerver(message)
+def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage, str]:
+    if not message.message:
+        return Err("Empty message text")
+
+    if not message.date:
+        return Err("Empty message date")
+
+    peer_id: int
+    if isinstance(message.peer_id, PeerUser):
+        peer_id = message.peer_id.user_id
+    elif isinstance(message.peer_id, PeerChat):
+        peer_id = message.peer_id.chat_id
+    elif isinstance(message.peer_id, PeerChannel):
+        peer_id = message.peer_id.channel_id
+    else:
+        assert_never(message.peer_id)
+
+    return Ok(
+        DataScraperMessage(
+            data=message.message,
+            identifier=f"{peer_id}:{message.id}",
+            origin=DataOrigin.TELEGRAM,
+            pub_date=message.date,
+            scraped_at=datetime.now(UTC),
+        )
+    )
