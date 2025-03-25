@@ -56,7 +56,7 @@ def run_embedding_pipeline(
             assert_never(context.embedding_type)
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    connection = _create_connection(db_file=context.db_file, autocommit=False)
+    connection = _create_connection(db_file=context.db_file)
     vectorstore = SQLiteVec(
         embedding_table_name,
         _create_connection_proxy(connection, _TranscationlessConnectionProxy),
@@ -74,7 +74,7 @@ def run_embedding_pipeline(
 
 
 def _create_connection(db_file: PathLike[str]) -> sqlite3.Connection:
-    connection = sqlite3.connect(db_file)
+    connection = sqlite3.connect(db_file, autocommit=False)
     connection.row_factory = sqlite3.Row
     connection.enable_load_extension(True)  # noqa: FBT003
     sqlite_vec.load(connection)
