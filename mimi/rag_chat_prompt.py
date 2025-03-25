@@ -1,6 +1,6 @@
 import functools
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Final
 
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseChatModel
@@ -11,7 +11,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from .data_scraper import DataScraperMessage
 
-template = """
+_TEMPLATE: Final = """
 You are Mimi The President of Cyber Valley, an assistant for question-answering tasks.
 Use the following pieces of context to answer the question at the end.
 If you don't know the answer,
@@ -27,17 +27,17 @@ Answer:"""
 @dataclass
 class State:
     question: str
-    context: list[DataScraperMessage]
+    context: list[str]
     answer: str
 
 
 def setup_graph(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateGraph:
     graph_builder = StateGraph(State)
     graph_builder.add_node(
-        "retrieve", functools.partial(_retrieve, vector_store=vector_store)
+        _retrieve.__name__, functools.partial(_retrieve, vector_store=vector_store)
     )
-    graph_builder.add_node("generate", functools.partial(_generate, llm=llm))
-    graph_builder.add_edge(START, "retrieve")
+    graph_builder.add_node(_generate.__name__, functools.partial(_generate, llm=llm, template=_TEMPLATE))
+    graph_builder.add_edge(START, _retrieve.__name__)
     return graph_builder.compile()
 
 
@@ -56,7 +56,7 @@ def _retrieve(
 
 
 def _generate(
-    state: State, llm: BaseChatModel
+    state: State, llm: BaseChatModel, template: str
 ) -> dict[Literal["answer"], str | list[Any]]:
     prompt = PromptTemplate.from_template(template)
     messages = prompt.invoke({"question": state.question, "context": state.context})
