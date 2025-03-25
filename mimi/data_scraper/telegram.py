@@ -7,11 +7,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn, assert_never, cast
 
 from result import Err, Ok, Result
-from telethon import TelegramClient
-from telethon.events.newmessage import NewMessage
-from telethon.tl.functions.channels import GetForumTopicsRequest
-from telethon.tl.types import PeerChannel, PeerChat, PeerUser
-from telethon.types import InputChannel, InputPeerChannel, Message
+from telethon import Client, types
+from telethon._impl import tl, client
+from telethon._impl.session import ChannelRef, GroupRef
+from telethon.events import Event, NewMessage
+from telethon.types import Message
 
 from mimi import DataOrigin, DataSink
 
@@ -85,15 +85,25 @@ async def _scrape(
 async def _scrape_updates(
     client: TelegramClient, config: PeersConfig, depth: int
 ) -> AsyncIterator[DataScraperMessage]:
-    delay = timedelta(milliseconds=100)
-    for stream in (
-        _scrape_groups(client, config.groups_ids, depth, delay),
-        _scrape_forums(client, config.forums_ids, depth, delay),
-    ):
-        async for message in stream:
+    for id in group_ids:
+        log.info("Starting to scrape group %s", id)
+        peer, *_ = await client.resolve_peers([ChannelRef(id)])
+        log.info("Resolved peer %s", peer)
+        forum_topics = await client(
+                tl.functions.channels.get_forum_topics(
+                    channel=peer.ref._to_input_channel(),  # noqa: SLF001
+                    q="",
+                    offset_date=0,
+                    offset_id=0,
+                    offset_topic=0,
+                    limit=100
+                )
+            )
+        log.info("Got response %s", forum_topics)
+
+        async for message in client.get_messages(dialog.chat, limit=depth):
             match _convert_to_internal_message(message):
                 case Ok(msg):
-                    log.debug("Successfully parsed message with %s symbols", len(msg.data))
                     yield msg
                 case Err(text):
                     log.warning(
@@ -101,51 +111,6 @@ async def _scrape_updates(
                         message.id,
                         text,
                     )
-
-
-async def _scrape_groups(
-    client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
-) -> AsyncIterator[Message]:
-    for idx, group_id in enumerate(ids):
-        log.info("[%s/%s]: Starting to scrape group %s", idx + 1, len(ids), group_id)
-        input_peer_group = await client.get_input_entity(PeerChat(group_id))
-        async for message in client.iter_messages(input_peer_group, limit=depth):
-            yield message
-        await asyncio.sleep(delay.total_seconds())
-
-
-async def _scrape_forums(
-    client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
-) -> AsyncIterator[Message]:
-    for idx, forum_id in enumerate(ids):
-        log.info("[%s/%s]: Starting to scrape forum %s", idx + 1, len(ids), forum_id)
-
-        input_peer_channel = await client.get_input_entity(PeerChannel(forum_id))
-        assert isinstance(input_peer_channel, InputPeerChannel), (
-            f"Got unexpected peer type f{input_peer_channel}"
-        )
-
-        topics_result = await client(
-            GetForumTopicsRequest(
-                channel=cast(InputChannel, input_peer_channel),
-                offset_date=None,
-                offset_id=0,
-                offset_topic=0,
-                limit=100,
-                q=None,
-            )
-        )
-
-        for topic in topics_result.topics:
-            log.info("Starting scraping topic %s", topic.title)
-            async for message in client.iter_messages(
-                input_peer_channel,
-                limit=depth,
-                reply_to=topic.id,
-            ):
-                yield message
-
-        await asyncio.sleep(delay.total_seconds())
 
 
 async def _process_updates(
