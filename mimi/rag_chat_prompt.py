@@ -38,7 +38,6 @@ def setup_graph(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateG
     )
     graph_builder.add_node("generate", functools.partial(_generate, llm=llm))
     graph_builder.add_edge(START, "retrieve")
-    graph_builder.add_edge("retrieve", "generate")
     return graph_builder.compile()
 
 
