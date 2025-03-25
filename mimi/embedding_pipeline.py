@@ -65,6 +65,9 @@ def run_embedding_pipeline(
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=1, max=10),
     stop=tenacity.stop_after_attempt(3),
+    before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
+    after=tenacity.after_log(log, logging.INFO),
+    retry_error_callback=lambda _: None,
 )
 def _process_message(
     text_splitter: TextSplitter,
