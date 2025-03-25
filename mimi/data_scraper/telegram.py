@@ -62,7 +62,7 @@ async def _scrape(
     log.info("Starting Telegram scraper")
 
     client = TelegramClient(context.client_name, context.api_id, context.api_hash)
-    await client.start()
+    await client.start()  # type: ignore
     await client.connect()
 
     log.info("Downloading history")
@@ -146,6 +146,7 @@ async def _scrape_forums(
                 yield message
 
         await asyncio.sleep(delay.total_seconds())
+
 
 async def _process_updates(
     client: TelegramClient,

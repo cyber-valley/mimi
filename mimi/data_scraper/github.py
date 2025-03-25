@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NoReturn
 
+import requests
 from result import Err, Ok, Result
 
 from mimi import DataOrigin, DataSink
@@ -53,6 +54,10 @@ def scrape(
         for repository in context.repositories_to_follow:
             _scrape_git_repository(sink, repository)
 
+    log.info("Starting downloading issues")
+    for repository in context.repositories_to_follow:
+        _scrape_issues(sink, repository)
+
     if not context.run_server:
         raise GithubScraperStopped
 
@@ -72,6 +77,41 @@ def scrape(
     log.info("Starting github webhook server on %s:%s", context.host, context.port)
     httpd.serve_forever()
     raise GithubScraperStopped
+
+
+def _scrape_issues(
+    sink: DataSink[DataScraperMessage], repository: GitRepository
+) -> None:
+    api_url = (
+        f"https://api.github.com/repos/{repository.owner}/{repository.name}/issues"
+    )
+
+    page = 1
+    while True:
+        response = requests.get(
+            api_url, params={"page": str(page), "state": "all"}, timeout=5
+        )
+        # FIXME: Wrap into own function with retry to handle rate limits
+        response.raise_for_status()
+
+        issues = response.json()
+        if not issues:
+            break
+
+        for issue in issues:
+            sink.put(
+                DataScraperMessage(
+                    data=issue["title"] + "\n\n" + issue["body"],
+                    origin=DataOrigin.GITHUB,
+                    scraped_at=datetime.now(UTC),
+                    pub_date=datetime.strptime(
+                        issue["updated_at"], "%Y-%m-%dT%H:%M:%SZ"
+                    ).replace(tzinfo=UTC),
+                    identifier=f"{repository.owner}/{repository.name}@{issue['number']}",
+                )
+            )
+
+        page += 1
 
 
 def _scrape_git_repository(
