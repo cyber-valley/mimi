@@ -14,7 +14,7 @@ from typing import NoReturn, assert_never
 from mimi import DataOrigin, data_scraper, embedding_pipeline
 from mimi.data_scraper import DataScraperMessage
 from mimi.data_scraper.github import GithubScraperContext
-from mimi.data_scraper.telegram import PeersConfig, TelegramScraperContext
+from mimi.data_scraper.telegram import TelegramScraperContext, PeersConfig
 from mimi.data_scraper.x import XScraperContext
 from mimi.embedding_config import EmbeddingPipelineConfig
 
@@ -121,7 +121,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                 TelegramScraperContext(
                     peers_config=PeersConfig(
                         groups_ids=set(map(int, args.groups_ids or [])),
-                        forums_ids=set(map(int, args.forums_ids or [])),
+                        forums_ids=set(map(int, args.forums_ids or []))
                     ),
                     history_depth=args.history_depth,
                     process_new=args.process_new,
