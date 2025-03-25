@@ -1,12 +1,16 @@
 import hashlib
+import inspect
 import logging
 import sqlite3
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC
 from enum import Enum, auto
-from typing import NoReturn, assert_never
+from os import PathLike
+from pathlib import Path
+from typing import NoReturn, assert_never, cast, override
 
+import sqlite_vec
 import tenacity
 from langchain_community.vectorstores import VectorStore
 from langchain_community.vectorstores.sqlitevec import SQLiteVec
@@ -25,7 +29,7 @@ class EmbeddingType(Enum):
 
 @dataclass
 class EmbeddingPipelineContext:
-    db_file: str
+    db_file: Path
     embedding_type: EmbeddingType
     embedding_model_name: str
 
@@ -51,15 +55,58 @@ def run_embedding_pipeline(
             assert_never(context.embedding_type)
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    connection = SQLiteVec.create_connection(db_file=context.db_file)
+
+    connection = _create_connection(db_file=context.db_file)
     _create_tables_if_not_exists(connection)
-    vectorstore = SQLiteVec(embedding_table_name, connection, embeddings)
+    vectorstore = SQLiteVec(
+        embedding_table_name,
+        _create_connection_proxy(connection, _TranscationlessConnectionProxy),
+        embeddings,
+    )
 
     while True:
         message = sink.get()
         _process_message(
             text_splitter, connection, vectorstore, embedding_table_name, message
         )
+
+
+def _create_connection(db_file: PathLike[str]) -> sqlite3.Connection:
+    connection = sqlite3.connect(db_file)
+    connection.row_factory = sqlite3.Row
+    connection.enable_load_extension(True)  # noqa: FBT003
+    sqlite_vec.load(connection)
+    connection.enable_load_extension(False)  # noqa: FBT003
+    return connection
+
+
+def _create_connection_proxy[T: sqlite3.Connection](
+    connection: sqlite3.Connection, proxy_cls: type[T]
+) -> T:
+    return cast(T, _ConnectionProxy(connection, proxy_cls))
+
+
+@dataclass
+class _ConnectionProxy[T: sqlite3.Connection]:
+    obj: sqlite3.Connection
+    proxy_cls: type[T]
+    overridden_methods: dict[str, object] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.overridden_methods = {
+            name: member
+            for name, member in inspect.getmembers(self.proxy_cls)
+            if hasattr(member, "__override__")
+        }
+
+    def __getattr__(self, name: str) -> object:
+        return self.overridden_methods.get(name, getattr(self.obj, name))
+
+
+class _TranscationlessConnectionProxy(sqlite3.Connection):
+    @override
+    def commit(self) -> None:
+        pass
 
 
 @tenacity.retry(
