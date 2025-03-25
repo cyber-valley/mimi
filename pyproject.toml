@@ -120,4 +120,6 @@ follow_untyped_imports = true
 
 [tool.uv.sources]
 result = { git = "https://github.com/montasaurus/result" }
-telethon = { url = "https://github.com/LonamiWebs/Telethon/archive/v2.zip", subdirectory = "client" }
+
+[tool.uv.workspace]
+members = ["test"]
