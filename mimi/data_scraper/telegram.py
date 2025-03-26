@@ -93,6 +93,7 @@ async def _scrape_updates(
         async for message in stream:
             match _convert_to_internal_message(message):
                 case Ok(msg):
+                    log.debug("Successfully parsed message with %s symbols", len(msg.data))
                     yield msg
                 case Err(text):
                     log.warning(
@@ -173,7 +174,6 @@ async def _process_updates(
 
 
 def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage, str]:
-    log.debug(message)
     if not message.message:
         return Err("Empty message text")
 
