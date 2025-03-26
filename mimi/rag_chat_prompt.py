@@ -1,6 +1,5 @@
-import functools
 import logging
-from typing import Any, Final, Literal, TypedDict
+from typing import Final, Literal, TypedDict
 
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseChatModel
@@ -32,13 +31,25 @@ class _State(TypedDict):
 
 
 def init(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateGraph:
-    retrieve = functools.partial(_retrieve, vector_store=vector_store)
-    retrieve.__name__ = "retrieve"
-    generate = functools.partial(_generate, llm=llm, template=_TEMPLATE)
-    generate.__name__ = "generate"
-    graph_builder = StateGraph(_State).add_sequence([
-        retrieve, generate
-    ])
+    def retrieve(state: _State) -> dict[Literal["context"], list[Document]]:
+        retrieved_docs = vector_store.similarity_search(state["question"])
+        if retrieved_docs:
+            log.info("Retrieved %s documents", len(retrieved_docs))
+        else:
+            log.warning("Retrieved zero documents")
+
+        return {"context": retrieved_docs}
+
+    def generate(state: _State) -> dict[Literal["answer"], str]:
+        prompt = PromptTemplate.from_template(_TEMPLATE)
+        docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+        messages = prompt.invoke(
+            {"question": state["question"], "context": docs_content}
+        )
+        response = llm.invoke(messages)
+        return {"answer": str(response.content)}
+
+    graph_builder = StateGraph(_State).add_sequence([retrieve, generate])
     graph_builder.add_edge(START, retrieve.__name__)
     return graph_builder.compile()
 
@@ -71,27 +82,3 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
         return Err(DocumentsNotFoundError())
 
     return Ok(answer)
-
-
-def _retrieve(
-    state: _State, vector_store: VectorStore
-) -> dict[Literal["context"], list[Document]]:
-    retrieved_docs = vector_store.similarity_search(state["question"])
-    if retrieved_docs:
-        log.info("Retrieved %s documents", len(retrieved_docs))
-    else:
-        log.warning("Retrieved zero documents")
-
-    return {"context": retrieved_docs}
-
-
-def _generate(
-    state: _State, llm: BaseChatModel, template: str
-) -> dict[Literal["answer"], str | list[Any]]:
-    prompt = PromptTemplate.from_template(template)
-    docs_content = "\n\n".join(doc.page_content for doc in state["context"])
-    messages = prompt.invoke({"question": state["question"], "context": docs_content})
-    log.debug("Invoking llm")
-    response = llm.invoke(messages)
-    log.debug("Got response from llm %s", response)
-    return {"answer": response.content}
