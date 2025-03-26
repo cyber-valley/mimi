@@ -36,41 +36,48 @@ class ScrapersContext:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Self:
         d = d["scrapers"]
-        github_repos = {
-            GitRepository(**repo)
-            for repo in d["github"].get("repositories_to_follow", [])
-        }
+        if d.get("github", {"disabled": True}).get("disabled", False):
+            github = None
+        else:
+            github_repos = {
+                GitRepository(**repo)
+                for repo in d["github"].get("repositories_to_follow", [])
+            }
+            github = GithubScraperContext(
+                port=d["github"].get("port", 8000),
+                host=d["github"].get("host", "localhost"),
+                repository_base_path=Path(
+                    d["github"].get("repository_base_path", "github-repositories")
+                ),
+                repositories_to_follow=github_repos,
+                run_server=d["github"].get("run_server", True),
+            )
 
-        peers_config_data = d["telegram"].get(
-            "peers_config", {"groups_ids": [], "fourms_ids": []}
-        )
-        peers_config = PeersConfig(**peers_config_data)
+        if d.get("x", {"disabled": True}).get("disabled", False):
+            x = None
+        else:
+            x = XScraperContext(
+                user_tweets_json_directory=Path(
+                    d["x"].get("user_tweets_json_directory", "")
+                ),
+                accounts_to_follow=d["x"].get("accounts_to_follow", []),
+                poll_interval=_deserialize_timedelta(d["x"]["poll_interval"])
+                if d["x"].get("poll_interval")
+                else None,
+            )
 
-        x = XScraperContext(
-            user_tweets_json_directory=Path(
-                d["x"].get("user_tweets_json_directory", "")
-            ),
-            accounts_to_follow=d["x"].get("accounts_to_follow", []),
-            poll_interval=_deserialize_timedelta(d["x"]["poll_interval"])
-            if d["x"].get("poll_interval")
-            else None,
-        )
-
-        telegram = TelegramScraperContext(
-            peers_config=peers_config,
-            history_depth=d["telegram"].get("history_depth", 50),
-            process_new=d["telegram"].get("process_new", True),
-        )
-
-        github = GithubScraperContext(
-            port=d["github"].get("port", 8000),
-            host=d["github"].get("host", "localhost"),
-            repository_base_path=Path(
-                d["github"].get("repository_base_path", "github-repositories")
-            ),
-            repositories_to_follow=github_repos,
-            run_server=d["github"].get("run_server", True),
-        )
+        if d.get("telegram", {"disabled": True}).get("disabled", False):
+            telegram = None
+        else:
+            peers_config_data = d["telegram"].get(
+                "peers_config", {"groups_ids": [], "fourms_ids": []}
+            )
+            peers_config = PeersConfig(**peers_config_data)
+            telegram = TelegramScraperContext(
+                peers_config=peers_config,
+                history_depth=d["telegram"].get("history_depth", 50),
+                process_new=d["telegram"].get("process_new", True),
+            )
 
         assert any(item is not None for item in (x, telegram, github)), (
             "At least one scraper should be configured."

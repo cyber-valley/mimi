@@ -16,14 +16,16 @@
       "poll_interval": "5m"
     },
     "telegram": {
+      "disabled": true,
       "peers_config": {
         "groups_ids": [],
-        "fourms_ids": [2245058785, 2572439595]
+        "forums_ids": [2245058785, 2572439595]
       },
       "history_depth": 1000,
       "process_new": true
     },
     "github": {
+      "disabled": true,
       "port": 8000,
       "host": "localhost",
       "repository_base_path": "github-repositories",

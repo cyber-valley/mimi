@@ -4,7 +4,7 @@ format:
 lint: format
 	uv run ruff check --fix; \
 	uv run mypy .; \
-	uv run codespell --write-changes --skip htmlcov .
+	uv run codespell --write-changes --skip htmlcov --skip github-repositories.
 
 pre-commit: lint
 
