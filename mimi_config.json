@@ -11,7 +11,7 @@
   },
   "scrapers": {
     "x": {
-      "user_tweets_json_directory": "user_tweets",
+      "user_tweets_json_directory": "user-tweets",
       "accounts_to_follow": ["mastercyb"],
       "poll_interval": "5m"
     },

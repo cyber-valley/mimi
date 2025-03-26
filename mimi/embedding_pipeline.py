@@ -113,7 +113,7 @@ def _delete_embeddings(
         """,  # noqa: S608
         ((rowid,) for rowid in rowids),
     )
-    connection.executemany(
+    connection.execute(
         """
         DELETE FROM identifier_to_rowid
         WHERE hash = ?
