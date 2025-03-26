@@ -535,6 +535,7 @@ dependencies = [
     { name = "langchain-openai" },
     { name = "langchain-text-splitters" },
     { name = "langgraph" },
+    { name = "pytelegrambotapi" },
     { name = "requests" },
     { name = "result" },
     { name = "rss-parser" },
@@ -560,6 +561,7 @@ requires-dist = [
     { name = "langchain-openai", specifier = ">=0.3.9" },
     { name = "langchain-text-splitters", specifier = ">=0.3.7" },
     { name = "langgraph", specifier = ">=0.3.18" },
+    { name = "pytelegrambotapi", specifier = ">=4.26.0" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "result", git = "https://github.com/montasaurus/result" },
     { name = "rss-parser", specifier = ">=2.1.0" },
@@ -855,6 +857,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/88/82/c79424d7d8c29b994fb01d277da57b0a9b09cc03c3ff875f9bd8a86b2145/pydantic_settings-2.8.1.tar.gz", hash = "sha256:d5c663dfbe9db9d5e1c646b2e161da12f0d734d422ee56f567d0ea2cee4e8585", size = 83550 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/53/a64f03044927dc47aafe029c42a5b7aabc38dfb813475e0e1bf71c4a59d0/pydantic_settings-2.8.1-py3-none-any.whl", hash = "sha256:81942d5ac3d905f7f3ee1a70df5dfb62d5569c12f51a5a647defc1c3d9ee2e9c", size = 30839 },
+]
+
+[[package]]
+name = "pytelegrambotapi"
+version = "4.26.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1d/83/fb889f80a072199bf98f621a514488c423c56a79b8041c9d860867d18b60/pytelegrambotapi-4.26.0.tar.gz", hash = "sha256:ba92f6a83bf991cbf189577dbc314976032ad8a3fbe6cd631d0ccd79db8523f9", size = 1338623 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/34/e1/b0d4248f395a19d76a46d1c0950354771c1176b9f27dc30849360363991a/pytelegrambotapi-4.26.0-py3-none-any.whl", hash = "sha256:6a7a10571dcecc01aac917269baf4321a0518d5db1fe57b6a09b76cab2bd6b91", size = 270483 },
 ]
 
 [[package]]

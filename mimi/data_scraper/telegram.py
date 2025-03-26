@@ -85,7 +85,7 @@ async def _scrape(
 async def _scrape_updates(
     client: TelegramClient, config: PeersConfig, depth: int
 ) -> AsyncIterator[DataScraperMessage]:
-    delay = timedelta(milliseconds=100)
+    delay = timedelta(seconds=1)
     for stream in (
         _scrape_groups(client, config.groups_ids, depth, delay),
         _scrape_forums(client, config.forums_ids, depth, delay),
@@ -93,7 +93,6 @@ async def _scrape_updates(
         async for message in stream:
             match _convert_to_internal_message(message):
                 case Ok(msg):
-                    log.debug("Successfully parsed message with %s symbols", len(msg.data))
                     yield msg
                 case Err(text):
                     log.warning(
@@ -101,6 +100,7 @@ async def _scrape_updates(
                         message.id,
                         text,
                     )
+            await asyncio.sleep(1)
 
 
 async def _scrape_groups(
@@ -173,6 +173,7 @@ async def _process_updates(
 
 
 def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage, str]:
+    log.debug(message)
     if not message.message:
         return Err("Empty message text")
 

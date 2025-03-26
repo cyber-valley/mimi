@@ -11,9 +11,9 @@ from mimi.embedding_pipeline import EmbeddingPipelineContext, EmbeddingType
 
 @dataclass
 class ScrapersContext:
-    x: None | XScraperContext
-    telegram: None | TelegramScraperContext
-    github: None | GithubScraperContext
+    x: XScraperContext
+    telegram: TelegramScraperContext
+    github: GithubScraperContext
 
 
 @dataclass
@@ -23,67 +23,47 @@ class EmbeddingPipelineConfig:
 
     @classmethod
     def from_dict(cls, json_data: dict[str, Any]) -> Self:
-        if (
-            json_data["scrapers"]
-            .get("github", {"disabled": True})
-            .get("disabled", False)
-        ):
-            github_context = None
-        else:
-            github_repos = {
-                GitRepository(**repo)
-                for repo in json_data["scrapers"]["github"].get(
-                    "repositories_to_follow", []
+        github_repos = {
+            GitRepository(**repo)
+            for repo in json_data["scrapers"]["github"].get(
+                "repositories_to_follow", []
+            )
+        }
+
+        peers_config_data = json_data["scrapers"]["telegram"].get(
+            "peers_config", {"groups_ids": [], "fourms_ids": []}
+        )
+        peers_config = PeersConfig(**peers_config_data)
+
+        x_context = XScraperContext(
+            user_tweets_json_directory=Path(
+                json_data["scrapers"]["x"].get("user_tweets_json_directory", "")
+            ),
+            accounts_to_follow=json_data["scrapers"]["x"].get("accounts_to_follow", []),
+            poll_interval=_deserialize_timedelta(
+                json_data["scrapers"]["x"]["poll_interval"]
+            )
+            if json_data["scrapers"]["x"].get("poll_interval")
+            else None,
+        )
+
+        telegram_context = TelegramScraperContext(
+            peers_config=peers_config,
+            history_depth=json_data["scrapers"]["telegram"].get("history_depth", 50),
+            process_new=json_data["scrapers"]["telegram"].get("process_new", True),
+        )
+
+        github_context = GithubScraperContext(
+            port=json_data["scrapers"]["github"].get("port", 8000),
+            host=json_data["scrapers"]["github"].get("host", "localhost"),
+            repository_base_path=Path(
+                json_data["scrapers"]["github"].get(
+                    "repository_base_path", "github-repositories"
                 )
-            }
-            github_context = GithubScraperContext(
-                port=json_data["scrapers"]["github"].get("port", 8000),
-                host=json_data["scrapers"]["github"].get("host", "localhost"),
-                repository_base_path=Path(
-                    json_data["scrapers"]["github"].get(
-                        "repository_base_path", "github-repositories"
-                    )
-                ),
-                repositories_to_follow=github_repos,
-                run_server=json_data["scrapers"]["github"].get("run_server", True),
-            )
-
-        if (
-            json_data["scrapers"]
-            .get("telegram", {"disabled": True})
-            .get("disabled", False)
-        ):
-            telegram_context = None
-        else:
-            peers_config_data = json_data["scrapers"]["telegram"].get(
-                "peers_config", {"groups_ids": [], "forums_ids": []}
-            )
-            peers_config = PeersConfig(**peers_config_data)
-
-            telegram_context = TelegramScraperContext(
-                peers_config=peers_config,
-                history_depth=json_data["scrapers"]["telegram"].get(
-                    "history_depth", 50
-                ),
-                process_new=json_data["scrapers"]["telegram"].get("process_new", True),
-            )
-
-        if json_data["scrapers"].get("x", {"disabled": True}).get("disabled", False):
-            x_context = None
-        else:
-            x_context = XScraperContext(
-                user_tweets_json_directory=Path(
-                    json_data["scrapers"]["x"].get("user_tweets_json_directory", "")
-                ),
-                accounts_to_follow=json_data["scrapers"]["x"].get(
-                    "accounts_to_follow", []
-                ),
-                poll_interval=_deserialize_timedelta(
-                    json_data["scrapers"]["x"]["poll_interval"]
-                )
-                if json_data["scrapers"]["x"].get("poll_interval")
-                else None,
-            )
+            ),
+            repositories_to_follow=github_repos,
+            run_server=json_data["scrapers"]["github"].get("run_server", True),
+        )
 
         scrapers_context = ScrapersContext(
             x=x_context, telegram=telegram_context, github=github_context
