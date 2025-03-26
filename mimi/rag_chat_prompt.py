@@ -1,7 +1,6 @@
 import functools
 import logging
-from dataclasses import dataclass
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, TypedDict
 
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseChatModel
@@ -26,8 +25,7 @@ Question: {question}
 Answer:"""
 
 
-@dataclass
-class _State:
+class _State(TypedDict):
     question: str
     context: list[str]
     answer: str
@@ -79,6 +77,11 @@ def _retrieve(
     state: _State, vector_store: VectorStore
 ) -> dict[Literal["context"], list[Document]]:
     retrieved_docs = vector_store.similarity_search(state.question)
+    if retrieved_docs:
+        log.info("Retrieved %s documents", len(retrieved_docs))
+    else:
+        log.warning("Retrieved zero documents")
+
     return {"context": retrieved_docs}
 
 

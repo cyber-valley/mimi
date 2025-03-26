@@ -101,7 +101,7 @@ class LLMContext:
     def from_dict(cls, d: dict[str, Any]) -> Self:
         return cls(
             provider=LLMProvider(d["llm"]["provider"]),
-            model=d["llm"]["embedding_table_name"],
+            model=d["llm"]["model"],
         )
 
 

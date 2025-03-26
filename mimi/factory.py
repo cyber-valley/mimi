@@ -58,7 +58,7 @@ def get_llm(provider: LLMProvider, model: str) -> BaseChatModel:
         case LLMProvider.OPENROUTER:
             return ChatOpenAI(
                 api_key=os.environ["OPENROUTER_API_KEY"],  # type: ignore[arg-type]
-                base_url=os.environ["OPENROUTER_BASE_URL"],
+                base_url=os.environ["OPENROUTER_API_URL"],
                 model=model,
             )
 
