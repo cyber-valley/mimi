@@ -68,17 +68,11 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
     except Exception as e:
         return Err(LangGraphInvokationError(e))
 
-    try:
-        answer = result["answer"]
-    except KeyError as e:
-        log.exception("Got unexcepted invocation format %s", result)
-        return Err(UnsupportedLangGraphFormatError(e))
-
-    if not isinstance(answer, str):
-        log.error("Got ansewr with unknown format %s", answer)
-        return Err(UnsupportedLangGraphFormatError(answer))
-
-    return Ok(answer)
+    match result:
+        case {"result": answer} if isinstance(answer, str):
+            return Ok(answer)
+        case unknown:
+            return Err(UnsupportedLangGraphFormatError(unknown))
 
 
 def _retrieve(

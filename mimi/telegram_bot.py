@@ -36,8 +36,10 @@ def create_bot(graph: CompiledStateGraph) -> None:
         match complete(graph, message.text):
             case Ok(answer):
                 bot.reply_to(message, answer)
-            case Err(_):
-                log.error("[%s] Failed to process query", message.message_id)
+            case Err(err):
+                log.error(
+                    "[%s] Failed to process query with %s", message.message_id, err
+                )
                 bot.reply_to(message, "Failed to process given message")
             case unreachable:
                 assert_never(unreachable)
