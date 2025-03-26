@@ -209,9 +209,15 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
     )
     sink: Queue[DataScraperMessage] = Queue()
 
-    with ThreadPoolExecutor(max_workers=len(scrapers)) as pool:
-        data_scraper.run_scrapers(pool, sink, scrapers)
-        embedding_pipeline.run(config.embedding, sink)
+    with ThreadPoolExecutor(max_workers=len(scrapers) + 2) as pool:
+        futures = (
+            pool.submit(embedding_pipeline.run, config.embedding, sink),
+            pool.submit(_queue_size_listener, sink),
+            *data_scraper.run_scrapers(pool, sink, scrapers)
+        )
+        for future in as_completed(futures):
+            print(future.result())
+            raise Exception
 
     scrapers = []
     if config.scrapers.github:
@@ -238,6 +244,12 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
             print(future.result())
             raise Exception
 
+
+
+def _queue_size_listener[T](sink: Queue[T]) -> NoReturn:
+    while True:
+        log.info("Queue size %s", sink.qsize())
+        time.sleep(60)
 
 
 def _queue_size_listener[T](sink: Queue[T]) -> NoReturn:
