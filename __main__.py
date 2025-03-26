@@ -1,5 +1,6 @@
 import argparse
 import functools
+import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -7,13 +8,14 @@ from datetime import timedelta
 from enum import StrEnum, auto
 from pathlib import Path
 from queue import Queue
-from typing import assert_never
+from typing import NoReturn, assert_never
 
-from mimi import DataOrigin, data_scraper
+from mimi import DataOrigin, data_scraper, embedding_pipeline
 from mimi.data_scraper import DataScraperMessage
 from mimi.data_scraper.github import GithubScraperContext
 from mimi.data_scraper.telegram import PeersConfig, TelegramScraperContext
 from mimi.data_scraper.x import XScraperContext
+from mimi.embedding_config import EmbeddingPipelineConfig
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.INFO))
 log = logging.getLogger(__name__)
@@ -21,16 +23,21 @@ log = logging.getLogger(__name__)
 
 class Command(StrEnum):
     SCRAPE = auto()
+    EMBEDDING_PIPELINE = auto()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Scrape data")
+    parser = argparse.ArgumentParser(
+        description="Mimi President which scrapes data and provides RAG powered chat."
+    )
     parser.add_argument("command", choices=list(Command), type=Command)
 
     args, _ = parser.parse_known_args()
     match args.command:
         case Command.SCRAPE:
             execute_scraper(parser)
+        case Command.EMBEDDING_PIPELINE:
+            execute_embedding_pipeline(parser)
         case _:
             assert_never(args.command)
 
@@ -180,12 +187,30 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                     raise
 
     sink.shutdown()
-    _consume_queue(sink)
+    while not sink.empty():
+        log.info(sink.get())
 
 
-def _consume_queue(queue: Queue[DataScraperMessage]) -> None:
-    while not queue.empty():
-        log.info(queue.get())
+def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
+    parser.add_argument(
+        "--config",
+        "-c",
+        type=Path,
+        default="pipeline_config.json",
+        help="Config file to run pipeline.",
+    )
+    args = parser.parse_args()
+    config = EmbeddingPipelineConfig.from_dict(json.loads(args.config.read_text()))
+    scrapers = (
+        functools.partial(data_scraper.github.scrape, config.scrapers.github),
+        functools.partial(data_scraper.x.scrape, config.scrapers.x),
+        functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram),
+    )
+    sink: Queue[DataScraperMessage] = Queue()
+
+    with ThreadPoolExecutor(max_workers=len(scrapers)) as pool:
+        data_scraper.run_scrapers(pool, sink, scrapers)
+        embedding_pipeline.run(config.embedding, sink)
 
 
 if __name__ == "__main__":

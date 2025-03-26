@@ -1,0 +1,34 @@
+{
+  "embedding": {
+    "db_file": "embeddings.db",
+    "embedding_type": "openai",
+    "embedding_model_name": "text-embedding-3-small"
+  },
+  "scrapers": {
+    "x": {
+      "user_tweets_json_directory": "user_tweets",
+      "accounts_to_follow": ["mastercyb"],
+      "poll_interval": "5m"
+    },
+    "telegram": {
+      "peers_config": {
+        "groups_ids": [],
+        "fourms_ids": [2245058785, 2572439595]
+      },
+      "history_depth": 1000,
+      "process_new": true
+    },
+    "github": {
+      "port": 8000,
+      "host": "localhost",
+      "repository_base_path": "github-repositories",
+      "run_server": true,
+      "repositories_to_follow": [
+        {
+          "owner": "InspektorKek",
+          "name": "cvland"
+        }
+      ]
+    }
+  }
+}

@@ -6,7 +6,7 @@ from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC
-from enum import Enum, auto
+from enum import StrEnum, auto
 from os import PathLike
 from pathlib import Path
 from typing import NoReturn, assert_never, cast, override
@@ -24,7 +24,7 @@ from .data_sink import DataSink
 log = logging.getLogger(__name__)
 
 
-class EmbeddingType(Enum):
+class EmbeddingType(StrEnum):
     OPENAI = auto()
 
 
@@ -39,7 +39,7 @@ class EmbeddingPipelineContext:
     retry=tenacity.retry_if_not_exception_type(sqlite3.OperationalError),
     wait=tenacity.wait_exponential(multiplier=1, max=10),
 )
-def run_embedding_pipeline(
+def run(
     context: EmbeddingPipelineContext, sink: DataSink[DataScraperMessage]
 ) -> NoReturn:
     """

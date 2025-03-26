@@ -7,3 +7,5 @@
 **.vscode**
 data/
 /.env
+*.session
+*.session-journal
