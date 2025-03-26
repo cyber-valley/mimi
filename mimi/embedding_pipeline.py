@@ -38,6 +38,8 @@ class EmbeddingPipelineContext:
 @tenacity.retry(
     retry=tenacity.retry_if_not_exception_type(sqlite3.OperationalError),
     wait=tenacity.wait_exponential(multiplier=1, max=10),
+    before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
+    after=tenacity.after_log(log, logging.INFO),
 )
 def run(
     context: EmbeddingPipelineContext, sink: DataSink[DataScraperMessage]
@@ -47,11 +49,13 @@ def run(
     - Saves raw data into the database
     - Calculates and saves embedding
     """
+    log.info("Starting embedding pipeline")
     embedding_table_name: str = "embedding"
 
     match context.embedding_type:
         case EmbeddingType.OPENAI:
             embeddings = OpenAIEmbeddings(model=context.embedding_model_name)
+            log.info("Using OpenAI embeddings %s", context.embedding_model_name)
         case _:
             assert_never(context.embedding_type)
 
@@ -62,11 +66,14 @@ def run(
         _create_connection_proxy(connection, _TranscationlessConnectionProxy),
         embeddings,
     )
+    log.info("Starting transaction")
     with _transaction(connection):
         _create_tables_if_not_exists(connection)
         vectorstore.create_table_if_not_exists()
+    log.info("Connected to database")
 
     while True:
+        log.debug("Waiting for the new message")
         message = sink.get()
         _process_message(
             text_splitter, connection, vectorstore, embedding_table_name, message
@@ -107,7 +114,7 @@ class _ConnectionProxy[T: sqlite3.Connection]:
 
 class _TranscationlessConnectionProxy(sqlite3.Connection):
     @override
-    def commit(self) -> None:
+    def commit() -> None:
         pass
 
 
@@ -131,7 +138,7 @@ def _process_message(
         "pub_date": int(message.pub_date.replace(tzinfo=UTC).timestamp()),
     }
     splits = text_splitter.split_text(message.data)
-    identifier_hash = hashlib.sha256(message.identifier.encode()).digest()
+    identifier_hash = hashlib.sha256(message.identifier.encode()).hexdigest()
     log.debug("Processing message from %s", message.origin)
 
     rowids = _find_rowids(identifier_hash, connection)
@@ -150,7 +157,7 @@ def _process_message(
     log.debug("Saved %s embeddings", len(rowids))
 
 
-def _find_rowids(identifier_hash: bytes, connection: sqlite3.Connection) -> list[str]:
+def _find_rowids(identifier_hash: str, connection: sqlite3.Connection) -> list[str]:
     return [
         row["rowid"]
         for row in connection.execute(
@@ -166,7 +173,7 @@ def _find_rowids(identifier_hash: bytes, connection: sqlite3.Connection) -> list
 def _delete_embeddings(
     table_name: str,
     rowids: Iterable[str],
-    identifier_hash: bytes,
+    identifier_hash: str,
     connection: sqlite3.Connection,
 ) -> None:
     connection.executemany(
@@ -186,7 +193,7 @@ def _delete_embeddings(
 
 
 def _save_identifier_to_rowid(
-    rowids: Iterable[str], identifier_hash: bytes, connection: sqlite3.Connection
+    rowids: Iterable[str], identifier_hash: str, connection: sqlite3.Connection
 ) -> None:
     connection.executemany(
         "INSERT INTO identifier_to_rowid(rowid, hash) VALUES (?,?)",
@@ -200,7 +207,7 @@ def _create_tables_if_not_exists(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS identifier_to_rowid
         (
             rowid INTEGER,
-            hash BLOB PRIMARY KEY
+            hash TEXT
         )
         """
     )
