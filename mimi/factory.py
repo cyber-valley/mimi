@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 
 def get_connection(db_file: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(db_file, autocommit=False)
+    connection = sqlite3.connect(db_file, autocommit=False, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.enable_load_extension(True)  # noqa: FBT003
     sqlite_vec.load(connection)

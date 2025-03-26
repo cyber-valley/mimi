@@ -27,7 +27,7 @@ Answer:"""
 
 class _State(TypedDict):
     question: str
-    context: list[str]
+    context: list[Document]
     answer: str
 
 
@@ -67,7 +67,7 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
         return Err(LangGraphInvokationError(e))
 
     match result:
-        case {"result": answer} if isinstance(answer, str):
+        case {"answer": answer} if isinstance(answer, str):
             return Ok(answer)
         case unknown:
             return Err(UnsupportedLangGraphFormatError(unknown))
@@ -76,7 +76,7 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
 def _retrieve(
     state: _State, vector_store: VectorStore
 ) -> dict[Literal["context"], list[Document]]:
-    retrieved_docs = vector_store.similarity_search(state.question)
+    retrieved_docs = vector_store.similarity_search(state["question"])
     if retrieved_docs:
         log.info("Retrieved %s documents", len(retrieved_docs))
     else:
@@ -89,6 +89,7 @@ def _generate(
     state: _State, llm: BaseChatModel, template: str
 ) -> dict[Literal["answer"], str | list[Any]]:
     prompt = PromptTemplate.from_template(template)
-    messages = prompt.invoke({"question": state.question, "context": state.context})
+    docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+    messages = prompt.invoke({"question": state["question"], "context": docs_content})
     response = llm.invoke(messages)
     return {"answer": response.content}
