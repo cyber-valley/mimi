@@ -27,14 +27,14 @@ Answer:"""
 
 
 @dataclass
-class State:
+class _State:
     question: str
     context: list[str]
     answer: str
 
 
 def setup_graph(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateGraph:
-    graph_builder = StateGraph(State)
+    graph_builder = StateGraph(_State)
     graph_builder.add_node(
         _retrieve.__name__, functools.partial(_retrieve, vector_store=vector_store)
     )
@@ -76,14 +76,14 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
 
 
 def _retrieve(
-    state: State, vector_store: VectorStore
+    state: _State, vector_store: VectorStore
 ) -> dict[Literal["context"], list[Document]]:
     retrieved_docs = vector_store.similarity_search(state.question)
     return {"context": retrieved_docs}
 
 
 def _generate(
-    state: State, llm: BaseChatModel, template: str
+    state: _State, llm: BaseChatModel, template: str
 ) -> dict[Literal["answer"], str | list[Any]]:
     prompt = PromptTemplate.from_template(template)
     messages = prompt.invoke({"question": state.question, "context": state.context})
