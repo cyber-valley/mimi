@@ -48,12 +48,11 @@ class LangGraphInvokationError(Exception):
         super().__init__(f"Failed to invoke langgraph with {error}")
 
 
-class UnsupportedLangGraphFormatError(Exception):
-    def __init__(self, info: Any) -> None:
-        super().__init__(f"Got unsupported answer format: {info}")
+class DocumentsNotFoundError(Exception):
+    pass
 
 
-RagCompletionError = LangGraphInvokationError | UnsupportedLangGraphFormatError
+RagCompletionError = LangGraphInvokationError | DocumentsNotFoundError
 
 
 def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletionError]:
@@ -66,11 +65,11 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
     except Exception as e:
         return Err(LangGraphInvokationError(e))
 
-    match result:
-        case {"answer": answer} if isinstance(answer, str):
-            return Ok(answer)
-        case unknown:
-            return Err(UnsupportedLangGraphFormatError(unknown))
+    answer = result.get("answer")
+    if not answer:
+        return Err(DocumentsNotFoundError())
+
+    return Ok(answer)
 
 
 def _retrieve(

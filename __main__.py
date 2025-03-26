@@ -35,6 +35,7 @@ class Command(StrEnum):
     SCRAPE = auto()
     EMBEDDING_PIPELINE = auto()
     TELEGRAM_BOT = auto()
+    COMPLETE = auto()
 
 
 def main() -> None:
@@ -51,6 +52,8 @@ def main() -> None:
             execute_embedding_pipeline(parser)
         case Command.TELEGRAM_BOT:
             execute_telegram_bot(parser)
+        case Command.COMPLETE:
+            execute_complete(parser)
         case _:
             assert_never(args.command)
 
@@ -284,6 +287,32 @@ def execute_telegram_bot(parser: argparse.ArgumentParser) -> NoReturn:
     llm = factory.get_llm(config.llm.provider, config.llm.model)
     graph = rag_chat_prompt.init(vector_store, llm)
     telegram_bot.run(graph)
+
+
+def execute_complete(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--config",
+        "-c",
+        type=Path,
+        default=DEFAULT_CONFIG_FILE_NAME,
+        help="Config file to run pipeline.",
+    )
+    parser.add_argument(
+        "query",
+        help="Query to complete with LLM.",
+    )
+    args = parser.parse_args()
+    config = TelegramConfig.from_dict(json.loads(args.config.read_text()))
+    connection = factory.get_connection(config.embedding.db_file)
+    vector_store = factory.get_vector_store(
+        connection,
+        config.embedding.embedding_provider,
+        config.embedding.embedding_model_name,
+        config.embedding.embedding_table_name,
+    )
+    llm = factory.get_llm(config.llm.provider, config.llm.model)
+    graph = rag_chat_prompt.init(vector_store, llm)
+    print(rag_chat_prompt.complete(graph, args.query))
 
 
 if __name__ == "__main__":

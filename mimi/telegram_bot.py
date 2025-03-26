@@ -8,6 +8,7 @@ from result import Err, Ok
 from telebot.types import Message
 
 from mimi import rag_chat_prompt
+from mimi.rag_chat_prompt import DocumentsNotFoundError
 
 log = logging.getLogger(__name__)
 
@@ -41,10 +42,16 @@ def run(graph: CompiledStateGraph) -> NoReturn:
             case Ok(answer):
                 bot.reply_to(message, answer)
             case Err(err):
-                log.error(
-                    "[%s] Failed to process query with %s", message.message_id, err
-                )
-                bot.reply_to(message, "Failed to process given message")
+                match err:
+                    case DocumentsNotFoundError():
+                        bot.reply_to(message, "Relative documents not found.")
+                    case _:
+                        log.error(
+                            "[%s] Failed to process query with %s",
+                            message.message_id,
+                            err,
+                        )
+                        bot.reply_to(message, "Failed to process given message")
             case unreachable:
                 assert_never(unreachable)
 
