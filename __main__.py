@@ -202,6 +202,16 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
     )
     args = parser.parse_args()
     config = EmbeddingPipelineConfig.from_dict(json.loads(args.config.read_text()))
+    scrapers = (
+        functools.partial(data_scraper.github.scrape, config.scrapers.github),
+        functools.partial(data_scraper.x.scrape, config.scrapers.x),
+        functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram),
+    )
+    sink: Queue[DataScraperMessage] = Queue()
+
+    with ThreadPoolExecutor(max_workers=len(scrapers)) as pool:
+        data_scraper.run_scrapers(pool, sink, scrapers)
+        embedding_pipeline.run(config.embedding, sink)
 
     scrapers = []
     if config.scrapers.github:

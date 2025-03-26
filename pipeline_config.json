@@ -6,7 +6,6 @@
   },
   "scrapers": {
     "x": {
-      "disabled": true,
       "user_tweets_json_directory": "user_tweets",
       "accounts_to_follow": ["mastercyb"],
       "poll_interval": "5m"
@@ -14,13 +13,12 @@
     "telegram": {
       "peers_config": {
         "groups_ids": [],
-        "forums_ids": [2245058785, 2572439595]
+        "fourms_ids": [2245058785, 2572439595]
       },
       "history_depth": 1000,
       "process_new": true
     },
     "github": {
-      "disabled": true,
       "port": 8000,
       "host": "localhost",
       "repository_base_path": "github-repositories",
