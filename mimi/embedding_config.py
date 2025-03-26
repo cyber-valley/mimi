@@ -11,9 +11,9 @@ from mimi.embedding_pipeline import EmbeddingPipelineContext, EmbeddingType
 
 @dataclass
 class ScrapersContext:
-    x: XScraperContext
-    telegram: TelegramScraperContext
-    github: GithubScraperContext
+    x: None | XScraperContext
+    telegram: None | TelegramScraperContext
+    github: None | GithubScraperContext
 
 
 @dataclass

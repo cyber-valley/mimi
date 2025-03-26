@@ -1,8 +1,10 @@
 import logging
 import os
+from typing import assert_never
 
 import telebot
 from langgraph.graph.state import CompiledStateGraph
+from result import Err, Ok
 from telebot.types import Message
 
 from mimi.rag_chat_prompt import complete
@@ -19,19 +21,23 @@ def create_bot(graph: CompiledStateGraph) -> None:
             message, "Hi there! Ask me anything, and I'll do my best to answer."
         )
 
-    @bot.message_handler
+    @bot.message_handler()
     def handle_message(message: Message) -> None:
         log.info(
             "[%s] Got new message from %s: %s",
             message.message_id,
-            message.from_user.id,
+            message.from_user.id if message.from_user else None,
             message.text,
         )
-        try:
-            answer = complete(graph, message.textCompiledStateGraph)
-        # TODO: Concretize exception
-        except Exception:
-            log.exception("[%s] Failed to process query", message.message_id)
+        if not message.text:
+            bot.reply_to(message, "I know how to process text messages only.")
             return
 
-        bot.reply_to(message, answer)
+        match complete(graph, message.text):
+            case Ok(answer):
+                bot.reply_to(message, answer)
+            case Err(_):
+                log.error("[%s] Failed to process query", message.message_id)
+                bot.reply_to(message, "Failed to process given message")
+            case unreachable:
+                assert_never(unreachable)

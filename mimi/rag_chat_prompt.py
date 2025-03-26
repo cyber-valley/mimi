@@ -1,4 +1,5 @@
 import functools
+import logging
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
@@ -8,6 +9,9 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.vectorstores import VectorStore
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from result import Err, Ok, Result
+
+log = logging.getLogger(__name__)
 
 _TEMPLATE: Final = """
 You are Mimi The President of Cyber Valley, an assistant for question-answering tasks.
@@ -41,11 +45,40 @@ def setup_graph(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateG
     return graph_builder.compile()
 
 
-def complete(graph: CompiledStateGraph, query: str) -> str:
-    result = graph.invoke({"question": query})
-    answer = result["answer"]
-    assert isinstance(answer, str), f"Got unexpected {answer=}"
-    return answer
+class LangGraphInvokationError(Exception):
+    def __init__(self, error: Exception) -> None:
+        super().__init__(f"Failed to invoke langgraph with {error}")
+
+
+class UnsupportedLangGraphFormatError(Exception):
+    def __init__(self, info: Any) -> None:
+        super().__init__(f"Got unsupported answer format: {info}")
+
+
+RagCompletionError = LangGraphInvokationError | UnsupportedLangGraphFormatError
+
+
+def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletionError]:
+    # Langgraph doesn't provide base exception and
+    # inherits all exceptions for the `Exception` class
+    # Here we can get one of those or any possible from the
+    # langgraph's dependencies
+    try:
+        result = graph.invoke({"question": query})
+    except Exception as e:
+        return Err(LangGraphInvokationError(e))
+
+    try:
+        answer = result["answer"]
+    except KeyError as e:
+        log.exception("Got unexcepted invocation format %s", result)
+        return Err(UnsupportedLangGraphFormatError(e))
+
+    if not isinstance(answer, str):
+        log.error("Got ansewr with unknown format %s", answer)
+        return Err(UnsupportedLangGraphFormatError(answer))
+
+    return Ok(answer)
 
 
 def _retrieve(

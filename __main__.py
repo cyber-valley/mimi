@@ -1,9 +1,9 @@
-import time
 import argparse
 import functools
 import json
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 from enum import StrEnum, auto
@@ -192,6 +192,10 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
         log.info(sink.get())
 
 
+class EmbeddingStoppedError(Exception):
+    pass
+
+
 def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
     parser.add_argument(
         "--config",
@@ -202,22 +206,30 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
     )
     args = parser.parse_args()
     config = EmbeddingPipelineConfig.from_dict(json.loads(args.config.read_text()))
-    scrapers = (
-        functools.partial(data_scraper.github.scrape, config.scrapers.github),
-        functools.partial(data_scraper.x.scrape, config.scrapers.x),
-        functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram),
-    )
+    scrapers = []
+    if config.scrapers.github:
+        scrapers.append(
+            functools.partial(data_scraper.github.scrape, config.scrapers.github)
+        )
+    if config.scrapers.x:
+        scrapers.append(functools.partial(data_scraper.x.scrape, config.scrapers.x))
+    if config.scrapers.telegram:
+        scrapers.append(
+            functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram)
+        )
+    assert scrapers, "At least one scraper should be configured."
+
     sink: Queue[DataScraperMessage] = Queue()
 
     with ThreadPoolExecutor(max_workers=len(scrapers) + 2) as pool:
         futures = (
             pool.submit(embedding_pipeline.run, config.embedding, sink),
             pool.submit(_queue_size_listener, sink),
-            *data_scraper.run_scrapers(pool, sink, scrapers)
+            *data_scraper.run_scrapers(pool, sink, scrapers),
         )
         for future in as_completed(futures):
             print(future.result())
-            raise Exception
+            raise EmbeddingStoppedError
 
     scrapers = []
     if config.scrapers.github:
@@ -238,24 +250,20 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
         futures = (
             pool.submit(embedding_pipeline.run, config.embedding, sink),
             pool.submit(_queue_size_listener, sink),
-            *data_scraper.run_scrapers(pool, sink, scrapers)
+            *data_scraper.run_scrapers(pool, sink, scrapers),
         )
         for future in as_completed(futures):
             print(future.result())
-            raise Exception
+            raise EmbeddingStoppedError
 
-
-
-def _queue_size_listener[T](sink: Queue[T]) -> NoReturn:
-    while True:
-        log.info("Queue size %s", sink.qsize())
-        time.sleep(60)
+    raise EmbeddingStoppedError
 
 
 def _queue_size_listener[T](sink: Queue[T]) -> NoReturn:
     while True:
         log.info("Queue size %s", sink.qsize())
         time.sleep(60)
+
 
 if __name__ == "__main__":
     main()

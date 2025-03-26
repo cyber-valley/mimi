@@ -114,7 +114,7 @@ class _ConnectionProxy[T: sqlite3.Connection]:
 
 class _TranscationlessConnectionProxy(sqlite3.Connection):
     @override
-    def commit() -> None:
+    def commit() -> None:  # type: ignore[misc]
         pass
 
 

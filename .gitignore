@@ -9,3 +9,4 @@ data/
 /.env
 *.session
 *.session-journal
+/github-repositories/
