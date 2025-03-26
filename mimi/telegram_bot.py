@@ -1,18 +1,22 @@
 import logging
 import os
-from typing import assert_never
+from typing import NoReturn, assert_never
 
 import telebot
 from langgraph.graph.state import CompiledStateGraph
 from result import Err, Ok
 from telebot.types import Message
 
-from mimi.rag_chat_prompt import complete
+from mimi import rag_chat_prompt
 
 log = logging.getLogger(__name__)
 
 
-def create_bot(graph: CompiledStateGraph) -> None:
+class TelegramBotStopped(Exception):  # noqa: N818
+    pass
+
+
+def run(graph: CompiledStateGraph) -> NoReturn:
     bot = telebot.TeleBot(os.environ["TELEGRAM_BOT_API_TOKEN"])
 
     @bot.message_handler(commands=["start"])
@@ -33,7 +37,7 @@ def create_bot(graph: CompiledStateGraph) -> None:
             bot.reply_to(message, "I know how to process text messages only.")
             return
 
-        match complete(graph, message.text):
+        match rag_chat_prompt.complete(graph, message.text):
             case Ok(answer):
                 bot.reply_to(message, answer)
             case Err(err):
@@ -43,3 +47,6 @@ def create_bot(graph: CompiledStateGraph) -> None:
                 bot.reply_to(message, "Failed to process given message")
             case unreachable:
                 assert_never(unreachable)
+
+    bot.infinity_polling()
+    raise TelegramBotStopped

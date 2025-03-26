@@ -1,8 +1,9 @@
 {
   "embedding": {
     "db_file": "embeddings.db",
-    "embedding_type": "openai",
-    "embedding_model_name": "text-embedding-3-small"
+    "embedding_provider": "openai",
+    "embedding_model_name": "text-embedding-3-small",
+    "embedding_table_name": "embeddings"
   },
   "scrapers": {
     "x": {

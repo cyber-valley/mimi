@@ -33,7 +33,7 @@ class _State:
     answer: str
 
 
-def setup_graph(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateGraph:
+def init(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateGraph:
     graph_builder = StateGraph(_State)
     graph_builder.add_node(
         _retrieve.__name__, functools.partial(_retrieve, vector_store=vector_store)

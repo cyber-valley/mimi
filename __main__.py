@@ -11,7 +11,12 @@ from pathlib import Path
 from queue import Queue
 from typing import NoReturn, assert_never
 
-from mimi import DataOrigin, data_scraper, embedding_pipeline
+from mimi import (
+    DataOrigin,
+    data_scraper,
+    embedding_pipeline,
+    factory,
+)
 from mimi.data_scraper import DataScraperMessage
 from mimi.data_scraper.github import GithubScraperContext
 from mimi.data_scraper.telegram import PeersConfig, TelegramScraperContext
@@ -25,6 +30,7 @@ log = logging.getLogger(__name__)
 class Command(StrEnum):
     SCRAPE = auto()
     EMBEDDING_PIPELINE = auto()
+    TELEGRAM_BOT = auto()
 
 
 def main() -> None:
@@ -39,6 +45,8 @@ def main() -> None:
             execute_scraper(parser)
         case Command.EMBEDDING_PIPELINE:
             execute_embedding_pipeline(parser)
+        case Command.TELEGRAM_BOT:
+            execute_telegram_bot(parser)
         case _:
             assert_never(args.command)
 
@@ -217,38 +225,25 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
         scrapers.append(
             functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram)
         )
-    assert scrapers, "At least one scraper should be configured."
 
     sink: Queue[DataScraperMessage] = Queue()
+    connection = factory.get_connection(config.embedding.db_file)
+    vector_store = factory.get_vector_store(
+        connection,
+        config.embedding.embedding_provider,
+        config.embedding.embedding_model_name,
+        config.embedding.embedding_table_name,
+    )
 
     with ThreadPoolExecutor(max_workers=len(scrapers) + 2) as pool:
         futures = (
-            pool.submit(embedding_pipeline.run, config.embedding, sink),
-            pool.submit(_queue_size_listener, sink),
-            *data_scraper.run_scrapers(pool, sink, scrapers),
-        )
-        for future in as_completed(futures):
-            print(future.result())
-            raise EmbeddingStoppedError
-
-    scrapers = []
-    if config.scrapers.github:
-        scrapers.append(
-            functools.partial(data_scraper.github.scrape, config.scrapers.github)
-        )
-    if config.scrapers.x:
-        scrapers.append(functools.partial(data_scraper.x.scrape, config.scrapers.x))
-    if config.scrapers.telegram:
-        scrapers.append(
-            functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram)
-        )
-    assert scrapers, "At least one scraper should be configured"
-
-    sink: Queue[DataScraperMessage] = Queue()
-
-    with ThreadPoolExecutor(max_workers=len(scrapers) + 2) as pool:
-        futures = (
-            pool.submit(embedding_pipeline.run, config.embedding, sink),
+            pool.submit(
+                embedding_pipeline.run,
+                sink,
+                connection,
+                vector_store,
+                config.embedding.embedding_table_name,
+            ),
             pool.submit(_queue_size_listener, sink),
             *data_scraper.run_scrapers(pool, sink, scrapers),
         )
@@ -263,6 +258,10 @@ def _queue_size_listener[T](sink: Queue[T]) -> NoReturn:
     while True:
         log.info("Queue size %s", sink.qsize())
         time.sleep(60)
+
+
+def execute_telegram_bot(_parser: argparse.ArgumentParser) -> NoReturn:
+    raise Exception
 
 
 if __name__ == "__main__":
