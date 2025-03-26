@@ -13,3 +13,4 @@ class EmbeddingProvider(StrEnum):
 
 class LLMProvider(StrEnum):
     OPENROUTER = auto()
+    OPENAI = auto()

@@ -32,14 +32,14 @@ class _State(TypedDict):
 
 
 def init(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateGraph:
-    graph_builder = StateGraph(_State)
-    graph_builder.add_node(
-        _retrieve.__name__, functools.partial(_retrieve, vector_store=vector_store)
-    )
-    graph_builder.add_node(
-        _generate.__name__, functools.partial(_generate, llm=llm, template=_TEMPLATE)
-    )
-    graph_builder.add_edge(START, _retrieve.__name__)
+    retrieve = functools.partial(_retrieve, vector_store=vector_store)
+    retrieve.__name__ = "retrieve"
+    generate = functools.partial(_generate, llm=llm, template=_TEMPLATE)
+    generate.__name__ = "generate"
+    graph_builder = StateGraph(_State).add_sequence([
+        retrieve, generate
+    ])
+    graph_builder.add_edge(START, retrieve.__name__)
     return graph_builder.compile()
 
 
@@ -66,6 +66,7 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
         return Err(LangGraphInvokationError(e))
 
     answer = result.get("answer")
+    log.debug("Current state: %s", result)
     if not answer:
         return Err(DocumentsNotFoundError())
 
@@ -90,5 +91,7 @@ def _generate(
     prompt = PromptTemplate.from_template(template)
     docs_content = "\n\n".join(doc.page_content for doc in state["context"])
     messages = prompt.invoke({"question": state["question"], "context": docs_content})
+    log.debug("Invoking llm")
     response = llm.invoke(messages)
+    log.debug("Got response from llm %s", response)
     return {"answer": response.content}

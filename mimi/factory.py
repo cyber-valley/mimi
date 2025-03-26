@@ -61,6 +61,10 @@ def get_llm(provider: LLMProvider, model: str) -> BaseChatModel:
                 base_url=os.environ["OPENROUTER_API_URL"],
                 model=model,
             )
+        case LLMProvider.OPENAI:
+            return ChatOpenAI(
+                model=model,
+            )
 
 
 def _create_tables_if_not_exists(connection: sqlite3.Connection) -> None:

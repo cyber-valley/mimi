@@ -3,11 +3,11 @@
     "db_file": "embeddings.db",
     "embedding_provider": "openai",
     "embedding_model_name": "text-embedding-3-small",
-    "embedding_table_name": "embeddings"
+    "embedding_table_name": "embedding"
   },
   "llm": {
-    "provider": "openrouter",
-    "model": "google/gemini-2.0-flash-lite-preview-02-05:free"
+    "provider": "openai",
+    "model": "gpt-4o-mini"
   },
   "scrapers": {
     "x": {
