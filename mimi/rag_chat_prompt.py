@@ -1,6 +1,6 @@
 import functools
 from dataclasses import dataclass
-from typing import Any, Literal, Final
+from typing import Any, Final, Literal
 
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseChatModel
@@ -8,8 +8,6 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.vectorstores import VectorStore
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
-
-from .data_scraper import DataScraperMessage
 
 _TEMPLATE: Final = """
 You are Mimi The President of Cyber Valley, an assistant for question-answering tasks.
@@ -36,7 +34,9 @@ def setup_graph(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateG
     graph_builder.add_node(
         _retrieve.__name__, functools.partial(_retrieve, vector_store=vector_store)
     )
-    graph_builder.add_node(_generate.__name__, functools.partial(_generate, llm=llm, template=_TEMPLATE))
+    graph_builder.add_node(
+        _generate.__name__, functools.partial(_generate, llm=llm, template=_TEMPLATE)
+    )
     graph_builder.add_edge(START, _retrieve.__name__)
     return graph_builder.compile()
 
