@@ -9,22 +9,26 @@ from datetime import timedelta
 from enum import StrEnum, auto
 from pathlib import Path
 from queue import Queue
-from typing import NoReturn, assert_never
+from typing import Final, NoReturn, assert_never
 
 from mimi import (
     DataOrigin,
     data_scraper,
     embedding_pipeline,
     factory,
+    rag_chat_prompt,
+    telegram_bot,
 )
+from mimi.config import EmbeddingPipelineConfig, TelegramConfig
 from mimi.data_scraper import DataScraperMessage
 from mimi.data_scraper.github import GithubScraperContext
 from mimi.data_scraper.telegram import PeersConfig, TelegramScraperContext
 from mimi.data_scraper.x import XScraperContext
-from mimi.embedding_config import EmbeddingPipelineConfig
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.INFO))
 log = logging.getLogger(__name__)
+
+DEFAULT_CONFIG_FILE_NAME: Final = "mimi_config.json"
 
 
 class Command(StrEnum):
@@ -209,7 +213,7 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
         "--config",
         "-c",
         type=Path,
-        default="pipeline_config.json",
+        default=DEFAULT_CONFIG_FILE_NAME,
         help="Config file to run pipeline.",
     )
     args = parser.parse_args()
@@ -260,8 +264,26 @@ def _queue_size_listener[T](sink: Queue[T]) -> NoReturn:
         time.sleep(60)
 
 
-def execute_telegram_bot(_parser: argparse.ArgumentParser) -> NoReturn:
-    raise Exception
+def execute_telegram_bot(parser: argparse.ArgumentParser) -> NoReturn:
+    parser.add_argument(
+        "--config",
+        "-c",
+        type=Path,
+        default=DEFAULT_CONFIG_FILE_NAME,
+        help="Config file to run pipeline.",
+    )
+    args = parser.parse_args()
+    config = TelegramConfig.from_dict(json.loads(args.config.read_text()))
+    connection = factory.get_connection(config.embedding.db_file)
+    vector_store = factory.get_vector_store(
+        connection,
+        config.embedding.embedding_provider,
+        config.embedding.embedding_model_name,
+        config.embedding.embedding_table_name,
+    )
+    llm = factory.get_llm(config.llm.provider, config.llm.model)
+    graph = rag_chat_prompt.init(vector_store, llm)
+    telegram_bot.run(graph)
 
 
 if __name__ == "__main__":

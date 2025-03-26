@@ -6,7 +6,7 @@ from typing import Any, Self
 from mimi.data_scraper.github import GithubScraperContext, GitRepository
 from mimi.data_scraper.telegram import PeersConfig, TelegramScraperContext
 from mimi.data_scraper.x import XScraperContext
-from mimi.domain import EmbeddingProvider
+from mimi.domain import EmbeddingProvider, LLMProvider
 
 
 @dataclass
@@ -17,12 +17,13 @@ class EmbeddingPipelineContext:
     embedding_table_name: str
 
     @classmethod
-    def from_dict(cls, json_data: dict[str, Any]) -> Self:
+    def from_dict(cls, d: dict[str, Any]) -> Self:
+        d = d["embedding"]
         return cls(
-            db_file=Path(json_data["db_file"]),
-            embedding_provider=EmbeddingProvider(json_data["embedding_provider"]),
-            embedding_model_name=json_data["embedding_model_name"],
-            embedding_table_name=json_data["embedding_table_name"],
+            db_file=Path(d["db_file"]),
+            embedding_provider=EmbeddingProvider(d["embedding_provider"]),
+            embedding_model_name=d["embedding_model_name"],
+            embedding_table_name=d["embedding_table_name"],
         )
 
 
@@ -33,41 +34,42 @@ class ScrapersContext:
     github: None | GithubScraperContext
 
     @classmethod
-    def from_dict(cls, json_data: dict[str, Any]) -> Self:
+    def from_dict(cls, d: dict[str, Any]) -> Self:
+        d = d["scrapers"]
         github_repos = {
             GitRepository(**repo)
-            for repo in json_data["github"].get("repositories_to_follow", [])
+            for repo in d["github"].get("repositories_to_follow", [])
         }
 
-        peers_config_data = json_data["telegram"].get(
+        peers_config_data = d["telegram"].get(
             "peers_config", {"groups_ids": [], "fourms_ids": []}
         )
         peers_config = PeersConfig(**peers_config_data)
 
         x = XScraperContext(
             user_tweets_json_directory=Path(
-                json_data["x"].get("user_tweets_json_directory", "")
+                d["x"].get("user_tweets_json_directory", "")
             ),
-            accounts_to_follow=json_data["x"].get("accounts_to_follow", []),
-            poll_interval=_deserialize_timedelta(json_data["x"]["poll_interval"])
-            if json_data["x"].get("poll_interval")
+            accounts_to_follow=d["x"].get("accounts_to_follow", []),
+            poll_interval=_deserialize_timedelta(d["x"]["poll_interval"])
+            if d["x"].get("poll_interval")
             else None,
         )
 
         telegram = TelegramScraperContext(
             peers_config=peers_config,
-            history_depth=json_data["telegram"].get("history_depth", 50),
-            process_new=json_data["telegram"].get("process_new", True),
+            history_depth=d["telegram"].get("history_depth", 50),
+            process_new=d["telegram"].get("process_new", True),
         )
 
         github = GithubScraperContext(
-            port=json_data["github"].get("port", 8000),
-            host=json_data["github"].get("host", "localhost"),
+            port=d["github"].get("port", 8000),
+            host=d["github"].get("host", "localhost"),
             repository_base_path=Path(
-                json_data["github"].get("repository_base_path", "github-repositories")
+                d["github"].get("repository_base_path", "github-repositories")
             ),
             repositories_to_follow=github_repos,
-            run_server=json_data["github"].get("run_server", True),
+            run_server=d["github"].get("run_server", True),
         )
 
         assert any(item is not None for item in (x, telegram, github)), (
@@ -83,10 +85,36 @@ class EmbeddingPipelineConfig:
     embedding: EmbeddingPipelineContext
 
     @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Self:
+        return cls(
+            scrapers=ScrapersContext.from_dict(d),
+            embedding=EmbeddingPipelineContext.from_dict(d),
+        )
+
+
+@dataclass
+class LLMContext:
+    provider: LLMProvider
+    model: str
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Self:
+        return cls(
+            provider=LLMProvider(d["llm"]["provider"]),
+            model=d["llm"]["embedding_table_name"],
+        )
+
+
+@dataclass
+class TelegramConfig:
+    llm: LLMContext
+    embedding: EmbeddingPipelineContext
+
+    @classmethod
     def from_dict(cls, json_data: dict[str, Any]) -> Self:
         return cls(
-            scrapers=ScrapersContext.from_dict(json_data["scrapers"]),
-            embedding=EmbeddingPipelineContext.from_dict(json_data["embedding"]),
+            llm=LLMContext.from_dict(json_data),
+            embedding=EmbeddingPipelineContext.from_dict(json_data),
         )
 
 

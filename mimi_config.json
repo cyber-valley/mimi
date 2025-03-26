@@ -5,6 +5,10 @@
     "embedding_model_name": "text-embedding-3-small",
     "embedding_table_name": "embeddings"
   },
+  "llm": {
+    "provider": "openrouter",
+    "model": "google/gemini-2.0-flash-lite-preview-02-05:free"
+  },
   "scrapers": {
     "x": {
       "user_tweets_json_directory": "user_tweets",
