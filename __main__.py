@@ -201,11 +201,20 @@ def execute_embedding_pipeline(parser: argparse.ArgumentParser) -> NoReturn:
     )
     args = parser.parse_args()
     config = EmbeddingPipelineConfig.from_dict(json.loads(args.config.read_text()))
-    scrapers = (
-        functools.partial(data_scraper.github.scrape, config.scrapers.github),
-        functools.partial(data_scraper.x.scrape, config.scrapers.x),
-        functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram),
-    )
+
+    scrapers = []
+    if config.scrapers.github:
+        scrapers.append(
+            functools.partial(data_scraper.github.scrape, config.scrapers.github)
+        )
+    if config.scrapers.x:
+        scrapers.append(functools.partial(data_scraper.x.scrape, config.scrapers.x))
+    if config.scrapers.telegram:
+        scrapers.append(
+            functools.partial(data_scraper.telegram.scrape, config.scrapers.telegram)
+        )
+    assert scrapers, "At least one scraper should be configured"
+
     sink: Queue[DataScraperMessage] = Queue()
 
     with ThreadPoolExecutor(max_workers=len(scrapers)) as pool:
