@@ -85,7 +85,7 @@ async def _scrape(
 async def _scrape_updates(
     client: TelegramClient, config: PeersConfig, depth: int
 ) -> AsyncIterator[DataScraperMessage]:
-    delay = timedelta(seconds=1)
+    delay = timedelta(milliseconds=100)
     for stream in (
         _scrape_groups(client, config.groups_ids, depth, delay),
         _scrape_forums(client, config.forums_ids, depth, delay),
@@ -101,7 +101,6 @@ async def _scrape_updates(
                         message.id,
                         text,
                     )
-            await asyncio.sleep(1)
 
 
 async def _scrape_groups(
