@@ -28,6 +28,8 @@ class EmbeddingPipelineConfig:
             .get("github", {"disabled": True})
             .get("disabled", False)
         ):
+            github_context = None
+        else:
             github_repos = {
                 GitRepository(**repo)
                 for repo in json_data["scrapers"]["github"].get(
@@ -45,16 +47,16 @@ class EmbeddingPipelineConfig:
                 repositories_to_follow=github_repos,
                 run_server=json_data["scrapers"]["github"].get("run_server", True),
             )
-        else:
-            github_context = None
 
         if (
             json_data["scrapers"]
             .get("telegram", {"disabled": True})
             .get("disabled", False)
         ):
+            telegram_context = None
+        else:
             peers_config_data = json_data["scrapers"]["telegram"].get(
-                "peers_config", {"groups_ids": [], "fourms_ids": []}
+                "peers_config", {"groups_ids": [], "forums_ids": []}
             )
             peers_config = PeersConfig(**peers_config_data)
 
@@ -65,10 +67,10 @@ class EmbeddingPipelineConfig:
                 ),
                 process_new=json_data["scrapers"]["telegram"].get("process_new", True),
             )
-        else:
-            telegram_context = None
 
         if json_data["scrapers"].get("x", {"disabled": True}).get("disabled", False):
+            x_context = None
+        else:
             x_context = XScraperContext(
                 user_tweets_json_directory=Path(
                     json_data["scrapers"]["x"].get("user_tweets_json_directory", "")
@@ -82,8 +84,6 @@ class EmbeddingPipelineConfig:
                 if json_data["scrapers"]["x"].get("poll_interval")
                 else None,
             )
-        else:
-            x_context = None
 
         scrapers_context = ScrapersContext(
             x=x_context, telegram=telegram_context, github=github_context
