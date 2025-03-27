@@ -69,35 +69,48 @@ def _process_message(
     }
     splits = text_splitter.split_text(message.data)
     identifier_hash = hashlib.sha256(message.identifier.encode()).hexdigest()
-    log.debug("Processing message from %s", message.origin)
+    log.debug("[%s] Processing message from %s", identifier_hash, message.origin)
 
-    rowids = _find_rowids(identifier_hash, connection)
+    rowids_to_texts = _find_rowids_to_texts_by_identifer_hash(
+        identifier_hash, connection, embedding_table_name
+    )
+    data_hash = hashlib.sha256(message.data.encode()).digest()
+    updated_rowids = [
+        rowid
+        for rowid, text in rowids_to_texts.items()
+        if hashlib.sha256(message.data.encode()).digest() == data_hash
+    ]
+
     with sqlite3_transaction(connection):
-        if rowids:
+        if updated_rowids:
             _delete_embeddings(
-                embedding_table_name, rowids, identifier_hash, connection
+                embedding_table_name, updated_rowids, identifier_hash, connection
             )
-            log.info("Deleted %s embeddings", len(rowids))
+            log.info("[%s] Deleted %s embeddings", identifier_hash, len(updated_rowids))
 
         rowids = vector_store.add_texts(
             texts=splits,
             metadatas=[metadata for _ in splits],
         )
         _save_identifier_to_rowid(rowids, identifier_hash, connection)
-    log.debug("Saved %s embeddings", len(rowids))
+    log.info("[%s] Saved %s embeddings", identifier_hash, len(rowids))
 
 
-def _find_rowids(identifier_hash: str, connection: sqlite3.Connection) -> list[str]:
-    return [
-        row["rowid"]
+def _find_rowids_to_texts_by_identifer_hash(
+    identifier_hash: str, connection: sqlite3.Connection, embedding_table_name: str
+) -> dict[str, str]:
+    return {
+        row["rowid"]: row["text"]
         for row in connection.execute(
-            """
-            SELECT rowid FROM identifier_to_rowid
+            f"""
+            SELECT itr.rowid, e.text FROM identifier_to_rowid itr
+            INNER JOIN {embedding_table_name} e
+              ON e.rowid = itr.rowid
             WHERE hash = ?
-            """,
+            """,  # noqa: S608
             (identifier_hash,),
         )
-    ]
+    }
 
 
 def _delete_embeddings(
