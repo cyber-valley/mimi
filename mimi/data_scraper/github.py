@@ -192,7 +192,7 @@ def _scrape_issues_page(
         return []
 
     log.info("Got %s issues from page %s", len(issues), page)
-    return [_scrape_issue(personal_access_token, issue) for issue in issues if issue]
+    return [_scrape_issue(personal_access_token, issue) for issue in issues]
 
 
 @tenacity.retry(
@@ -210,7 +210,7 @@ def _scrape_issue(personal_access_token: str, url_or_data: str | Any) -> GithubI
             log.debug("Processing issue %s", issue)
 
             title = issue["title"]
-            assignee_login = issue.get("assignee", {}).get("login")
+            assignee_login = (issue.get("assignee") or {}).get("login")
             body = issue["body"]
             if not body:
                 log.warning("Got issue with empty body")
