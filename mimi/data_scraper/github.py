@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, NoReturn, assert_never, Self
+from typing import Any, NoReturn, Self, assert_never
 
 import requests
 import tenacity
@@ -104,12 +104,13 @@ def _scrape_issues(
     sink: DataSink[DataScraperMessage],
     repository: GitRepository,
     *,
-    issue_url: None | str = None
+    issues_urls: None | list[str] = None,
 ) -> None:
-    if issue_url:
-        issues = [_scrape_issue(issue_url_or_repository)]
+    issues: Iterable[GithubIssue]
+    if issues_urls:
+        issues = (_scrape_issue(url) for url in issues_urls)
     else:
-        issues = _scrape_issues_by_pages(sink, issue_url_or_repository)
+        issues = _scrape_all_issues(repository)
 
     for issue in issues:
         data = (
@@ -137,9 +138,8 @@ def _scrape_issues(
             )
         )
 
-def _scrape_issues_by_pages(
-    sink: DataSink[DataScraperMessage], repository: GitRepository
-) -> Iterable[GithubIssue]:
+
+def _scrape_all_issues(repository: GitRepository) -> Iterable[GithubIssue]:
     url = f"https://api.github.com/repos/{repository.owner}/{repository.name}/issues"
 
     page = 1
@@ -313,11 +313,12 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
 
     def _process_webhook(self) -> None:
         content_length = int(self.headers["Content-Length"])
-        post_data = self.rfile.read(content_length)
+        post_data = self.rfile.read(content_length).decode("utf-8")
 
         try:
-            payload = json.loads(post_data.decode("utf-8"))
+            payload = json.loads(post_data)
         except json.JSONDecodeError:
+            log.exception("Failed to parse payload of %s", post_data)
             self.send_response(400)
             return
 
@@ -331,19 +332,19 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
                     )
                 with _set_directory(self._context.repository_base_path):
                     _scrape_git_repository(self._sink, repository)
-            case ["issues", {"repository": {"full_name": full_name}, "issue": {"url": url}}]:
+            case [
+                "issues" | "issue_comment",
+                {"repository": {"full_name": full_name}, "issue": {"url": url}},
+            ]:
                 log.info("Received issues event. Payload=%s", payload)
                 repository = GitRepository.from_github_full_name(full_name)
                 if repository not in self._context.repositories_to_follow:
                     log.warning(
                         "Got issues event for the unfollowed repository %s", repository
                     )
-                _scrape_issues(self._sink, repository, issue_url=url)
+                _scrape_issues(self._sink, repository, issues_urls=[url])
             case event:
-                log.warning(
-                    "Received unknown event=%s ",
-                    event
-                )
+                log.warning("Received unknown event=%s ", event)
 
         self.send_response(200)
         self.send_header("Content-type", "application/json")
