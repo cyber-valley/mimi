@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, NoReturn, assert_never
+from typing import Any, NoReturn, assert_never, Self
 
 import requests
 import tenacity
@@ -30,6 +30,10 @@ class GithubScraperStopped(Exception):  # noqa: N818
 class GitRepository:
     owner: str
     name: str
+
+    @classmethod
+    def from_github_full_name(cls, full_name: str) -> Self:
+        return cls(*full_name.split("/"))
 
 
 @dataclass
@@ -97,8 +101,45 @@ class GithubIssue:
 
 
 def _scrape_issues(
-    sink: DataSink[DataScraperMessage], repository: GitRepository
+    sink: DataSink[DataScraperMessage],
+    repository: GitRepository,
+    *,
+    issue_url: None | str = None
 ) -> None:
+    if issue_url:
+        issues = [_scrape_issue(issue_url_or_repository)]
+    else:
+        issues = _scrape_issues_by_pages(sink, issue_url_or_repository)
+
+    for issue in issues:
+        data = (
+            issue.title
+            + (
+                ("\nAssigned to: @" + issue.assignee_login)
+                if issue.assignee_login
+                else "\nNot assigned yet"
+            )
+            + "\n\n"
+            + (issue.body or "")
+            + "\n\nComments:\n"
+            + "\n".join(
+                f"From @{comment.user_login}: {comment.comment}"
+                for comment in issue.comments
+            )
+        )
+        sink.put(
+            DataScraperMessage(
+                data=data,
+                origin=DataOrigin.GITHUB,
+                scraped_at=datetime.now(UTC),
+                pub_date=issue.updated_at,
+                identifier=f"{repository.owner}/{repository.name}@{issue.number}",
+            )
+        )
+
+def _scrape_issues_by_pages(
+    sink: DataSink[DataScraperMessage], repository: GitRepository
+) -> Iterable[GithubIssue]:
     url = f"https://api.github.com/repos/{repository.owner}/{repository.name}/issues"
 
     page = 1
@@ -106,33 +147,7 @@ def _scrape_issues(
         issues = _scrape_issues_page(url, page)
         if not issues:
             break
-
-        for issue in issues:
-            data = (
-                issue.title
-                + (
-                    ("\nAssigned to: @" + issue.assignee_login)
-                    if issue.assignee_login
-                    else "\nNot assigned yet"
-                )
-                + "\n\n"
-                + (issue.body or "")
-                + "\n\nComments:\n"
-                + "\n".join(
-                    f"From @{comment.user_login}: {comment.comment}"
-                    for comment in issue.comments
-                )
-            )
-            sink.put(
-                DataScraperMessage(
-                    data=data,
-                    origin=DataOrigin.GITHUB,
-                    scraped_at=datetime.now(UTC),
-                    pub_date=issue.updated_at,
-                    identifier=f"{repository.owner}/{repository.name}@{issue.number}",
-                )
-            )
-
+        yield from issues
         page += 1
 
 
@@ -306,24 +321,28 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
             self.send_response(400)
             return
 
-        match self.headers.get("X-GitHub-Event"):
-            case "push":
+        match [self.headers.get("X-GitHub-Event"), payload]:
+            case ["push", {"repository": {"full_name": full_name}}]:
                 log.info("Received push event. Payload=%s", payload)
-                repository = GitRepository(*payload["full_name"].split("/"))
+                repository = GitRepository.from_github_full_name(full_name)
                 if repository not in self._context.repositories_to_follow:
                     log.warning(
                         "Got push event for the unfollowed repository %s", repository
                     )
                 with _set_directory(self._context.repository_base_path):
                     _scrape_git_repository(self._sink, repository)
-            case "issues":
+            case ["issues", {"repository": {"full_name": full_name}, "issue": {"url": url}}]:
                 log.info("Received issues event. Payload=%s", payload)
-                raise NotImplementedError
-            case event_type:
+                repository = GitRepository.from_github_full_name(full_name)
+                if repository not in self._context.repositories_to_follow:
+                    log.warning(
+                        "Got issues event for the unfollowed repository %s", repository
+                    )
+                _scrape_issues(self._sink, repository, issue_url=url)
+            case event:
                 log.warning(
-                    "Received unknown event_type=%s with payload=%s",
-                    event_type,
-                    payload,
+                    "Received unknown event=%s ",
+                    event
                 )
 
         self.send_response(200)
