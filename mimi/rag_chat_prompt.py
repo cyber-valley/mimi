@@ -17,6 +17,8 @@ Use the following pieces of context to answer the question at the end.
 If you don't know the answer,
 just say that you don't know, don't try to make up an answer.
 Keep the answer as concise as possible.
+Add any provided relevant URLs
+Use Telegram HTML markdown for the formatting
 
 Context: {context}
 Question: {question}
