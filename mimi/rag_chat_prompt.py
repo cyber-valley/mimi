@@ -24,6 +24,8 @@ Use HTML formatting instead of markdown. Take thes as examples:
 <b>bold</b>
 <code>inline fixed-width code</code>
 <blockquote>Block quotation started</blockquote>
+Use tags from the above example only, all others are forbidden and u will be
+enslaved for 1_000_000 years if u use them.
 
 Context: {context}
 Question: {question}
