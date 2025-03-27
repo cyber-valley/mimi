@@ -21,6 +21,8 @@ FROM python:3.13-slim-bookworm AS production
 
 WORKDIR /app
 
+RUN apt-get install -y git
+
 COPY /mimi mimi
 COPY __main__.py .
 COPY --from=builder /app/.venv .venv
