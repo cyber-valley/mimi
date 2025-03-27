@@ -78,7 +78,7 @@ def _process_message(
     updated_rowids = [
         rowid
         for rowid, text in rowids_to_texts.items()
-        if hashlib.sha256(message.data.encode()).digest() == data_hash
+        if hashlib.sha256(message.data.encode()).digest() != data_hash
     ]
 
     with sqlite3_transaction(connection):
