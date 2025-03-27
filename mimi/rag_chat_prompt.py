@@ -19,7 +19,7 @@ just say that you don't know, don't try to make up an answer.
 Keep the answer as concise as possible.
 Add any provided relevant URLs
 
-Use HTML formatting instead of markdown. Take thes as examples:
+Use HTML formatting instead of markdown. Take this as examples:
 <a href="http://www.example.com/">inline URL</a>
 <b>bold</b>
 <code>inline fixed-width code</code>
@@ -58,7 +58,9 @@ def init(
 
     def generate(state: _State) -> dict[Literal["answer"], str]:
         prompt = PromptTemplate.from_template(_TEMPLATE)
-        docs_content = "\n\n".join(_cleanup_markdown(doc.page_content) for doc in state["context"])
+        docs_content = "\n\n".join(
+            _cleanup_markdown(doc.page_content) for doc in state["context"]
+        )
         messages = prompt.invoke(
             {"question": state["question"], "context": docs_content}
         )
