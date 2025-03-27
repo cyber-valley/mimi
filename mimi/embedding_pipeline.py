@@ -88,12 +88,15 @@ def _process_message(
             )
             log.info("[%s] Deleted %s embeddings", identifier_hash, len(updated_rowids))
 
-        rowids = vector_store.add_texts(
-            texts=splits,
-            metadatas=[metadata for _ in splits],
-        )
-        _save_identifier_to_rowid(rowids, identifier_hash, connection)
-    log.info("[%s] Saved %s embeddings", identifier_hash, len(rowids))
+        if not rowids_to_texts or updated_rowids:
+            rowids = vector_store.add_texts(
+                texts=splits,
+                metadatas=[metadata for _ in splits],
+            )
+            _save_identifier_to_rowid(rowids, identifier_hash, connection)
+            log.info("[%s] Saved %s embeddings", identifier_hash, len(rowids))
+        else:
+            log.info("[%s] Has actual embedding already", identifier_hash)
 
 
 def _find_rowids_to_texts_by_identifer_hash(
