@@ -4,14 +4,15 @@ import logging
 import os
 import subprocess
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn, assert_never
 
 import requests
+import tenacity
 from result import Err, Ok, Result
 
 from mimi import DataOrigin, DataSink
@@ -79,70 +80,139 @@ def scrape(
     raise GithubScraperStopped
 
 
+@dataclass
+class GithubIssueComment:
+    user_login: str
+    comment: str
+
+
+@dataclass
+class GithubIssue:
+    number: int
+    title: str
+    assignee_login: None | str
+    body: None | str
+    comments: list[GithubIssueComment]
+    updated_at: datetime
+
+
 def _scrape_issues(
     sink: DataSink[DataScraperMessage], repository: GitRepository
 ) -> None:
-    api_url = (
-        f"https://api.github.com/repos/{repository.owner}/{repository.name}/issues"
-    )
+    url = f"https://api.github.com/repos/{repository.owner}/{repository.name}/issues"
 
     page = 1
     while True:
-        response = requests.get(
-            api_url, params={"page": str(page), "state": "all"}, timeout=5
-        )
-        # FIXME: Wrap into own function with retry to handle rate limits
-        response.raise_for_status()
-
-        issues = response.json()
+        issues = _scrape_issues_page(url, page)
         if not issues:
             break
 
-        log.info("Got %s issues from page %s", len(issues), page)
         for issue in issues:
-            log.debug("Processing issue %s", issue)
-            response = requests.get(issue["comments_url"], timeout=3)
-            # FIXME: Wrap into own function with retry to handle rate limits
-            response.raise_for_status()
-            comments = response.json()
-
-            title = issue["title"] or ""
-            if not title:
-                log.warning("Got issue with empty title")
-            assignee_login = issue.get("assignee", {}).get("login")
-            body = issue["body"] or ""
-            if not body:
-                log.warning("Got issue with empty body")
-            comments = "\n".join(
-                f"Comment from @{login}: {body}"
-                for login, body in (
-                    (comment["user"]["login"], comment.get("body", "empty comment"))
-                    for comment in comments
-                )
-            )
-
             data = (
-                title
-                + "\nAssigned to: @"
-                + assignee_login
+                issue.title
+                + (
+                    ("\nAssigned to: @" + issue.assignee_login)
+                    if issue.assignee_login
+                    else "\nNot assigned yet"
+                )
                 + "\n\n"
-                + body
+                + (issue.body or "")
                 + "\n\nComments:\n"
-                + comments
+                + "\n".join(
+                    f"From @{comment.user_login}: {comment.comment}"
+                    for comment in issue.comments
+                )
             )
             sink.put(
                 DataScraperMessage(
                     data=data,
                     origin=DataOrigin.GITHUB,
                     scraped_at=datetime.now(UTC),
-                    pub_date=datetime.strptime(
-                        issue["updated_at"], "%Y-%m-%dT%H:%M:%SZ"
-                    ).replace(tzinfo=UTC),
-                    identifier=f"{repository.owner}/{repository.name}@{issue['number']}",
+                    pub_date=issue.updated_at,
+                    identifier=f"{repository.owner}/{repository.name}@{issue.number}",
                 )
             )
 
         page += 1
+
+
+@tenacity.retry(
+    retry=tenacity.retry_if_exception_type(requests.HTTPError)
+    | tenacity.retry_if_exception_type(requests.Timeout),
+    wait=tenacity.wait_exponential(multiplier=1, max=10),
+    stop=tenacity.stop_after_attempt(3),
+    before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
+    after=tenacity.after_log(log, logging.INFO),
+)
+def _scrape_issues_page(url: str, page: int) -> list[GithubIssue]:
+    response = requests.get(url, params={"page": str(page), "state": "all"}, timeout=5)
+    response.raise_for_status()
+
+    issues = response.json()
+    if not issues:
+        return []
+
+    log.info("Got %s issues from page %s", len(issues), page)
+    return [_scrape_issue(issue) for issue in issues]
+
+
+@tenacity.retry(
+    retry=tenacity.retry_if_exception_type(requests.HTTPError)
+    | tenacity.retry_if_exception_type(requests.Timeout),
+    wait=tenacity.wait_exponential(multiplier=1, max=10),
+    stop=tenacity.stop_after_attempt(3),
+    before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
+    after=tenacity.after_log(log, logging.INFO),
+)
+def _scrape_issue(url_or_data: str | Any) -> GithubIssue:
+    match url_or_data:
+        case Mapping():
+            issue = url_or_data
+            log.debug("Processing issue %s", issue)
+
+            title = issue["title"]
+            assignee_login = issue.get("assignee", {}).get("login")
+            body = issue["body"]
+            if not body:
+                log.warning("Got issue with empty body")
+
+            return GithubIssue(
+                number=issue["number"],
+                title=title,
+                assignee_login=assignee_login,
+                body=body,
+                comments=_scrape_issue_comments(issue["comments_url"]),
+                updated_at=datetime.strptime(
+                    issue["updated_at"], "%Y-%m-%dT%H:%M:%SZ"
+                ).replace(tzinfo=UTC),
+            )
+        case str():
+            response = requests.get(url_or_data, timeout=5)
+            response.raise_for_status()
+            return _scrape_issue(response.json())
+        case _:
+            assert_never(url_or_data)
+
+
+@tenacity.retry(
+    retry=tenacity.retry_if_exception_type(requests.HTTPError)
+    | tenacity.retry_if_exception_type(requests.Timeout),
+    wait=tenacity.wait_exponential(multiplier=1, max=10),
+    stop=tenacity.stop_after_attempt(3),
+    before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
+    after=tenacity.after_log(log, logging.INFO),
+)
+def _scrape_issue_comments(url: str) -> list[GithubIssueComment]:
+    response = requests.get(url, timeout=3)
+    response.raise_for_status()
+    comments = response.json()
+    return [
+        GithubIssueComment(
+            user_login=comment["user"]["login"],
+            comment=comment.get("body", "empty comment"),
+        )
+        for comment in comments
+    ]
 
 
 def _scrape_git_repository(
