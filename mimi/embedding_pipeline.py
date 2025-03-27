@@ -74,15 +74,15 @@ def _process_message(
     rowids_to_texts = _find_rowids_to_texts_by_identifer_hash(
         identifier_hash, connection, embedding_table_name
     )
-    data_hash = hashlib.sha256(message.data.encode()).digest()
     updated_rowids = [
         rowid
-        for rowid, text in rowids_to_texts.items()
-        if hashlib.sha256(text.encode()).digest() != data_hash
+        for (rowid, old), new in zip(rowids_to_texts.items(), splits, strict=False)
+        if hashlib.sha256(old.encode()).digest()
+        != hashlib.sha256(new.encode()).digest()
     ]
 
     with sqlite3_transaction(connection):
-        if updated_rowids:
+        if updated_rowids or len(updated_rowids) != len(splits):
             _delete_embeddings(
                 embedding_table_name, updated_rowids, identifier_hash, connection
             )
@@ -110,6 +110,7 @@ def _find_rowids_to_texts_by_identifer_hash(
             INNER JOIN {embedding_table_name} e
               ON e.rowid = itr.rowid
             WHERE hash = ?
+            ORDER BY itr.rowid
             """,  # noqa: S608
             (identifier_hash,),
         )
