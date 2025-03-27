@@ -19,15 +19,15 @@ just say that you don't know, don't try to make up an answer.
 Keep the answer as concise as possible.
 Add any provided relevant URLs
 
-Use HTML formatting instead of markdown. Take this as examples:
+Use HTML formatting instead of markdown. Use only these tags for the formatting.
 <a href="http://www.example.com/">inline URL</a>
 <b>bold</b>
 <code>inline fixed-width code</code>
 <blockquote>Block quotation started</blockquote>
-Use tags from the above example only, all others are forbidden and u will be
-enslaved for 1_000_000 years if u use them.
+All others are forbidden
 
-For the lists use numbered format.
+For the lists use numbered format without HTML. Your output will be provided
+to telegram api with HTML parse mode enabled
 
 Context: {context}
 Question: {question}

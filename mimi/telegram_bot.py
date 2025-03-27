@@ -41,9 +41,17 @@ def run(graph: CompiledStateGraph) -> NoReturn:
 
         match rag_chat_prompt.complete(graph, message.text):
             case Ok(answer):
-                bot.reply_to(
-                    message, answer, parse_mode="HTML", disable_web_page_preview=True
-                )
+                try:
+                    bot.reply_to(
+                        message,
+                        answer,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                    )
+                except Exception:
+                    bot.reply_to(
+                        message, "Failed to send the following text:\n" + answer
+                    )
             case Err(err):
                 match err:
                     case DocumentsNotFoundError():
