@@ -5,6 +5,7 @@ from typing import NoReturn, assert_never
 import telebot
 from langgraph.graph.state import CompiledStateGraph
 from result import Err, Ok
+from telebot.apihelper import ApiTelegramException
 from telebot.types import Message
 
 from mimi import rag_chat_prompt
@@ -48,7 +49,8 @@ def run(graph: CompiledStateGraph) -> NoReturn:
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
-                except Exception:
+                except ApiTelegramException:
+                    log.exception("Failed to send answer %s", answer)
                     bot.reply_to(
                         message, "Failed to send the following text:\n" + answer
                     )
