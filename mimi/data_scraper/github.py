@@ -119,10 +119,13 @@ def _scrape_issues(
     else:
         issues = _scrape_all_issues(personal_access_token, repository)
 
+    repository_url = "https://github.com/" + repository.owner + "/" + repository.name
     for issue in issues:
         data = (
-            "GitHub Issue\n"
-            + issue.title
+            "GitHub Issue in repository "
+            + repository_url
+            + "\n title: " + issue.title
+            + "\n url: " + repository_url + "/issues" + str(issue.number)
             + (
                 ("\nAssigned to: @" + issue.assignee_login)
                 if issue.assignee_login
