@@ -27,6 +27,8 @@ Use HTML formatting instead of markdown. Take thes as examples:
 Use tags from the above example only, all others are forbidden and u will be
 enslaved for 1_000_000 years if u use them.
 
+For the lists use numbered format.
+
 Context: {context}
 Question: {question}
 
