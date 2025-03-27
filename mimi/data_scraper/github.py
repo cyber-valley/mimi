@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import http.server
 import json
 import logging
@@ -43,6 +45,10 @@ class GithubScraperContext:
     repositories_to_follow: set[GitRepository]
     run_server: bool
     host: str = field(default="localhost")
+    secret: str = field(default_factory=lambda: os.environ["GITHUB_WEBHOOK_SECRET"])
+    personal_access_token: str = field(
+        default_factory=lambda: os.environ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+    )
 
 
 def scrape(
@@ -61,7 +67,7 @@ def scrape(
 
     log.info("Starting downloading issues")
     for repository in context.repositories_to_follow:
-        _scrape_issues(sink, repository)
+        _scrape_issues(sink, repository, context.personal_access_token)
 
     if not context.run_server:
         raise GithubScraperStopped
@@ -103,18 +109,20 @@ class GithubIssue:
 def _scrape_issues(
     sink: DataSink[DataScraperMessage],
     repository: GitRepository,
+    personal_access_token: str,
     *,
     issues_urls: None | list[str] = None,
 ) -> None:
     issues: Iterable[GithubIssue]
     if issues_urls:
-        issues = (_scrape_issue(url) for url in issues_urls)
+        issues = (_scrape_issue(personal_access_token, url) for url in issues_urls)
     else:
-        issues = _scrape_all_issues(repository)
+        issues = _scrape_all_issues(personal_access_token, repository)
 
     for issue in issues:
         data = (
-            issue.title
+            "GitHub Issue\n"
+            + issue.title
             + (
                 ("\nAssigned to: @" + issue.assignee_login)
                 if issue.assignee_login
@@ -139,12 +147,14 @@ def _scrape_issues(
         )
 
 
-def _scrape_all_issues(repository: GitRepository) -> Iterable[GithubIssue]:
+def _scrape_all_issues(
+    personal_access_token: str, repository: GitRepository
+) -> Iterable[GithubIssue]:
     url = f"https://api.github.com/repos/{repository.owner}/{repository.name}/issues"
 
     page = 1
     while True:
-        issues = _scrape_issues_page(url, page)
+        issues = _scrape_issues_page(personal_access_token, url, page)
         if not issues:
             break
         yield from issues
@@ -159,8 +169,15 @@ def _scrape_all_issues(repository: GitRepository) -> Iterable[GithubIssue]:
     before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
     after=tenacity.after_log(log, logging.INFO),
 )
-def _scrape_issues_page(url: str, page: int) -> list[GithubIssue]:
-    response = requests.get(url, params={"page": str(page), "state": "all"}, timeout=5)
+def _scrape_issues_page(
+    personal_access_token: str, url: str, page: int
+) -> list[GithubIssue]:
+    response = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {personal_access_token}"},
+        params={"page": str(page), "state": "all"},
+        timeout=5,
+    )
     response.raise_for_status()
 
     issues = response.json()
@@ -168,7 +185,7 @@ def _scrape_issues_page(url: str, page: int) -> list[GithubIssue]:
         return []
 
     log.info("Got %s issues from page %s", len(issues), page)
-    return [_scrape_issue(issue) for issue in issues]
+    return [_scrape_issue(personal_access_token, issue) for issue in issues]
 
 
 @tenacity.retry(
@@ -179,7 +196,7 @@ def _scrape_issues_page(url: str, page: int) -> list[GithubIssue]:
     before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
     after=tenacity.after_log(log, logging.INFO),
 )
-def _scrape_issue(url_or_data: str | Any) -> GithubIssue:
+def _scrape_issue(personal_access_token: str, url_or_data: str | Any) -> GithubIssue:
     match url_or_data:
         case Mapping():
             issue = url_or_data
@@ -202,9 +219,13 @@ def _scrape_issue(url_or_data: str | Any) -> GithubIssue:
                 ).replace(tzinfo=UTC),
             )
         case str():
-            response = requests.get(url_or_data, timeout=5)
+            response = requests.get(
+                url_or_data,
+                headers={"Authorization": f"Bearer {personal_access_token}"},
+                timeout=5,
+            )
             response.raise_for_status()
-            return _scrape_issue(response.json())
+            return _scrape_issue(personal_access_token, response.json())
         case _:
             assert_never(url_or_data)
 
@@ -312,13 +333,22 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
             self.end_headers()
 
     def _process_webhook(self) -> None:
+        signature = self.headers.get("X-Hub-Signature-256")
+
         content_length = int(self.headers["Content-Length"])
-        post_data = self.rfile.read(content_length).decode("utf-8")
+        body = self.rfile.read(content_length)
+
+        if not (
+            signature and _validate_signature(body, signature, self._context.secret)
+        ):
+            self.send_response(403)
+            self.end_headers()
+            return
 
         try:
-            payload = json.loads(post_data)
+            payload = json.loads(body.decode("utf-8"))
         except json.JSONDecodeError:
-            log.exception("Failed to parse payload of %s", post_data)
+            log.exception("Failed to parse payload of %s", body)
             self.send_response(400)
             return
 
@@ -342,7 +372,13 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
                     log.warning(
                         "Got issues event for the unfollowed repository %s", repository
                     )
-                _scrape_issues(self._sink, repository, issues_urls=[url])
+                _scrape_issues(
+                    self._sink,
+                    repository,
+                    self._context.personal_access_token,
+                    issues_urls=[url],
+                )
+                log.info("Issues updated")
             case event:
                 log.warning("Received unknown event=%s ", event)
 
@@ -381,3 +417,11 @@ def _set_directory(path: Path) -> Iterator[None]:
     finally:
         os.chdir(origin)
         log.debug("Switched current working directory back to %s", path)
+
+
+def _validate_signature(data: bytes, signature: str, secret: str) -> bool:
+    expected_signature = hmac.new(
+        secret.encode("utf-8"), msg=data, digestmod=hashlib.sha256
+    ).hexdigest()
+
+    return hmac.compare_digest(f"sha256={expected_signature}", signature)
