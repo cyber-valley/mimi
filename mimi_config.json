@@ -6,9 +6,9 @@
     "embedding_table_name": "embedding"
   },
   "llm": {
-    "provider": "openai",
-    "model": "gpt-4o-mini",
-    "max_documents_to_find": 10
+    "provider": "openrouter",
+    "model": "google/gemini-2.0-pro-exp-02-05:free",
+    "max_documents_to_find": 15
   },
   "scrapers": {
     "x": {
@@ -17,7 +17,6 @@
       "poll_interval": "5m"
     },
     "telegram": {
-      "disabled": true,
       "peers_config": {
         "groups_ids": [],
         "forums_ids": [2245058785, 2572439595]
@@ -26,14 +25,13 @@
       "process_new": true
     },
     "github": {
-      "disabled": true,
       "port": 8000,
       "host": "localhost",
       "repository_base_path": "github-repositories",
       "run_server": true,
       "repositories_to_follow": [
         {
-          "owner": "InspektorKek",
+          "owner": "cyber-valley",
           "name": "cvland"
         }
       ]
