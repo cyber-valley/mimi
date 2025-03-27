@@ -19,9 +19,11 @@ just say that you don't know, don't try to make up an answer.
 Keep the answer as concise as possible.
 Add any provided relevant URLs
 
-Use HTML to format URLs or text styles
-Take this as example:
+Use HTML formatting instead of markdown. Take thes as examples:
 <a href="http://www.example.com/">inline URL</a>
+<b>bold</b>
+<code>inline fixed-width code</code>
+<blockquote>Block quotation started</blockquote>
 
 Context: {context}
 Question: {question}
