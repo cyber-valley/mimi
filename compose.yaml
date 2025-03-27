@@ -8,11 +8,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./user-tweets:/app/user-tweets
-      - ./github-repositories:/app/github-repositories
-      - ./michael-client.session:/app/michael-client.session
-      - ./embeddings.db:/app/embeddings.db
-      - ./mimi_config.json:/app/mimi_config.json
+      - ./:/app
     command: embedding_pipeline
     restart: unless-stopped
     ports:
@@ -25,7 +21,6 @@ services:
     env_file:
       - .env
     volumes:
-      - ./embeddings.db:/app/embeddings.db
-      - ./mimi_config.json:/app/mimi_config.json
+      - ./:/app
     command: telegram_bot
     restart: unless-stopped
