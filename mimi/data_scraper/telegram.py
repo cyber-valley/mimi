@@ -10,8 +10,14 @@ from result import Err, Ok, Result
 from telethon import TelegramClient
 from telethon.events.newmessage import NewMessage
 from telethon.tl.functions.channels import GetForumTopicsRequest
-from telethon.tl.types import PeerChannel, PeerChat, PeerUser
-from telethon.types import InputChannel, InputPeerChannel, Message
+from telethon.tl.types import (
+    Channel,
+    Chat,
+    PeerChannel,
+    PeerChat,
+    PeerUser,
+)
+from telethon.types import InputChannel, Message
 
 from mimi import DataOrigin, DataSink
 
@@ -90,8 +96,8 @@ async def _scrape_updates(
         _scrape_groups(client, config.groups_ids, depth, delay),
         _scrape_forums(client, config.forums_ids, depth, delay),
     ):
-        async for message in stream:
-            match _convert_to_internal_message(message):
+        async for message, additional_content in stream:
+            match _convert_to_internal_message(message, additional_content):
                 case Ok(msg):
                     yield msg
                 case Err(text):
@@ -103,26 +109,41 @@ async def _scrape_updates(
             await asyncio.sleep(1)
 
 
+@dataclass
+class GroupAdditionalMessageContent:
+    title: str
+
+
+@dataclass
+class ForumAdditionalMessageContent:
+    title: str
+    topic_title: str
+
+
+AdditionalMessageContent = GroupAdditionalMessageContent | ForumAdditionalMessageContent
+
+
 async def _scrape_groups(
     client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
-) -> AsyncIterator[Message]:
+) -> AsyncIterator[tuple[Message, GroupAdditionalMessageContent]]:
     for idx, group_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape group %s", idx + 1, len(ids), group_id)
-        input_peer_group = await client.get_input_entity(PeerChat(group_id))
+        input_peer_group = await client.get_entity(PeerChat(group_id))
+        assert isinstance(input_peer_group, Chat)
         async for message in client.iter_messages(input_peer_group, limit=depth):
-            yield message
+            yield (message, GroupAdditionalMessageContent(input_peer_group.title))
         await asyncio.sleep(delay.total_seconds())
 
 
 async def _scrape_forums(
     client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
-) -> AsyncIterator[Message]:
+) -> AsyncIterator[tuple[Message, ForumAdditionalMessageContent]]:
     for idx, forum_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape forum %s", idx + 1, len(ids), forum_id)
 
-        input_peer_channel = await client.get_input_entity(PeerChannel(forum_id))
-        assert isinstance(input_peer_channel, InputPeerChannel), (
-            f"Got unexpected peer type f{input_peer_channel}"
+        input_peer_channel = await client.get_entity(PeerChannel(forum_id))
+        assert isinstance(input_peer_channel, Channel), (
+            f"Got unexpected peer type {input_peer_channel}"
         )
 
         topics_result = await client(
@@ -137,13 +158,18 @@ async def _scrape_forums(
         )
 
         for topic in topics_result.topics:
-            log.info("Starting scraping topic %s", topic.title)
+            log.info("Starting scraping topic %s", input_peer_channel.title)
             async for message in client.iter_messages(
                 input_peer_channel,
                 limit=depth,
                 reply_to=topic.id,
             ):
-                yield message
+                yield (
+                    message,
+                    ForumAdditionalMessageContent(
+                        title=input_peer_channel.title, topic_title=topic.title
+                    ),
+                )
 
         await asyncio.sleep(delay.total_seconds())
 
@@ -160,7 +186,9 @@ async def _process_updates(
 
         log.info("Got new message from %s: %s", event.chat.name, event)
 
-        match _convert_to_internal_message(event):
+        match _convert_to_internal_message(
+            event, GroupAdditionalMessageContent(event.chat.name)
+        ):
             case Ok(msg):
                 log.debug("Message sended to the sink")
                 sink.put(msg)
@@ -172,7 +200,9 @@ async def _process_updates(
     raise TelegramScraperStopped
 
 
-def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage, str]:
+def _convert_to_internal_message(
+    message: Message, additional_content: AdditionalMessageContent
+) -> Result[DataScraperMessage, str]:
     log.debug(message)
     if not message.message:
         return Err("Empty message text")
@@ -190,9 +220,19 @@ def _convert_to_internal_message(message: Message) -> Result[DataScraperMessage,
     else:
         assert_never(message.peer_id)
 
+    data = "Telegram message\n"
+    match additional_content:
+        case GroupAdditionalMessageContent(title=title):
+            data += f"Group title: {title}"
+        case ForumAdditionalMessageContent(title=title, topic_title=topic_title):
+            data += f"Forum title: {title}, topic title: {topic_title}"
+        case _:
+            assert_never(additional_content)
+    data += f"\n\nText {message.message}"
+
     return Ok(
         DataScraperMessage(
-            data=message.message,
+            data=data,
             identifier=f"{peer_id}:{message.id}",
             origin=DataOrigin.TELEGRAM,
             pub_date=message.date,
