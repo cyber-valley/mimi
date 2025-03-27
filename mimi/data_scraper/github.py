@@ -101,6 +101,11 @@ def _scrape_issues(
         log.info("Got %s issues from page %s", len(issues), page)
         for issue in issues:
             log.debug("Processing issue %s", issue)
+            response = requests.get(issue["comments_url"], timeout=3)
+            # FIXME: Wrap into own function with retry to handle rate limits
+            response.raise_for_status()
+            comments = response.json()
+
             title = issue["title"] or ""
             if not title:
                 log.warning("Got issue with empty title")
@@ -108,9 +113,26 @@ def _scrape_issues(
             body = issue["body"] or ""
             if not body:
                 log.warning("Got issue with empty body")
+            comments = "\n".join(
+                f"Comment from @{login}: {body}"
+                for login, body in (
+                    (comment["user"]["login"], comment.get("body", "empty comment"))
+                    for comment in comments
+                )
+            )
+
+            data = (
+                title
+                + "\nAssigned to: @"
+                + assignee_login
+                + "\n\n"
+                + body
+                + "\n\nComments:\n"
+                + comments
+            )
             sink.put(
                 DataScraperMessage(
-                    data=title + "\nAssigned to: @" + assignee_login + "\n\n" + body,
+                    data=data,
                     origin=DataOrigin.GITHUB,
                     scraped_at=datetime.now(UTC),
                     pub_date=datetime.strptime(
