@@ -213,7 +213,9 @@ def _scrape_issue(personal_access_token: str, url_or_data: str | Any) -> GithubI
                 title=title,
                 assignee_login=assignee_login,
                 body=body,
-                comments=_scrape_issue_comments(issue["comments_url"]),
+                comments=_scrape_issue_comments(
+                    personal_access_token,
+                    issue["comments_url"]),
                 updated_at=datetime.strptime(
                     issue["updated_at"], "%Y-%m-%dT%H:%M:%SZ"
                 ).replace(tzinfo=UTC),
@@ -238,10 +240,14 @@ def _scrape_issue(personal_access_token: str, url_or_data: str | Any) -> GithubI
     before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
     after=tenacity.after_log(log, logging.INFO),
 )
-def _scrape_issue_comments(url: str) -> list[GithubIssueComment]:
-    response = requests.get(url, timeout=3)
+def _scrape_issue_comments(personal_access_token: str, url: str) -> list[GithubIssueComment]:
+    log.debug("Scraping comments from %s", url)
+    response = requests.get(url,
+                            headers={"Authorization": f"Bearer {personal_access_token}"},
+                            timeout=3)
     response.raise_for_status()
     comments = response.json()
+    log.info("Scraped %s comments", len(comments))
     return [
         GithubIssueComment(
             user_login=comment["user"]["login"],
