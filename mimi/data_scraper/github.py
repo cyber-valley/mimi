@@ -98,10 +98,19 @@ def _scrape_issues(
         if not issues:
             break
 
+        log.info("Got %s issues from page %s", len(issues), page)
         for issue in issues:
+            log.debug("Processing issue %s", issue)
+            title = issue["title"] or ""
+            if not title:
+                log.warning("Got issue with empty title")
+            assignee_login = issue.get("assignee", {}).get("login")
+            body = issue["body"] or ""
+            if not body:
+                log.warning("Got issue with empty body")
             sink.put(
                 DataScraperMessage(
-                    data=issue["title"] + "\n\n" + issue["body"],
+                    data=title + "\nAssigned to: @" + assignee_login + "\n\n" + body,
                     origin=DataOrigin.GITHUB,
                     scraped_at=datetime.now(UTC),
                     pub_date=datetime.strptime(
