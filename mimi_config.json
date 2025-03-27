@@ -7,7 +7,8 @@
   },
   "llm": {
     "provider": "openai",
-    "model": "gpt-4o-mini"
+    "model": "gpt-4o-mini",
+    "max_documents_to_find": 10
   },
   "scrapers": {
     "x": {

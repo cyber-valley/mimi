@@ -103,12 +103,14 @@ class EmbeddingPipelineConfig:
 class LLMContext:
     provider: LLMProvider
     model: str
+    max_documents_to_find: int
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Self:
         return cls(
             provider=LLMProvider(d["llm"]["provider"]),
             model=d["llm"]["model"],
+            max_documents_to_find=d["llm"]["max_documents_to_find"],
         )
 
 

@@ -285,7 +285,7 @@ def execute_telegram_bot(parser: argparse.ArgumentParser) -> NoReturn:
         config.embedding.embedding_table_name,
     )
     llm = factory.get_llm(config.llm.provider, config.llm.model)
-    graph = rag_chat_prompt.init(vector_store, llm)
+    graph = rag_chat_prompt.init(vector_store, llm, config.llm.max_documents_to_find)
     telegram_bot.run(graph)
 
 
@@ -311,7 +311,7 @@ def execute_complete(parser: argparse.ArgumentParser) -> None:
         config.embedding.embedding_table_name,
     )
     llm = factory.get_llm(config.llm.provider, config.llm.model)
-    graph = rag_chat_prompt.init(vector_store, llm)
+    graph = rag_chat_prompt.init(vector_store, llm, config.llm.max_documents_to_find)
     print(rag_chat_prompt.complete(graph, args.query))
 
 

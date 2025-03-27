@@ -30,9 +30,14 @@ class _State(TypedDict):
     answer: str
 
 
-def init(vector_store: VectorStore, llm: BaseChatModel) -> CompiledStateGraph:
+def init(
+    vector_store: VectorStore, llm: BaseChatModel, max_documents_to_find: int
+) -> CompiledStateGraph:
     def retrieve(state: _State) -> dict[Literal["context"], list[Document]]:
-        retrieved_docs = vector_store.similarity_search(state["question"])
+        retrieved_docs = vector_store.similarity_search(
+            state["question"], k=max_documents_to_find
+        )
+        log.debug("Found documents %s", retrieved_docs)
         if retrieved_docs:
             log.info("Retrieved %s documents", len(retrieved_docs))
         else:
