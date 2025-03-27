@@ -52,7 +52,7 @@ def init(
 
     def generate(state: _State) -> dict[Literal["answer"], str]:
         prompt = PromptTemplate.from_template(_TEMPLATE)
-        docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+        docs_content = "\n\n".join(_cleanup_markdown(doc.page_content) for doc in state["context"])
         messages = prompt.invoke(
             {"question": state["question"], "context": docs_content}
         )
@@ -92,3 +92,7 @@ def complete(graph: CompiledStateGraph, query: str) -> Result[str, RagCompletion
         return Err(DocumentsNotFoundError())
 
     return Ok(answer)
+
+
+def _cleanup_markdown(data: str) -> str:
+    return data.replace("[[", "").replace("]]", "")
