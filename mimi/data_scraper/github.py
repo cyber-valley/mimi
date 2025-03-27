@@ -192,7 +192,7 @@ def _scrape_issues_page(
         return []
 
     log.info("Got %s issues from page %s", len(issues), page)
-    return [_scrape_issue(personal_access_token, issue) for issue in issues]
+    return [_scrape_issue(personal_access_token, issue) for issue in issues if issue]
 
 
 @tenacity.retry(
