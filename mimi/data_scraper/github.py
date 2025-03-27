@@ -124,8 +124,12 @@ def _scrape_issues(
         data = (
             "GitHub Issue in repository "
             + repository_url
-            + "\n title: " + issue.title
-            + "\n url: " + repository_url + "/issues" + str(issue.number)
+            + "\n title: "
+            + issue.title
+            + "\n url: "
+            + repository_url
+            + "/issues"
+            + str(issue.number)
             + (
                 ("\nAssigned to: @" + issue.assignee_login)
                 if issue.assignee_login
@@ -217,8 +221,8 @@ def _scrape_issue(personal_access_token: str, url_or_data: str | Any) -> GithubI
                 assignee_login=assignee_login,
                 body=body,
                 comments=_scrape_issue_comments(
-                    personal_access_token,
-                    issue["comments_url"]),
+                    personal_access_token, issue["comments_url"]
+                ),
                 updated_at=datetime.strptime(
                     issue["updated_at"], "%Y-%m-%dT%H:%M:%SZ"
                 ).replace(tzinfo=UTC),
@@ -243,11 +247,13 @@ def _scrape_issue(personal_access_token: str, url_or_data: str | Any) -> GithubI
     before_sleep=tenacity.before_sleep_log(log, logging.ERROR, exc_info=True),
     after=tenacity.after_log(log, logging.INFO),
 )
-def _scrape_issue_comments(personal_access_token: str, url: str) -> list[GithubIssueComment]:
+def _scrape_issue_comments(
+    personal_access_token: str, url: str
+) -> list[GithubIssueComment]:
     log.debug("Scraping comments from %s", url)
-    response = requests.get(url,
-                            headers={"Authorization": f"Bearer {personal_access_token}"},
-                            timeout=3)
+    response = requests.get(
+        url, headers={"Authorization": f"Bearer {personal_access_token}"}, timeout=3
+    )
     response.raise_for_status()
     comments = response.json()
     log.info("Scraped %s comments", len(comments))
