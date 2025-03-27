@@ -18,7 +18,10 @@ If you don't know the answer,
 just say that you don't know, don't try to make up an answer.
 Keep the answer as concise as possible.
 Add any provided relevant URLs
-Use Telegram HTML markdown for the formatting
+
+Use HTML to format URLs or text styles
+Take this as example:
+<a href="http://www.example.com/">inline URL</a>
 
 Context: {context}
 Question: {question}
