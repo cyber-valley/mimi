@@ -34,6 +34,7 @@ def run(graph: CompiledStateGraph) -> NoReturn:
             message.from_user.id if message.from_user else None,
             message.text,
         )
+        bot.send_chat_action(message.chat.id, "typing")
         if not message.text:
             bot.reply_to(message, "I know how to process text messages only.")
             return
