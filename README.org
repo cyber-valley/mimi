@@ -2,18 +2,20 @@
 #+author: aishift
 
 * Table of contents                                          :toc_3:noexport:
-- [[#problem][Problem]]
-- [[#solution][Solution]]
-  - [[#announce][Announce]]
-  - [[#implementation-details][Implementation details]]
-    - [[#embedding-model][Embedding model]]
-    - [[#llm-chat-bot][LLM chat bot]]
-    - [[#data-store][Data store]]
-    - [[#programming-language][Programming language]]
-    - [[#parsing][Parsing]]
-- [[#feature-improvements][Feature improvements]]
+- [[#closed-beta][Closed beta]]
+  - [[#problem][Problem]]
+  - [[#solution][Solution]]
+    - [[#announce][Announce]]
+    - [[#implementation-details][Implementation details]]
+  - [[#feature-improvements][Feature improvements]]
+- [[#minimal-valuable-product][Minimal valuable product]]
+  - [[#problem-1][Problem]]
+  - [[#solution-1][Solution]]
+    - [[#additional-improvements--features][Additional improvements / features]]
+    - [[#implementation-details-1][Implementation details]]
 
-* Problem
+* Closed beta
+** Problem
 
 The rapidly developing Cyber Valley project has diverse sources of truth represented in the following resources:
 
@@ -24,50 +26,81 @@ The rapidly developing Cyber Valley project has diverse sources of truth represe
 
 Searching all of them becomes a time-consuming process and requires a simple way of querying all of them at one time.
 
-* Solution
+** Solution
 
-** Announce
+*** Announce
 
 Develop RAG over all resources mentioned in the problem statement and provide an LLM-driven chat bot, which allows interactive and free-form querying of all of them at once.
 
-** Implementation details
+*** Implementation details
 
-*** Embedding model
+**** Embedding model
 
 We keep in mind that in the future it could be great to change the chosen model, but it requires complete recalculation for the whole dataset (because of different dimensions and algorithms in general). To handle this, we will store all source data "as is", so making embeddings will be a question of computation.
 For the POC we will stick to the OpenAI [[https://platform.openai.com/docs/guides/embeddings#embedding-models][text-embedding-3-small]] which is pretty cheap and should work well enough.
 
 [[file:img/embedding-model-pricing.png]]
 
-*** LLM chat bot
+**** LLM chat bot
 
 Our solution is completely model-agnostic, so any provider could be used and switched on the fly.
 
-*** Data store
+**** Data store
 
 We choose [[https://docs.turso.tech/introduction][Turso]] as our DBMS; it works perfectly with vector search, scales greatly on HDD drives, and has zero network latency because it's built on [[https://github.com/tursodatabase/libsql/][libSQL]].
 
-*** Programming language
+**** Programming language
 
 We will use Python & [[https://www.langchain.com/langchain][LangChain]] for the project because it'll just need glue between IO operations. Rust wouldn't make a visible difference in speed or durability and lacks ready-to-use packages for fast idea testing.
 
-*** Parsing
+**** Parsing
 
-**** X.com
+***** X.com
 
 We don't know for sure the general required number of accounts, their requirements, and their publicity. So for the start and completely for free, it's possible to use Google news RSS. As an example, here is the RSS feed generated for [[https://x.com/levelsio][@levelsio]] - https://news.google.com/rss/search?q=site:twitter.com/levelsio+when:7
 
-**** Telegram groups
+***** Telegram groups
 
 We offer to use the [[https://core.telegram.org/#telegram-api][Telegram Client API]]. It requires its own Telegram account but in exchange has access to the whole history of messages (in super groups where it's allowed). The algorithm for adding support for a new group will be the same as adding a new participant to the group. Then we will download all message history (with a given threshold or fully), then listen to new messages and process them as well.
 
-**** GitHub
+***** GitHub
 
 We can use the [[https://docs.github.com/en/webhooks/webhook-events-and-payloads][Webhooks API]] to get updates on commits to the LogSeq files and issues.
 
-* Feature improvements
+** Feature improvements
 
 - Embed media (pictures, video, and audio) as well
 - Query and embed provided URLs in the text info
 - Include URLs to the initial sources found with RAG
 - Allow querying only given resources e.g., "What are the statuses of the current projects with aishift in GitHub issues"
+
+* Minimal valuable product
+
+** Problem
+
+Straight forward RAG solution doesn't work good enough in case of awareness of sources and types of information, so queries about concrete messages in telegram groups or issues assigned to exact people and time boundaries don't work.
+
+** Solution
+
+Enrich documents metadata with all possible tags and implement additional filtering by them with LLM
+
+*** Additional improvements / features
+
+**** Self aware prompt
+
+Make Mimi to know in general in what field of data it operates and what are it's responsibilities
+
+**** Store chat history
+
+Keep each user's conversation so Mimi will know about previous messages
+
+**** Add GitHub project's board parsing
+
+Pure GitHub issues scraping isn't enough, more information should be fetched from the API. TBD @MichaelBorisov
+
+*** Implementation details
+
+- Migrate from SQLite to [[https://docs.cozodb.org/en/latest/index.html][CozoDB]] for the better metada search and future easier improves
+- Add context about CyberValley directly to the system prompt
+- Store all chat history in CozoDB as well but take only fixed amount of messages to fit in the context window
+- Improve GitHub scraper to parse more data
