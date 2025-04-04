@@ -340,7 +340,7 @@ class _BaseGithubWebhookHandler(http.server.BaseHTTPRequestHandler, ABC):
     def _sink(self) -> DataSink[DataScraperMessage]: ...
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path == "/webhook":
+        if self.path == "/github/webhook":
             self._process_webhook()
         else:
             self.send_response(404)
