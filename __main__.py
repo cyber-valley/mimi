@@ -1,8 +1,10 @@
 import argparse
+import atexit
 import functools
 import json
 import logging
-import os
+import logging.config
+import logging.handlers
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
@@ -25,7 +27,6 @@ from mimi.data_scraper.github import GithubScraperContext
 from mimi.data_scraper.telegram import PeersConfig, TelegramScraperContext
 from mimi.data_scraper.x import XScraperContext
 
-logging.basicConfig(level=os.getenv("LOG_LEVEL", logging.INFO))
 log = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_FILE_NAME: Final = "mimi_config.json"
@@ -39,6 +40,7 @@ class Command(StrEnum):
 
 
 def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Mimi President which scrapes data and provides RAG powered chat."
     )
@@ -313,6 +315,18 @@ def execute_complete(parser: argparse.ArgumentParser) -> None:
     llm = factory.get_llm(config.llm.provider, config.llm.model)
     graph = rag_chat_prompt.init(vector_store, llm, config.llm.max_documents_to_find)
     print(rag_chat_prompt.complete(graph, args.query))
+
+
+def setup_logging() -> None:
+    config = json.loads(Path("logging.json").read_text())
+    logging.config.dictConfig(config)
+    queue_handler = logging.getHandlerByName("queue_handler")
+    if queue_handler is None:
+        return
+    assert isinstance(queue_handler, logging.handlers.QueueHandler)
+    assert queue_handler.listener is not None
+    queue_handler.listener.start()
+    atexit.register(queue_handler.listener.stop)
 
 
 if __name__ == "__main__":

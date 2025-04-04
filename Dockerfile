@@ -28,6 +28,7 @@ RUN apt-get update \
 
 COPY /mimi mimi
 COPY __main__.py .
+COPY logging.json .
 COPY --from=builder /app/.venv .venv
 
 ENV PATH="/app/.venv/bin:$PATH"
