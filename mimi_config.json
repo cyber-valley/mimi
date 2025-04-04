@@ -7,8 +7,8 @@
   },
   "llm": {
     "provider": "openrouter",
-    "model": "google/gemini-2.0-pro-exp-02-05:free",
-    "max_documents_to_find": 15
+    "model": "google/gemini-2.0-flash-001",
+    "max_documents_to_find": 30
   },
   "scrapers": {
     "x": {
