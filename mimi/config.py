@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Self
 
@@ -81,7 +81,7 @@ class ScrapersContext:
                 peers_config=peers_config,
                 history_depth=d["telegram"].get("history_depth", 50),
                 process_new=d["telegram"].get("process_new", True),
-                last_sync_date=last_sync_date
+                last_sync_date=last_sync_date,
             )
 
         assert any(item is not None for item in (x, telegram, github)), (

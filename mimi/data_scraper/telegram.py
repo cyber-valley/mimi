@@ -75,7 +75,10 @@ async def _scrape(
     log.info("Downloading history")
     update_counter = 0
     async for message in _scrape_updates(
-        client, context.peers_config, context.history_depth, until=context.last_sync_date
+        client,
+        context.peers_config,
+        context.history_depth,
+        until=context.last_sync_date,
     ):
         sink.put(message)
         update_counter += 1
@@ -94,13 +97,13 @@ async def _scrape_updates(
 ) -> AsyncIterator[DataScraperMessage]:
     delay = timedelta(seconds=1)
     for stream in (
-        _scrape_groups(client, config.groups_ids, depth, delay, until),
-        _scrape_forums(client, config.forums_ids, depth, delay, until),
+        _scrape_groups(client, config.groups_ids, depth, delay),
+        _scrape_forums(client, config.forums_ids, depth, delay),
     ):
         async for message, additional_content in stream:
             match _convert_to_internal_message(message, additional_content):
                 case Ok(msg):
-                    if msg.pub_date < until:
+                    if until and msg.pub_date < until:
                         break
                     yield msg
                 case Err(text):

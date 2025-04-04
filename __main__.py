@@ -142,6 +142,7 @@ def execute_scraper(parser: argparse.ArgumentParser) -> None:
                     ),
                     history_depth=args.history_depth,
                     process_new=args.process_new,
+                    last_sync_date=None,
                 ),
             )
             should_raise = args.process_new is not None
