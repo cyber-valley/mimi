@@ -97,14 +97,12 @@ async def _scrape_updates(
 ) -> AsyncIterator[DataScraperMessage]:
     delay = timedelta(seconds=1)
     for stream in (
-        _scrape_groups(client, config.groups_ids, depth, delay),
-        _scrape_forums(client, config.forums_ids, depth, delay),
+        _scrape_groups(client, config.groups_ids, depth, delay, until),
+        _scrape_forums(client, config.forums_ids, depth, delay, until),
     ):
         async for message, additional_content in stream:
             match _convert_to_internal_message(message, additional_content):
                 case Ok(msg):
-                    if until and msg.pub_date < until:
-                        break
                     yield msg
                 case Err(text):
                     log.warning(
@@ -130,19 +128,34 @@ AdditionalMessageContent = GroupAdditionalMessageContent | ForumAdditionalMessag
 
 
 async def _scrape_groups(
-    client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
+    client: TelegramClient,
+    ids: Collection[int],
+    depth: int,
+    delay: timedelta,
+    until: None | datetime,
 ) -> AsyncIterator[tuple[Message, GroupAdditionalMessageContent]]:
     for idx, group_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape group %s", idx + 1, len(ids), group_id)
         input_peer_group = await client.get_entity(PeerChat(group_id))
         assert isinstance(input_peer_group, Chat)
+        additional_content = GroupAdditionalMessageContent(input_peer_group.title)
         async for message in client.iter_messages(input_peer_group, limit=depth):
-            yield (message, GroupAdditionalMessageContent(input_peer_group.title))
+            if until and message.date < until:
+                log.info(
+                    "Stopping scraping messages for %s",
+                    additional_content,
+                )
+                break
+            yield (message, additional_content)
         await asyncio.sleep(delay.total_seconds())
 
 
 async def _scrape_forums(
-    client: TelegramClient, ids: Collection[int], depth: int, delay: timedelta
+    client: TelegramClient,
+    ids: Collection[int],
+    depth: int,
+    delay: timedelta,
+    until: None | datetime,
 ) -> AsyncIterator[tuple[Message, ForumAdditionalMessageContent]]:
     for idx, forum_id in enumerate(ids):
         log.info("[%s/%s]: Starting to scrape forum %s", idx + 1, len(ids), forum_id)
@@ -165,17 +178,21 @@ async def _scrape_forums(
 
         for topic in topics_result.topics:
             log.info("Starting scraping topic %s", input_peer_channel.title)
+            additional_content = ForumAdditionalMessageContent(
+                title=input_peer_channel.title, topic_title=topic.title
+            )
             async for message in client.iter_messages(
                 input_peer_channel,
                 limit=depth,
                 reply_to=topic.id,
             ):
-                yield (
-                    message,
-                    ForumAdditionalMessageContent(
-                        title=input_peer_channel.title, topic_title=topic.title
-                    ),
-                )
+                if until and message.date < until:
+                    log.info(
+                        "Stopping scraping messages for %s",
+                        additional_content,
+                    )
+                    break
+                yield (message, additional_content)
 
         await asyncio.sleep(delay.total_seconds())
 
