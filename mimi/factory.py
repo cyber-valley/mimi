@@ -22,12 +22,17 @@ log = logging.getLogger(__name__)
 
 def get_connection(db_file: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(
-        db_file, autocommit=False, check_same_thread=False, timeout=10
+        db_file,
+        autocommit=False,
+        check_same_thread=False,
+        timeout=10,
+        isolation_level="IMMEDIATE",
     )
     connection.row_factory = sqlite3.Row
     connection.enable_load_extension(True)  # noqa: FBT003
     sqlite_vec.load(connection)
     connection.enable_load_extension(False)  # noqa: FBT003
+    connection.execute("pragma journal_mode=wal")
     with sqlite3_transaction(connection):
         _create_tables_if_not_exists(connection)
     return connection
