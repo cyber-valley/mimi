@@ -128,7 +128,7 @@ def _scrape_issues(
             + issue.title
             + "\n url: "
             + repository_url
-            + "/issues"
+            + "/issues/"
             + str(issue.number)
             + (
                 ("\nAssigned to: @" + issue.assignee_login)
