@@ -22,7 +22,8 @@
         "forums_ids": [2245058785, 2572439595]
       },
       "history_depth": 1000,
-      "process_new": true
+      "process_new": true,
+      "last_sync_date": "2025-04-04T10:58:41.438332+00:00"
     },
     "github": {
       "port": 8000,

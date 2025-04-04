@@ -72,11 +72,16 @@ class ScrapersContext:
             peers_config_data = d["telegram"].get(
                 "peers_config", {"groups_ids": [], "fourms_ids": []}
             )
+            if sync_date := d["telegram"].get("last_sync_date"):
+                last_sync_date = datetime.fromisoformat(sync_date)
+            else:
+                last_sync_date = None
             peers_config = PeersConfig(**peers_config_data)
             telegram = TelegramScraperContext(
                 peers_config=peers_config,
                 history_depth=d["telegram"].get("history_depth", 50),
                 process_new=d["telegram"].get("process_new", True),
+                last_sync_date=last_sync_date
             )
 
         assert any(item is not None for item in (x, telegram, github)), (

@@ -46,6 +46,7 @@ class TelegramScraperContext:
     peers_config: PeersConfig
     history_depth: int
     process_new: bool
+    last_sync_date: None | datetime
     client_name: str = field(default_factory=lambda: os.environ["TELEGRAM_CLIENT_NAME"])
     api_id: int = field(default_factory=lambda: int(os.environ["TELEGRAM_API_ID"]))
     api_hash: str = field(default_factory=lambda: os.environ["TELEGRAM_API_HASH"])
@@ -74,7 +75,7 @@ async def _scrape(
     log.info("Downloading history")
     update_counter = 0
     async for message in _scrape_updates(
-        client, context.peers_config, context.history_depth
+        client, context.peers_config, context.history_depth, until=context.last_sync_date
     ):
         sink.put(message)
         update_counter += 1
@@ -89,16 +90,18 @@ async def _scrape(
 
 
 async def _scrape_updates(
-    client: TelegramClient, config: PeersConfig, depth: int
+    client: TelegramClient, config: PeersConfig, depth: int, *, until: None | datetime
 ) -> AsyncIterator[DataScraperMessage]:
     delay = timedelta(seconds=1)
     for stream in (
-        _scrape_groups(client, config.groups_ids, depth, delay),
-        _scrape_forums(client, config.forums_ids, depth, delay),
+        _scrape_groups(client, config.groups_ids, depth, delay, until),
+        _scrape_forums(client, config.forums_ids, depth, delay, until),
     ):
         async for message, additional_content in stream:
             match _convert_to_internal_message(message, additional_content):
                 case Ok(msg):
+                    if msg.pub_date < until:
+                        break
                     yield msg
                 case Err(text):
                     log.warning(
