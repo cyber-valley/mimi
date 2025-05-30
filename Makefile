@@ -10,5 +10,19 @@ pre-commit: lint
 run: lint
 	go run main.go
 
-generate-requirements:
-	uv export --no-hashes --format requirements-txt > requirements.txt
+sqlc-generate:
+	podman run --rm -v $(PWD):/src -w /src docker.io/sqlc/sqlc generate
+
+podman-db:
+	test -n "$(DB_USER)" || exit 1
+	test -n "$(DB_PASSWORD)" || exit 1
+	test -n "$(DB_NAME)" || exit 1
+	test -n "$(DB_PORT)" || exit 1
+	podman stop $(db-container) || exit 0
+	podman run --rm -d \
+		--name=$(db-container) \
+		-e POSTGRES_PASSWORD="$(DB_PASSWORD)" \
+		-e POSTGRES_USER="$(DB_USER)" \
+		-e POSTGRES_DB="$(DB_NAME)" \
+		-p "$(DB_PORT)":5432 \
+		docker.io/pgvector/pgvector:pg17
