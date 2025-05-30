@@ -131,7 +131,7 @@ Pure GitHub issues scraping isn't enough, more information should be fetched fro
 - Improve GitHub scraper to parse more data
 - Use LLM to extract required filters from customer's query and convert them into [[https://en.wikipedia.org/wiki/Datalog][Datalog]] query
 
-* Version 1
+* Version 1.2
 ** Telegram chat summarization
 
 *** Problem
