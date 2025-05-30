@@ -1,14 +1,14 @@
 format:
-	uv run ruff format
+	go fmt ./...
 
 lint: format
-	uv run ruff check --fix; \
-	uv run mypy .; \
+	go vet ./...
+	staticcheck ./...
 
 pre-commit: lint
 
-run:
-	uv run python __main__.py
+run: lint
+	go run main.go
 
 generate-requirements:
 	uv export --no-hashes --format requirements-txt > requirements.txt
