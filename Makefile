@@ -1,5 +1,10 @@
 -include .env
 
+install:
+	go install honnef.co/go/tools/cmd/staticcheck@latest
+	go install github.com/air-verse/air@latest
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
 format:
 	go fmt ./...
 
@@ -10,10 +15,10 @@ lint: format
 pre-commit: lint
 
 run-telegram-bot: lint
-	go run ./cmd/bot/main.go
+	air --build.cmd "go build -o bin/bot cmd/bot/main.go" --build.bin "./bin/bot"
 
 sqlc-generate:
-	podman run --rm -v $(PWD):/src -w /src docker.io/sqlc/sqlc generate
+	sqlc generate
 
 podman-db:
 	test -n "$(DB_USER)" || exit 1
