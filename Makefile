@@ -1,3 +1,5 @@
+-include .env
+
 format:
 	go fmt ./...
 
@@ -7,8 +9,8 @@ lint: format
 
 pre-commit: lint
 
-run: lint
-	go run main.go
+run-telegram-bot: lint
+	go run ./cmd/bot/main.go
 
 sqlc-generate:
 	podman run --rm -v $(PWD):/src -w /src docker.io/sqlc/sqlc generate
