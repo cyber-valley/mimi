@@ -19,9 +19,14 @@ func Start(token string) {
 
 	for update := range udpates {
 		if update.Message != nil {
-			glog.Infof("[%d]: %s", update.Message.Chat.ID, update.Message.Text)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-			bot.Send(msg)
+			handleMessage(bot, update.Message)
 		}
 	}
+}
+
+func handleMessage(b *tgbotapi.BotAPI, m *tgbotapi.Message) error {
+	glog.Infof("[%d]: %s", m.Chat.ID, m.Text)
+	msg := tgbotapi.NewMessage(m.Chat.ID, m.Text+" LMAO")
+	b.Send(msg)
+	return nil
 }
