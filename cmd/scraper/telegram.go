@@ -109,7 +109,7 @@ func main() {
 
 		return nil
 	}); err != nil {
-    glog.Fatalf("Failed to auth with %s", err)
-  }
+		glog.Fatalf("Failed to auth with %s", err)
+	}
 
 }

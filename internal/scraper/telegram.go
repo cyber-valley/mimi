@@ -4,6 +4,10 @@ import (
 	"context"
 	"github.com/golang/glog"
 	"github.com/gotd/td/telegram"
+	"github.com/gotd/td/telegram/query"
+	"github.com/gotd/td/telegram/query/dialogs"
+	"github.com/gotd/td/telegram/query/messages"
+	"github.com/gotd/td/tg"
 	"os"
 	"os/signal"
 )
@@ -25,7 +29,26 @@ func StartTelegramScraper(appID int, appHash string, telegramBotToken *string) e
 				return err
 			}
 		}
-		glog.Info("Scraper finished")
-		return nil
+		glog.Info("Auth succeed")
+
+		raw := tg.NewClient(client)
+		cb := func(ctx context.Context, dlg dialogs.Elem) error {
+			// Skip deleted dialogs.
+			if dlg.Deleted() {
+				return nil
+			}
+
+			return dlg.Messages(raw).ForEach(ctx, func(ctx context.Context, elem messages.Elem) error {
+				msg, ok := elem.Msg.(*tg.Message)
+				if !ok {
+					return nil
+				}
+				glog.Info(msg.Message)
+
+				return nil
+			})
+		}
+
+		return query.GetDialogs(raw).ForEach(ctx, cb)
 	})
 }
