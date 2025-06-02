@@ -17,6 +17,11 @@ pre-commit: lint
 run-telegram-bot: lint
 	air --build.cmd "go build -o bin/bot cmd/bot/main.go" --build.bin "./bin/bot"
 
+run-telegram-scraper: lint
+	air \
+		--build.cmd "go build -o bin/scraper/telegram cmd/scraper/telegram.go" \
+		--build.bin "./bin/scraper/telegram"
+
 sqlc-generate:
 	sqlc generate
 

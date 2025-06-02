@@ -11,5 +11,6 @@ data/
 *.session-journal
 /github-repositories/
 *.logs
-/bin/
-/tmp/
+bin/
+tmp/
+/.dumbjump
