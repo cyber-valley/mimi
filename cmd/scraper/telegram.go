@@ -16,14 +16,20 @@ import (
 	"github.com/golang/glog"
 	"github.com/gotd/contrib/middleware/floodwait"
 	"github.com/gotd/contrib/middleware/ratelimit"
+	"github.com/gotd/td/telegram/updates"
+	updhook "github.com/gotd/td/telegram/updates/hook"
 	"golang.org/x/time/rate"
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
-	"github.com/gotd/td/telegram/query"
-	"github.com/gotd/td/telegram/query/dialogs"
-	"github.com/gotd/td/telegram/query/messages"
 	"github.com/gotd/td/tg"
+)
+
+const (
+	tgAppID    = "TG_APP_ID"
+	tgAppHash  = "TG_APP_HASH"
+	tgBotToken = "TG_BOT_TOKEN"
+	tgPhone    = "TG_PHONE"
 )
 
 func sessionFolder(phone string) string {
@@ -35,13 +41,6 @@ func sessionFolder(phone string) string {
 	}
 	return "phone-" + string(out)
 }
-
-const (
-	tgAppID    = "TG_APP_ID"
-	tgAppHash  = "TG_APP_HASH"
-	tgBotToken = "TG_BOT_TOKEN"
-	tgPhone    = "TG_PHONE"
-)
 
 func run(ctx context.Context) error {
 	flag.Lookup("stderrthreshold").Value.Set("INFO")
@@ -79,6 +78,9 @@ func run(ctx context.Context) error {
 	//
 	// Dispatcher is used to register handlers for events.
 	dispatcher := tg.NewUpdateDispatcher()
+	gaps := updates.New(updates.Config{
+		Handler: dispatcher,
+	})
 
 	// Handler of FLOOD_WAIT that will automatically retry request.
 	waiter := floodwait.NewWaiter().WithCallback(func(ctx context.Context, wait floodwait.FloodWait) {
@@ -89,15 +91,17 @@ func run(ctx context.Context) error {
 	// Filling client options.
 	options := telegram.Options{
 		SessionStorage: sessionStorage, // Setting up session sessionStorage to store auth data.
+		UpdateHandler:  gaps,
 		Middlewares: []telegram.Middleware{
 			// Setting up FLOOD_WAIT handler to automatically wait and retry request.
 			waiter,
 			// Setting up general rate limits to less likely get flood wait errors.
 			ratelimit.New(rate.Every(time.Millisecond*100), 5),
+			updhook.UpdateHook(gaps.Handle),
 		},
 	}
 	client := telegram.NewClient(appID, appHash, options)
-	// api := client.API()
+	api := client.API()
 
 	// Registering handler for new private messages.
 	dispatcher.OnNewMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
@@ -110,7 +114,7 @@ func run(ctx context.Context) error {
 			return nil
 		}
 
-		glog.Info("new message: %s", msg.Message)
+		glog.Infof("new message: %s", msg.Message)
 		return nil
 	})
 
@@ -138,31 +142,11 @@ func run(ctx context.Context) error {
 			}
 			fmt.Println("Current user:", name)
 
-			glog.Infof("Login firstName=%s, lastName=%s, username=%s, id=%s",
-				self.FirstName,
-				self.LastName,
-				self.Username,
-				self.ID,
-			)
-			raw := tg.NewClient(client)
-			cb := func(ctx context.Context, dlg dialogs.Elem) error {
-				// Skip deleted dialogs.
-				if dlg.Deleted() {
-					return nil
-				}
-
-				return dlg.Messages(raw).ForEach(ctx, func(ctx context.Context, elem messages.Elem) error {
-					msg, ok := elem.Msg.(*tg.Message)
-					if !ok {
-						return nil
-					}
-					glog.Info(msg.Message)
-
-					return nil
-				})
-			}
-
-			return query.GetDialogs(raw).ForEach(ctx, cb)
+			return gaps.Run(ctx, api, self.ID, updates.AuthOptions{
+				OnStart: func(ctx context.Context) {
+					glog.Info("listening for events")
+				},
+			})
 		}); err != nil {
 			return errors.Wrap(err, "run")
 		}
