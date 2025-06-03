@@ -18,6 +18,9 @@ run-telegram-bot: lint
 	air --build.cmd "go build -o bin/bot cmd/bot/main.go" --build.bin "./bin/bot"
 
 run-telegram-scraper: lint
+	go run cmd/scraper/telegram.go
+
+run-telegram-scraper-live-reload: lint
 	air \
 		--build.cmd "go build -o bin/scraper/telegram cmd/scraper/telegram.go" \
 		--build.bin "./bin/scraper/telegram"
