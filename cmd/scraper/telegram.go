@@ -20,6 +20,9 @@ import (
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
+	"github.com/gotd/td/telegram/query"
+	"github.com/gotd/td/telegram/query/dialogs"
+	"github.com/gotd/td/telegram/query/messages"
 	"github.com/gotd/td/tg"
 )
 
@@ -141,7 +144,25 @@ func run(ctx context.Context) error {
 				self.Username,
 				self.ID,
 			)
-			return nil
+			raw := tg.NewClient(client)
+			cb := func(ctx context.Context, dlg dialogs.Elem) error {
+				// Skip deleted dialogs.
+				if dlg.Deleted() {
+					return nil
+				}
+
+				return dlg.Messages(raw).ForEach(ctx, func(ctx context.Context, elem messages.Elem) error {
+					msg, ok := elem.Msg.(*tg.Message)
+					if !ok {
+						return nil
+					}
+					glog.Info(msg.Message)
+
+					return nil
+				})
+			}
+
+			return query.GetDialogs(raw).ForEach(ctx, cb)
 		}); err != nil {
 			return errors.Wrap(err, "run")
 		}
