@@ -1,4 +1,4 @@
-package telegram
+package tgscraper
 
 import (
 	"bufio"
@@ -20,19 +20,19 @@ import (
 //
 // This is only example implementation, you should not use it in your code.
 // Copy it and modify to fit your needs.
-type Terminal struct {
+type terminalUserAuthenticator struct {
 	PhoneNumber string // optional, will be prompted if empty
 }
 
-func (Terminal) SignUp(ctx context.Context) (auth.UserInfo, error) {
+func (terminalUserAuthenticator) SignUp(ctx context.Context) (auth.UserInfo, error) {
 	return auth.UserInfo{}, errors.New("signing up not implemented in Terminal")
 }
 
-func (Terminal) AcceptTermsOfService(ctx context.Context, tos tg.HelpTermsOfService) error {
+func (terminalUserAuthenticator) AcceptTermsOfService(ctx context.Context, tos tg.HelpTermsOfService) error {
 	return &auth.SignUpRequired{TermsOfService: tos}
 }
 
-func (Terminal) Code(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
+func (terminalUserAuthenticator) Code(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
 	fmt.Print("Enter code: ")
 	code, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
@@ -41,7 +41,7 @@ func (Terminal) Code(ctx context.Context, sentCode *tg.AuthSentCode) (string, er
 	return strings.TrimSpace(code), nil
 }
 
-func (a Terminal) Phone(_ context.Context) (string, error) {
+func (a terminalUserAuthenticator) Phone(_ context.Context) (string, error) {
 	if a.PhoneNumber != "" {
 		return a.PhoneNumber, nil
 	}
@@ -53,7 +53,7 @@ func (a Terminal) Phone(_ context.Context) (string, error) {
 	return strings.TrimSpace(phone), nil
 }
 
-func (Terminal) Password(_ context.Context) (string, error) {
+func (terminalUserAuthenticator) Password(_ context.Context) (string, error) {
 	fmt.Print("Enter 2FA password: ")
 	bytePwd, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
