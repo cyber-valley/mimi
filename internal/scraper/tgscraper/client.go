@@ -11,7 +11,7 @@ import (
 	"github.com/gotd/contrib/middleware/floodwait"
 	"github.com/gotd/contrib/middleware/ratelimit"
 	"github.com/gotd/td/telegram/updates"
-	updhook "github.com/gotd/td/telegram/updates/hook"
+	"github.com/gotd/td/telegram/updates/hook"
 	"golang.org/x/time/rate"
 
 	"github.com/gotd/td/telegram"
@@ -20,10 +20,7 @@ import (
 )
 
 const (
-	tgAppID    = "TG_APP_ID"
-	tgAppHash  = "TG_APP_HASH"
-	tgBotToken = "TG_BOT_TOKEN"
-	tgPhone    = "TG_PHONE"
+	tgPhone = "TG_PHONE"
 )
 
 func Run(ctx context.Context) error {
@@ -46,7 +43,7 @@ func Run(ctx context.Context) error {
 		Middlewares: []telegram.Middleware{
 			waiter,
 			ratelimit.New(rate.Every(time.Millisecond*100), 5),
-			updhook.UpdateHook(gaps.Handle),
+			hook.UpdateHook(gaps.Handle),
 		},
 	})
 	if err != nil {
@@ -54,18 +51,7 @@ func Run(ctx context.Context) error {
 	}
 	api := client.API()
 
-	dispatcher.OnNewMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
-		msg, ok := u.Message.(*tg.Message)
-		if !ok {
-			return nil
-		}
-		if msg.Out {
-			return nil
-		}
-
-		glog.Infof("new message: %s", msg.Message)
-		return nil
-	})
+	dispatcher.OnNewMessage(newMessageHandler)
 
 	flow := auth.NewFlow(terminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
@@ -96,4 +82,17 @@ func Run(ctx context.Context) error {
 		}
 		return nil
 	})
+}
+
+func newMessageHandler(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
+	msg, ok := u.Message.(*tg.Message)
+	if !ok {
+		return nil
+	}
+	if msg.Out {
+		return nil
+	}
+
+	glog.Infof("new message: %s", msg.Message)
+	return nil
 }
