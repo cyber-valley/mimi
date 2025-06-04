@@ -30,6 +30,8 @@ func Run(ctx context.Context) error {
 	}
 
 	dispatcher := tg.NewUpdateDispatcher()
+	dispatcher.OnNewMessage(newMessageHandler)
+
 	gaps := updates.New(updates.Config{
 		Handler: dispatcher,
 	})
@@ -49,9 +51,6 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	api := client.API()
-
-	dispatcher.OnNewMessage(newMessageHandler)
 
 	flow := auth.NewFlow(terminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
@@ -72,7 +71,7 @@ func Run(ctx context.Context) error {
 			}
 			glog.Info("Current user:", name)
 
-			return gaps.Run(ctx, api, self.ID, updates.AuthOptions{
+			return gaps.Run(ctx, client.API(), self.ID, updates.AuthOptions{
 				OnStart: func(ctx context.Context) {
 					glog.Info("listening for events")
 				},
@@ -85,14 +84,7 @@ func Run(ctx context.Context) error {
 }
 
 func newMessageHandler(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
-	msg, ok := u.Message.(*tg.Message)
-	if !ok {
-		return nil
-	}
-	if msg.Out {
-		return nil
-	}
-
-	glog.Infof("new message: %s", msg.Message)
+	msg := u.GetMessage()
+	glog.Infof("new message: %s", msg)
 	return nil
 }
