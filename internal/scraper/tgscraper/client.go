@@ -2,7 +2,6 @@ package tgscraper
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -28,9 +27,6 @@ const (
 )
 
 func Run(ctx context.Context) error {
-	flag.Lookup("stderrthreshold").Value.Set("INFO")
-	flag.Parse()
-
 	phone := os.Getenv(tgPhone)
 	if phone == "" {
 		return errors.New(fmt.Sprintf("phone env variable %s is missing", tgPhone))

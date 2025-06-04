@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"os/signal"
 
@@ -10,6 +11,9 @@ import (
 )
 
 func main() {
+	flag.Lookup("stderrthreshold").Value.Set("INFO")
+	flag.Parse()
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
