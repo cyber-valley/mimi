@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/go-faster/errors"
@@ -35,59 +33,29 @@ func Run(ctx context.Context) error {
 
 	phone := os.Getenv(tgPhone)
 	if phone == "" {
-		return errors.New("no phone")
-	}
-	// APP_HASH, APP_ID is from https://my.telegram.org/.
-	appID, err := strconv.Atoi(os.Getenv(tgAppID))
-	if err != nil {
-		return errors.Wrap(err, " parse app id")
-	}
-	appHash := os.Getenv(tgAppHash)
-	if appHash == "" {
-		return errors.New("no app hash")
+		return errors.New(fmt.Sprintf("phone env variable %s is missing", tgPhone))
 	}
 
-	// Setting up session storage.
-	// This is needed to reuse session and not login every time.
-	sessionDir := filepath.Join("session", sessionFolder(phone))
-	if err := os.MkdirAll(sessionDir, 0700); err != nil {
-		return err
-	}
-
-	glog.Infof("Storing session in %s", sessionDir)
-
-	// So, we are storing session information in current directory, under subdirectory "session/phone_hash"
-	sessionStorage := &telegram.FileSessionStorage{
-		Path: filepath.Join(sessionDir, "session.json"),
-	}
-
-	// Setting up client.
-	//
-	// Dispatcher is used to register handlers for events.
 	dispatcher := tg.NewUpdateDispatcher()
 	gaps := updates.New(updates.Config{
 		Handler: dispatcher,
 	})
 
-	// Handler of FLOOD_WAIT that will automatically retry request.
 	waiter := floodwait.NewWaiter().WithCallback(func(ctx context.Context, wait floodwait.FloodWait) {
-		// Notifying about flood wait.
-		glog.Info("Got FLOOD_WAIT. Will retry after", wait.Duration)
+		glog.Warning("Got FLOOD_WAIT. Will retry after", wait.Duration)
 	})
 
-	// Filling client options.
-	options := telegram.Options{
-		SessionStorage: sessionStorage, // Setting up session sessionStorage to store auth data.
-		UpdateHandler:  gaps,
+	client, err := telegram.ClientFromEnvironment(telegram.Options{
+		UpdateHandler: gaps,
 		Middlewares: []telegram.Middleware{
-			// Setting up FLOOD_WAIT handler to automatically wait and retry request.
 			waiter,
-			// Setting up general rate limits to less likely get flood wait errors.
 			ratelimit.New(rate.Every(time.Millisecond*100), 5),
 			updhook.UpdateHook(gaps.Handle),
 		},
+	})
+	if err != nil {
+		return err
 	}
-	client := telegram.NewClient(appID, appHash, options)
 	api := client.API()
 
 	// Registering handler for new private messages.
@@ -140,14 +108,4 @@ func Run(ctx context.Context) error {
 		}
 		return nil
 	})
-}
-
-func sessionFolder(phone string) string {
-	var out []rune
-	for _, r := range phone {
-		if r >= '0' && r <= '9' {
-			out = append(out, r)
-		}
-	}
-	return "phone-" + string(out)
 }
