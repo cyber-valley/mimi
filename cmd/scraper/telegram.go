@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"os/signal"
 
+	"github.com/golang/glog"
 	"mimi/internal/scraper/tgscraper"
 )
 
@@ -15,14 +14,8 @@ func main() {
 	defer cancel()
 
 	if err := tgscraper.Run(ctx); err != nil {
-		if errors.Is(err, context.Canceled) && ctx.Err() == context.Canceled {
-			fmt.Println("\rClosed")
-			os.Exit(0)
-		}
-		_, _ = fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-		os.Exit(1)
-	} else {
-		fmt.Println("Done")
-		os.Exit(0)
+		glog.Fatalf("error: %+v", err)
 	}
+
+	glog.Warning("tg scraper exited without any error")
 }
