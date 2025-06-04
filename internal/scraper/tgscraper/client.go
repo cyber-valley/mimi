@@ -38,7 +38,7 @@ func Run(ctx context.Context) error {
 	})
 
 	waiter := floodwait.NewWaiter().WithCallback(func(ctx context.Context, wait floodwait.FloodWait) {
-		glog.Warning("Got FLOOD_WAIT. Will retry after", wait.Duration)
+		glog.Warning("got FLOOD_WAIT. Will retry after", wait.Duration)
 	})
 
 	client, err := telegram.ClientFromEnvironment(telegram.Options{
@@ -54,14 +54,12 @@ func Run(ctx context.Context) error {
 	}
 	api := client.API()
 
-	// Registering handler for new private messages.
 	dispatcher.OnNewMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
 		msg, ok := u.Message.(*tg.Message)
 		if !ok {
 			return nil
 		}
 		if msg.Out {
-			// Outgoing message.
 			return nil
 		}
 
@@ -69,18 +67,14 @@ func Run(ctx context.Context) error {
 		return nil
 	})
 
-	// Authentication flow handles authentication process, like prompting for code and 2FA password.
 	flow := auth.NewFlow(terminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
 	return waiter.Run(ctx, func(ctx context.Context) error {
-		// Spawning main goroutine.
 		if err := client.Run(ctx, func(ctx context.Context) error {
-			// Perform auth if no session is available.
 			if err := client.Auth().IfNecessary(ctx, flow); err != nil {
 				return errors.Wrap(err, "auth")
 			}
 
-			// Getting info about current user.
 			self, err := client.Self(ctx)
 			if err != nil {
 				return errors.Wrap(err, "call self")
@@ -88,12 +82,10 @@ func Run(ctx context.Context) error {
 
 			name := self.FirstName
 			if self.Username != "" {
-				// Username is optional.
 				name = fmt.Sprintf("%s (@%s)", name, self.Username)
 			}
-			fmt.Println("Current user:", name)
+			glog.Info("Current user:", name)
 
-			// Editing some stuff
 			return gaps.Run(ctx, api, self.ID, updates.AuthOptions{
 				OnStart: func(ctx context.Context) {
 					glog.Info("listening for events")
