@@ -51,6 +51,7 @@ func Run(ctx context.Context) error {
 		return err
 	}
 	api := client.API()
+	session := newSession()
 
 	dispatcher.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
 		msg, ok := u.Message.(*tg.Message)
@@ -68,38 +69,12 @@ func Run(ctx context.Context) error {
 		}
 		glog.Info("reply to ", replyTo)
 		if replyTo.ForumTopic {
-			c := &tg.InputChannel{ChannelID: channel.ChannelID, AccessHash: 0}
-			raw := tg.NewClient(client)
-			resp, err := raw.ChannelsGetChannels(ctx, []tg.InputChannelClass{c})
+			topic, err := session.resolveTopic(ctx, tg.NewClient(client), channel.ChannelID, replyTo.ReplyToMsgID)
 			if err != nil {
-				glog.Error("failed to resolve channel peer with ", err)
+				glog.Error("failed to resolve topic with: ", err)
 				return err
 			}
-			glog.Info("channel resolved to ", resp)
-			chats := resp.(*tg.MessagesChats).Chats
-
-			if l := len(chats); l != 1 {
-				glog.Error("expected only one chat but got ", l)
-				return errors.New("unexpected resolve of channel")
-			}
-
-			inputChan := chats[0].(*tg.Channel)
-
-			c = &tg.InputChannel{
-				ChannelID:  channel.ChannelID,
-				AccessHash: inputChan.AccessHash,
-			}
-			req := &tg.ChannelsGetForumTopicsByIDRequest{
-				Channel: c,
-				Topics:  []int{replyTo.ReplyToMsgID},
-			}
-
-			topics, err := raw.ChannelsGetForumTopicsByID(ctx, req)
-			if err != nil {
-				glog.Error("failed to get forum topics with", err)
-				return err
-			}
-			glog.Info("fetched forum topics", topics)
+			glog.Info("resolved topic: ", topic)
 		}
 		return handleNewChannelMessage(client, msg)
 	})
@@ -133,6 +108,69 @@ func Run(ctx context.Context) error {
 		}
 		return nil
 	})
+}
+
+type session struct {
+	forumTopics map[topicKey]*tg.ForumTopic
+}
+
+type topicKey struct {
+	gID int64
+	tID int
+}
+
+func newSession() *session {
+	return &session{
+		forumTopics: make(map[topicKey]*tg.ForumTopic),
+	}
+}
+
+func (s *session) resolveTopic(ctx context.Context, raw *tg.Client, groupID int64, topicID int) (*tg.ForumTopic, error) {
+	key := topicKey{groupID, topicID}
+	topic, ok := s.forumTopics[key]
+	if ok {
+		return topic, nil
+	}
+	ic := &tg.InputChannel{ChannelID: groupID, AccessHash: 0}
+	resp, err := raw.ChannelsGetChannels(ctx, []tg.InputChannelClass{ic})
+	if err != nil {
+		glog.Error("failed to resolve channel peer with ", err)
+		return nil, err
+	}
+	glog.Info("channel resolved to ", resp)
+	chats := resp.(*tg.MessagesChats).Chats
+
+	if l := len(chats); l != 1 {
+		glog.Error("expected only one chat but got ", l)
+		return nil, errors.New("unexpected resolve of channel")
+	}
+
+	c, ok := chats[0].(*tg.Channel)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result of resolving: %+v", chats)
+	}
+
+	req := &tg.ChannelsGetForumTopicsByIDRequest{
+		Channel: &tg.InputChannel{
+			ChannelID:  ic.ChannelID,
+			AccessHash: c.AccessHash,
+		},
+		Topics: []int{topicID},
+	}
+	topics, err := raw.ChannelsGetForumTopicsByID(ctx, req)
+	if err != nil {
+		glog.Error("failed to get forum topics with", err)
+		return nil, err
+	}
+	glog.Info("fetched forum topics", topics)
+
+	switch topic := topics.Topics[0].(type) {
+	default:
+		return nil, fmt.Errorf("unexpected topic type: %+v", chats)
+	case *tg.ForumTopic:
+		s.forumTopics[key] = topic
+		return topic, nil
+	}
 }
 
 func handleNewChannelMessage(c *telegram.Client, msg *tg.Message) error {
