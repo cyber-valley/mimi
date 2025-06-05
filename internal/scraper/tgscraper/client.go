@@ -137,7 +137,7 @@ func (s *session) resolveTopic(ctx context.Context, raw *tg.Client, groupID int6
 		glog.Error("failed to resolve channel peer with ", err)
 		return nil, err
 	}
-	glog.Info("channel resolved to ", resp)
+	glog.Debug("channel resolved to ", resp)
 	chats := resp.(*tg.MessagesChats).Chats
 
 	if l := len(chats); l != 1 {
@@ -162,7 +162,7 @@ func (s *session) resolveTopic(ctx context.Context, raw *tg.Client, groupID int6
 		glog.Error("failed to get forum topics with", err)
 		return nil, err
 	}
-	glog.Info("fetched forum topics", topics)
+	glog.Debug("fetched forum topics", topics)
 
 	switch topic := topics.Topics[0].(type) {
 	default:
