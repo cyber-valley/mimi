@@ -17,16 +17,31 @@ import (
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/tg"
+	"github.com/jackc/pgx/v5"
+
+	"mimi/persist"
 )
 
 const (
 	tgPhone = "TG_PHONE"
 )
 
-func Run(ctx context.Context) error {
+func Run(ctx context.Context, conn *pgx.Conn) error {
 	phone := os.Getenv(tgPhone)
 	if phone == "" {
 		return fmt.Errorf("phone env variable %s is missing", tgPhone)
+	}
+
+	q := persist.New(conn)
+	subscribeTo, err := q.FindChannelsToFollow(ctx)
+	if err != nil {
+		glog.Error("failed to find peers to subscribe ", err)
+		return err
+	}
+	if len(subscribeTo) < 1 {
+		err = errors.New("got empty peers to subscribe")
+		glog.Error(err)
+		return err
 	}
 
 	dispatcher := tg.NewUpdateDispatcher()
@@ -137,7 +152,7 @@ func (s *session) resolveTopic(ctx context.Context, raw *tg.Client, groupID int6
 		glog.Error("failed to resolve channel peer with ", err)
 		return nil, err
 	}
-	glog.Debug("channel resolved to ", resp)
+	glog.Info("channel resolved to ", resp)
 	chats := resp.(*tg.MessagesChats).Chats
 
 	if l := len(chats); l != 1 {
@@ -162,7 +177,7 @@ func (s *session) resolveTopic(ctx context.Context, raw *tg.Client, groupID int6
 		glog.Error("failed to get forum topics with", err)
 		return nil, err
 	}
-	glog.Debug("fetched forum topics", topics)
+	glog.Info("fetched forum topics", topics)
 
 	switch topic := topics.Topics[0].(type) {
 	default:

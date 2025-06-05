@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/golang/glog"
+	"github.com/jackc/pgx/v5"
 	"mimi/internal/scraper/tgscraper"
 )
 
@@ -17,7 +18,13 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	if err := tgscraper.Run(ctx); err != nil {
+	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		glog.Fatal("failed to connect to postgres with: ", err)
+	}
+	defer conn.Close(ctx)
+
+	if err := tgscraper.Run(ctx, conn); err != nil {
 		glog.Fatalf("error: %+v", err)
 	}
 
