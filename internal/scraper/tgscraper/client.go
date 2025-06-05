@@ -2,11 +2,11 @@ package tgscraper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/go-faster/errors"
 	"github.com/golang/glog"
 	"github.com/gotd/contrib/middleware/floodwait"
 	"github.com/gotd/contrib/middleware/ratelimit"
@@ -26,11 +26,10 @@ const (
 func Run(ctx context.Context) error {
 	phone := os.Getenv(tgPhone)
 	if phone == "" {
-		return errors.New(fmt.Sprintf("phone env variable %s is missing", tgPhone))
+		return fmt.Errorf("phone env variable %s is missing", tgPhone)
 	}
 
 	dispatcher := tg.NewUpdateDispatcher()
-	dispatcher.OnNewMessage(newMessageHandler)
 
 	gaps := updates.New(updates.Config{
 		Handler: dispatcher,
@@ -51,18 +50,71 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	api := client.API()
+
+	dispatcher.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
+		msg, ok := u.Message.(*tg.Message)
+		if !ok {
+			return nil
+		}
+		channel, ok := msg.PeerID.(*tg.PeerChannel)
+		if !ok {
+			glog.Warning("failed to extract channel from", msg.PeerID)
+		}
+		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
+		if !ok {
+			glog.Warning("failed to extract reply to from", msg.ReplyTo)
+			return nil
+		}
+		glog.Info("reply to", replyTo)
+		if replyTo.ForumTopic {
+			c := &tg.InputChannel{ChannelID: channel.ChannelID, AccessHash: 0}
+			raw := tg.NewClient(client)
+			resp, err := raw.ChannelsGetChannels(ctx, []tg.InputChannelClass{c})
+			if err != nil {
+				glog.Error("failed to resolve channel peer with", err)
+				return err
+			}
+			glog.Info("channel resolved to ", resp)
+			chats := resp.(*tg.MessagesChats).Chats
+
+			if l := len(chats); l != 1 {
+				glog.Error("expected only one chat but got ", l)
+				return errors.New("unexpected resolve of channel")
+			}
+
+			inputChan := chats[0].(*tg.Channel)
+
+			c = &tg.InputChannel{
+				ChannelID:  channel.ChannelID,
+				AccessHash: inputChan.AccessHash,
+			}
+			req := &tg.ChannelsGetForumTopicsByIDRequest{
+				Channel: c,
+				Topics:  []int{replyTo.ReplyToMsgID},
+			}
+
+			topics, err := raw.ChannelsGetForumTopicsByID(ctx, req)
+			if err != nil {
+				glog.Error("failed to get forum topics with", err)
+				return err
+			}
+			glog.Info("fetched forum topics", topics)
+		}
+		return handleNewChannelMessage(client, msg)
+	})
 
 	flow := auth.NewFlow(terminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
 	return waiter.Run(ctx, func(ctx context.Context) error {
 		if err := client.Run(ctx, func(ctx context.Context) error {
 			if err := client.Auth().IfNecessary(ctx, flow); err != nil {
-				return errors.Wrap(err, "auth")
+				return err
 			}
 
 			self, err := client.Self(ctx)
 			if err != nil {
-				return errors.Wrap(err, "call self")
+				return err
 			}
 
 			name := self.FirstName
@@ -71,20 +123,19 @@ func Run(ctx context.Context) error {
 			}
 			glog.Info("Current user:", name)
 
-			return gaps.Run(ctx, client.API(), self.ID, updates.AuthOptions{
+			return gaps.Run(ctx, api, self.ID, updates.AuthOptions{
 				OnStart: func(ctx context.Context) {
 					glog.Info("listening for events")
 				},
 			})
 		}); err != nil {
-			return errors.Wrap(err, "run")
+			return err
 		}
 		return nil
 	})
 }
 
-func newMessageHandler(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
-	msg := u.GetMessage()
-	glog.Infof("new message: %s", msg)
+func handleNewChannelMessage(c *telegram.Client, msg *tg.Message) error {
+	glog.Infof("new channel message: %s", msg)
 	return nil
 }
