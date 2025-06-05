@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/golang/glog"
@@ -76,6 +77,9 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 		channel, ok := msg.PeerID.(*tg.PeerChannel)
 		if !ok {
 			glog.Warning("failed to extract channel from ", msg.PeerID)
+		}
+		if !slices.Contains(subscribeTo, channel.ChannelID) {
+			return nil
 		}
 		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
 		if !ok {
