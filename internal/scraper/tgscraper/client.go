@@ -59,20 +59,20 @@ func Run(ctx context.Context) error {
 		}
 		channel, ok := msg.PeerID.(*tg.PeerChannel)
 		if !ok {
-			glog.Warning("failed to extract channel from", msg.PeerID)
+			glog.Warning("failed to extract channel from ", msg.PeerID)
 		}
 		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
 		if !ok {
-			glog.Warning("failed to extract reply to from", msg.ReplyTo)
+			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
 			return nil
 		}
-		glog.Info("reply to", replyTo)
+		glog.Info("reply to ", replyTo)
 		if replyTo.ForumTopic {
 			c := &tg.InputChannel{ChannelID: channel.ChannelID, AccessHash: 0}
 			raw := tg.NewClient(client)
 			resp, err := raw.ChannelsGetChannels(ctx, []tg.InputChannelClass{c})
 			if err != nil {
-				glog.Error("failed to resolve channel peer with", err)
+				glog.Error("failed to resolve channel peer with ", err)
 				return err
 			}
 			glog.Info("channel resolved to ", resp)
