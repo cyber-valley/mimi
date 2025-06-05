@@ -7,4 +7,7 @@ CREATE TABLE embedding (
   embedding vector(1536)
 );
 
+CREATE TABLE telegram_peers (
+  peer_id bigint PRIMARY KEY,
+  enabled boolean NOT NULL DEFAULT false
 );

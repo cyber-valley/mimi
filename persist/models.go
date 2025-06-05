@@ -15,3 +15,8 @@ type Embedding struct {
 	Metadata  []byte
 	Embedding pgvector.Vector
 }
+
+type TelegramPeer struct {
+	PeerID  int64
+	Enabled bool
+}
