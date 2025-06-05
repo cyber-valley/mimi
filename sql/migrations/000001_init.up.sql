@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS embedding (
 
 CREATE TABLE IF NOT EXISTS telegram_peers (
   peer_id bigint PRIMARY KEY,
-  enabled boolean NOT NULL DEFAULT false
+  enabled boolean NOT NULL DEFAULT true
 );
