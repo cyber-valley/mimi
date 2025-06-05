@@ -1,4 +1,5 @@
 -include .env
+db-container = mimi-db
 
 install:
 	go install honnef.co/go/tools/cmd/staticcheck@latest
@@ -27,6 +28,9 @@ run-telegram-scraper-live-reload: lint
 
 sqlc-generate:
 	sqlc generate
+
+migrate:
+	go run ./cmd/migrate/main.go
 
 podman-db:
 	test -n "$(DB_USER)" || exit 1
