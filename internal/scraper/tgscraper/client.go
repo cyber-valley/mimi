@@ -20,7 +20,7 @@ import (
 	"github.com/gotd/td/tg"
 	"github.com/jackc/pgx/v5"
 
-	"mimi/persist"
+	"mimi/internal/persist"
 )
 
 const (
@@ -78,7 +78,9 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 		if !ok {
 			glog.Warning("failed to extract channel from ", msg.PeerID)
 		}
-		if !slices.Contains(subscribeTo, channel.ChannelID) {
+		if slices.IndexFunc(subscribeTo, func(s persist.FindChannelsToFollowRow) bool {
+			return s.ID == channel.ChannelID
+		}) == -1 {
 			return nil
 		}
 		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
