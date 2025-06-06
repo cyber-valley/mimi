@@ -1,1 +1,4 @@
-delete from telegram_peers where peer_id in (2594250873);
+DELETE FROM
+    telegram_peers
+WHERE
+    peer_id IN (2594250873);

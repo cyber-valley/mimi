@@ -1,1 +1,4 @@
-insert into telegram_peers (peer_id) values (2594250873);
+INSERT INTO
+    telegram_peers (peer_id)
+VALUES
+    (2594250873);
