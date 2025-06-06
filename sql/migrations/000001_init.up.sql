@@ -13,8 +13,16 @@ CREATE TABLE IF NOT EXISTS telegram_peer (
     enabled boolean NOT NULL DEFAULT TRUE
 );
 
+CREATE TABLE IF NOT EXISTS telegram_topic (
+    id int,
+    peer_id bigint NOT NULL REFERENCES telegram_peer(id),
+    title text NOT NULL,
+    PRIMARY KEY (id, peer_id)
+);
+
 CREATE TABLE IF NOT EXISTS telegram_message (
     peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id),
+    topic_id int NULL REFERENCES telegram_topic(id),
     message text NOT NULL,
     created_at timestamp WITH time zone DEFAULT NOW()
 );

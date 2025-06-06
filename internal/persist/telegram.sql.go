@@ -7,6 +7,8 @@ package persist
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const findChannelsToFollow = `-- name: FindChannelsToFollow :many
@@ -42,4 +44,22 @@ func (q *Queries) FindChannelsToFollow(ctx context.Context) ([]FindChannelsToFol
 		return nil, err
 	}
 	return items, nil
+}
+
+const saveTelegramMessage = `-- name: SaveTelegramMessage :exec
+INSERT INTO
+    telegram_message (peer_id, topic_id, message)
+VALUES
+    ($1, $2, $3)
+`
+
+type SaveTelegramMessageParams struct {
+	PeerID  int64
+	TopicID pgtype.Int4
+	Message string
+}
+
+func (q *Queries) SaveTelegramMessage(ctx context.Context, arg SaveTelegramMessageParams) error {
+	_, err := q.db.Exec(ctx, saveTelegramMessage, arg.PeerID, arg.TopicID, arg.Message)
+	return err
 }

@@ -18,6 +18,7 @@ type Embedding struct {
 
 type TelegramMessage struct {
 	PeerID    int64
+	TopicID   pgtype.Int4
 	Message   string
 	CreatedAt pgtype.Timestamptz
 }
@@ -26,4 +27,10 @@ type TelegramPeer struct {
 	ID       int64
 	ChatName string
 	Enabled  bool
+}
+
+type TelegramTopic struct {
+	ID     int32
+	PeerID int64
+	Title  string
 }
