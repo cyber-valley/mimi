@@ -1,7 +1,8 @@
 -- name: FindChannelsToFollow :many
 SELECT
-    peer_id
+    id,
+    chat_name
 FROM
-    telegram_peers
+    telegram_peer
 WHERE
     enabled;
