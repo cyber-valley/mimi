@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"mimi/internal/persist"
+	"mimi/internal/scraper/tgscraper/handle"
 )
 
 const (
@@ -123,23 +124,21 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
 			return nil
 		}
-		glog.Info("reply to ", replyTo)
-		if !replyTo.ForumTopic {
-			return nil
+		var topic *tg.ForumTopic
+		if replyTo.ForumTopic {
+			t, err := s.resolveTopic(ctx, tg.NewClient(c), channel.ChannelID, replyTo.ReplyToMsgID)
+			if err != nil {
+				glog.Error("failed to resolve topic with: ", err)
+				return err
+			}
+			topic = t
 		}
-		topic, err := s.resolveTopic(ctx, tg.NewClient(c), channel.ChannelID, replyTo.ReplyToMsgID)
-		if err != nil {
-			glog.Error("failed to resolve topic with: ", err)
-			return err
-		}
-		glog.Info("resolved topic: ", topic)
-		return handleNewChannelMessage(c, msg)
+		return handle.ChannelMessage(ctx, q, &handle.ChannelMessageRequest{
+			Topic:   topic,
+			Channel: channel,
+			Msg:     msg,
+		})
 	})
 
-	return nil
-}
-
-func handleNewChannelMessage(c *telegram.Client, msg *tg.Message) error {
-	glog.Infof("new channel message: %s", msg)
 	return nil
 }
