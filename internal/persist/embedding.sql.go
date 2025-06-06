@@ -14,11 +14,13 @@ import (
 
 const findCosine = `-- name: FindCosine :many
 SELECT
-	id,
-	text,
-	metadata
-FROM embedding
-WHERE embedding <=> $1
+    id,
+    text,
+    metadata
+FROM
+    embedding
+WHERE
+    embedding <=> $1
 `
 
 type FindCosineRow struct {
@@ -48,9 +50,12 @@ func (q *Queries) FindCosine(ctx context.Context, embedding pgvector.Vector) ([]
 }
 
 const saveEmbedding = `-- name: SaveEmbedding :one
-INSERT INTO embedding (text, metadata, embedding)
-VALUES ($1, $2, $3)
-RETURNING id
+INSERT INTO
+    embedding (text, metadata, embedding)
+VALUES
+    ($1, $2, $3)
+RETURNING
+    id
 `
 
 type SaveEmbeddingParams struct {

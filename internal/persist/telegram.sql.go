@@ -11,24 +11,32 @@ import (
 
 const findChannelsToFollow = `-- name: FindChannelsToFollow :many
 SELECT
- peer_id
-FROM telegram_peers
-WHERE enabled
+    id,
+    chat_name
+FROM
+    telegram_peer
+WHERE
+    enabled
 `
 
-func (q *Queries) FindChannelsToFollow(ctx context.Context) ([]int64, error) {
+type FindChannelsToFollowRow struct {
+	ID       int64
+	ChatName string
+}
+
+func (q *Queries) FindChannelsToFollow(ctx context.Context) ([]FindChannelsToFollowRow, error) {
 	rows, err := q.db.Query(ctx, findChannelsToFollow)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []int64
+	var items []FindChannelsToFollowRow
 	for rows.Next() {
-		var peer_id int64
-		if err := rows.Scan(&peer_id); err != nil {
+		var i FindChannelsToFollowRow
+		if err := rows.Scan(&i.ID, &i.ChatName); err != nil {
 			return nil, err
 		}
-		items = append(items, peer_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

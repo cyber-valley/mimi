@@ -16,7 +16,14 @@ type Embedding struct {
 	Embedding pgvector.Vector
 }
 
+type TelegramMessage struct {
+	PeerID    int64
+	Message   string
+	CreatedAt pgtype.Timestamptz
+}
+
 type TelegramPeer struct {
-	PeerID  int64
-	Enabled bool
+	ID       int64
+	ChatName string
+	Enabled  bool
 }
