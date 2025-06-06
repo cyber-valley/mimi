@@ -1,17 +1,19 @@
+include .env.example
 -include .env
 db-container = mimi-db
 
 install:
-	go install honnef.co/go/tools/cmd/staticcheck@latest
+	curl -o $(HOME)/.local/bin/sleek \
+		https://github.com/nrempel/sleek/releases/download/v0.5.0/sleek-linux-x86_64
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.1.6
 	go install github.com/air-verse/air@latest
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
 format:
-	go fmt ./...
+	golangci-lint fmt ./...
 
 lint: format
-	go vet ./...
-	staticcheck ./...
+	golangci-lint run ./...
 
 pre-commit: lint
 
