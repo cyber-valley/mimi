@@ -34,16 +34,6 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 	}
 
 	q := persist.New(conn)
-	subscribeTo, err := q.FindChannelsToFollow(ctx)
-	if err != nil {
-		glog.Error("failed to find peers to subscribe ", err)
-		return err
-	}
-	if len(subscribeTo) < 1 {
-		err = errors.New("got empty peers to subscribe")
-		glog.Error(err)
-		return err
-	}
 
 	dispatcher := tg.NewUpdateDispatcher()
 
@@ -64,41 +54,13 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 		},
 	})
 	if err != nil {
+		glog.Error("failed to init client with ", err)
 		return err
 	}
 	api := client.API()
 	session := newSession()
 
-	dispatcher.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
-		msg, ok := u.Message.(*tg.Message)
-		if !ok {
-			return nil
-		}
-		channel, ok := msg.PeerID.(*tg.PeerChannel)
-		if !ok {
-			glog.Warning("failed to extract channel from ", msg.PeerID)
-		}
-		if slices.IndexFunc(subscribeTo, func(s persist.FindChannelsToFollowRow) bool {
-			return s.ID == channel.ChannelID
-		}) == -1 {
-			return nil
-		}
-		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
-		if !ok {
-			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
-			return nil
-		}
-		glog.Info("reply to ", replyTo)
-		if replyTo.ForumTopic {
-			topic, err := session.resolveTopic(ctx, tg.NewClient(client), channel.ChannelID, replyTo.ReplyToMsgID)
-			if err != nil {
-				glog.Error("failed to resolve topic with: ", err)
-				return err
-			}
-			glog.Info("resolved topic: ", topic)
-		}
-		return handleNewChannelMessage(client, msg)
-	})
+	setupDispatcher(ctx, &dispatcher, client, q, session)
 
 	flow := auth.NewFlow(terminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
@@ -129,6 +91,52 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 		}
 		return nil
 	})
+}
+
+func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Client, q *persist.Queries, s *session) error {
+	subscribeTo, err := q.FindChannelsToFollow(ctx)
+	if err != nil {
+		glog.Error("failed to find peers to subscribe ", err)
+		return err
+	}
+	if len(subscribeTo) < 1 {
+		err = errors.New("got empty peers to subscribe")
+		glog.Error(err)
+		return err
+	}
+	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
+		msg, ok := u.Message.(*tg.Message)
+		if !ok {
+			return nil
+		}
+		channel, ok := msg.PeerID.(*tg.PeerChannel)
+		if !ok {
+			glog.Warning("failed to extract channel from ", msg.PeerID)
+		}
+		if slices.IndexFunc(subscribeTo, func(s persist.FindChannelsToFollowRow) bool {
+			return s.ID == channel.ChannelID
+		}) == -1 {
+			return nil
+		}
+		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
+		if !ok {
+			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
+			return nil
+		}
+		glog.Info("reply to ", replyTo)
+		if !replyTo.ForumTopic {
+			return nil
+		}
+		topic, err := s.resolveTopic(ctx, tg.NewClient(c), channel.ChannelID, replyTo.ReplyToMsgID)
+		if err != nil {
+			glog.Error("failed to resolve topic with: ", err)
+			return err
+		}
+		glog.Info("resolved topic: ", topic)
+		return handleNewChannelMessage(c, msg)
+	})
+
+	return nil
 }
 
 type session struct {
