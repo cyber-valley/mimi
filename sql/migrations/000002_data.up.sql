@@ -1,4 +1,4 @@
 INSERT INTO
-    telegram_peers (peer_id)
+    telegram_peer (id, chat_name)
 VALUES
-    (2594250873);
+    (2594250873, 'test-megagroup');
