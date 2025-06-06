@@ -17,5 +17,6 @@ type ChannelMessageRequest struct {
 
 func ChannelMessage(ctx context.Context, q *persist.Queries, r *ChannelMessageRequest) error {
 	glog.Info("processing new channel message")
+
 	return nil
 }

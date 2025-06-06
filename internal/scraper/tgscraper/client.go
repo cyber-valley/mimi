@@ -19,9 +19,9 @@ import (
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/tg"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"mimi/internal/persist"
-	"mimi/internal/scraper/tgscraper/handle"
 )
 
 const (
@@ -124,20 +124,28 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
 			return nil
 		}
-		var topic *tg.ForumTopic
+		var (
+			topicID int32
+			found   bool
+		)
 		if replyTo.ForumTopic {
 			t, err := s.resolveTopic(ctx, tg.NewClient(c), channel.ChannelID, replyTo.ReplyToMsgID)
 			if err != nil {
 				glog.Error("failed to resolve topic with: ", err)
 				return err
 			}
-			topic = t
+			topicID = int32(t.ID)
+			found = true
 		}
-		return handle.ChannelMessage(ctx, q, &handle.ChannelMessageRequest{
-			Topic:   topic,
-			Channel: channel,
-			Msg:     msg,
+		err := q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+			PeerID:  channel.ChannelID,
+			TopicID: pgtype.Int4{Int32: topicID, Valid: found},
 		})
+		if err != nil {
+			glog.Error("failed to save telegram message with ", err)
+			return err
+		}
+		return nil
 	})
 
 	return nil
