@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	m, err := migrate.New("file://sql/migrations", strings.Replace(os.Getenv("DATABASE_URL"), "postgresql://", "pgx5://", 1))
+	url := strings.Replace(os.Getenv("DATABASE_URL"), "postgresql://", "pgx5://", 1)
+	m, err := migrate.New("file://sql/migrations", url)
 	if err != nil {
 		log.Fatal(err)
 	}
