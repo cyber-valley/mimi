@@ -6,8 +6,10 @@ package logseq
 
 import (
 	"context"
+	"fmt"
 	"github.com/aholstenson/logseq-go"
 	"github.com/golang/glog"
+	"math"
 )
 
 func SyncGraph(ctx context.Context, path string) error {
@@ -17,11 +19,16 @@ func SyncGraph(ctx context.Context, path string) error {
 		return err
 	}
 	glog.Infof("graph: %#v", g)
-	pages, err := g.SearchPages(ctx)
+	pages, err := g.SearchPages(ctx, logseq.WithQuery(logseq.All()), logseq.WithMaxHits(math.MaxInt))
 	if err != nil {
 		glog.Errorf("failed to search pages with: %s", err)
 		return err
 	}
+	if pages.Size() != pages.Count() {
+		return fmt.Errorf("pages amount differs from total count: %d != %d", pages.Size(), pages.Count())
+	}
+	glog.Infof("found pages size: %d, count: %d", pages.Size(), pages.Count())
+
 	for _, p := range pages.Results() {
 		glog.Infof("page: %s", p.Title())
 		p, err := p.Open()
