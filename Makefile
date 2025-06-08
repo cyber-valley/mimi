@@ -33,6 +33,9 @@ run-telegram-scraper-live-reload: lint
 		--build.cmd "go build -o bin/scraper/telegram cmd/scraper/telegram.go" \
 		--build.bin "./bin/scraper/telegram"
 
+run-logseq-scraper: lint
+	go run cmd/scraper/logseq/main.go
+
 sqlc-generate:
 	sqlc generate
 
