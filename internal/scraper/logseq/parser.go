@@ -39,7 +39,15 @@ func SyncGraph(ctx context.Context, path string) error {
 		}
 		glog.Infof("subpath: %#v", p)
 		for prop := range walkProps(p) {
-			glog.Infof("prop %#v", prop)
+			for _, child := range prop.Children() {
+				if text, ok := child.(*content.Text); ok {
+					glog.Infof("prop %s:%#v", prop.Name, text.Value)
+				}
+			}
+		}
+
+		for ref := range walkRefs(p) {
+			glog.Infof("ref %#v", ref)
 		}
 	}
 	return nil
@@ -49,19 +57,28 @@ func walkProps(p logseq.Page) iter.Seq[*content.Property] {
 	blocks := p.Blocks()
 	return func(yield func(*content.Property) bool) {
 		for _, b := range blocks {
-			for _, node := range b.Content() {
-				props, ok := node.(*content.Properties)
-				if !ok {
-					continue
+			for _, prop := range b.Children().FilterDeep(func(node content.Node) bool {
+				_, ok := node.(*content.Property)
+				return ok
+			}) {
+				if !yield(prop.(*content.Property)) {
+					return
 				}
-				for _, prop := range props.Children() {
-					prop, ok := prop.(*content.Property)
-					if !ok {
-						continue
-					}
-					if !yield(prop) {
-						return
-					}
+			}
+		}
+	}
+}
+
+func walkRefs(p logseq.Page) iter.Seq[content.PageRef] {
+	blocks := p.Blocks()
+	return func(yield func(content.PageRef) bool) {
+		for _, b := range blocks {
+			for _, ref := range b.Children().FilterDeep(func(node content.Node) bool {
+				_, ok := node.(content.PageRef)
+				return ok
+			}) {
+				if !yield(ref.(content.PageRef)) {
+					return
 				}
 			}
 		}
