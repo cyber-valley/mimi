@@ -8,7 +8,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/aholstenson/logseq-go"
+	"github.com/aholstenson/logseq-go/content"
 	"github.com/golang/glog"
+	"iter"
 	"math"
 )
 
@@ -35,7 +37,33 @@ func SyncGraph(ctx context.Context, path string) error {
 		if err != nil {
 			glog.Warning("failed to open page with: %s", err)
 		}
-		glog.Infof("subpath: %T %#v", p, p)
+		glog.Infof("subpath: %#v", p)
+		for prop := range walkProps(p) {
+			glog.Infof("prop %#v", prop)
+		}
 	}
 	return nil
+}
+
+func walkProps(p logseq.Page) iter.Seq[*content.Property] {
+	blocks := p.Blocks()
+	return func(yield func(*content.Property) bool) {
+		for _, b := range blocks {
+			for _, node := range b.Content() {
+				props, ok := node.(*content.Properties)
+				if !ok {
+					continue
+				}
+				for _, prop := range props.Children() {
+					prop, ok := prop.(*content.Property)
+					if !ok {
+						continue
+					}
+					if !yield(prop) {
+						return
+					}
+				}
+			}
+		}
+	}
 }
