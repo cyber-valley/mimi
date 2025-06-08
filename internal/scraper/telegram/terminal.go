@@ -1,4 +1,4 @@
-package tgscraper
+package telegram
 
 import (
 	"bufio"

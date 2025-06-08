@@ -1,4 +1,4 @@
-package tgscraper
+package telegram
 
 import (
 	"context"
@@ -106,7 +106,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		return err
 	}
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
-    // Validate types
+		// Validate types
 		msg, ok := u.Message.(*tg.Message)
 		if !ok {
 			return nil
@@ -115,13 +115,13 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		if !ok {
 			glog.Warning("failed to extract channel from ", msg.PeerID)
 		}
-    // Process only subscribed channels / groups
+		// Process only subscribed channels / groups
 		if slices.IndexFunc(subscribeTo, func(s persist.FindChannelsToFollowRow) bool {
 			return s.ID == channel.ChannelID
 		}) == -1 {
 			return nil
 		}
-    // Extract forum topic info if exists
+		// Extract forum topic info if exists
 		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
 		if !ok {
 			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
@@ -140,7 +140,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 			topicID = int32(t.ID)
 			found = true
 		}
-    // Persist message
+		// Persist message
 		err := q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
 			PeerID:  channel.ChannelID,
 			TopicID: pgtype.Int4{Int32: topicID, Valid: found},

@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/jackc/pgx/v5"
-	"mimi/internal/scraper/tgscraper"
+	"mimi/internal/scraper/telegram"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
-	if err := tgscraper.Run(ctx, conn); err != nil {
+	if err := telegram.Run(ctx, conn); err != nil {
 		glog.Fatalf("error: %+v", err)
 	}
 
