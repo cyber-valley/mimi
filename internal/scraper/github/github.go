@@ -30,6 +30,7 @@ func Run() error {
 func (m eventMonitor) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	payload, err := github.ValidatePayload(r, m.webhookSecretKey)
 	if err != nil {
+    glog.Errorf("signature validation %s", err)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -43,12 +44,12 @@ func (m eventMonitor) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		glog.Infof("Got push event %#v", event)
 	case *github.IssueEvent:
 		glog.Infof("Got issue event %#v", event)
-  case *github.IssueCommentEvent:
-    glog.Infof("Got issue comment event %#v", event)
-  case *github.ProjectV2Event:
-    glog.Infof("Got project event %#v", event)
-  case *github.ProjectV2ItemEvent:
-    glog.Infof("Got project item event %#v", event)
+	case *github.IssueCommentEvent:
+		glog.Infof("Got issue comment event %#v", event)
+	case *github.ProjectV2Event:
+		glog.Infof("Got project event %#v", event)
+	case *github.ProjectV2ItemEvent:
+		glog.Infof("Got project item event %#v", event)
 	default:
 		glog.Warning("Got unexpected event %#v", event)
 		http.Error(w, "", http.StatusNotImplemented)
