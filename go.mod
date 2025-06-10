@@ -7,6 +7,7 @@ require (
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/golang/glog v1.2.5
+	github.com/google/go-github/v72 v72.0.0
 	github.com/gotd/contrib v0.21.0
 	github.com/gotd/td v0.124.0
 	github.com/jackc/pgx/v5 v5.7.2
@@ -43,6 +44,7 @@ require (
 	github.com/go-faster/xor v1.0.0 // indirect
 	github.com/go-faster/yaml v0.4.6 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gotd/ige v0.2.2 // indirect
 	github.com/gotd/neo v0.1.5 // indirect
