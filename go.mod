@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	github.com/aholstenson/logseq-go v0.0.0-20240211185252-504b4e13ddcd
+	github.com/cozodb/cozo-lib-go v0.7.5
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/golang/glog v1.2.5
@@ -61,6 +62,7 @@ require (
 	github.com/ogen-go/ogen v1.12.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/yuin/goldmark v1.6.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
