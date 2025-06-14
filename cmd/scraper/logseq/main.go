@@ -24,11 +24,23 @@ func main() {
 		log.Fatalf("failed to create relations with %s", err)
 	}
 
-	logseq.SyncGraph(ctx, q, "/home/user/code/clone/cvland")
-
-	rels, err := q.FindRelatives("genesis", 2)
+	g, err := logseq.New(ctx, q, "/home/user/code/clone/cvland")
 	if err != nil {
-		log.Fatalf("failed to find relatives with %s", err)
+		log.Fatalf("failed to create graph with %s", err)
 	}
-	slog.Info("found relatives", "amount", len(rels))
+
+	if err := g.Sync(); err != nil {
+		log.Fatalf("failed to sync graph with %s", err)
+	}
+
+	contents, err := g.Retrieve("genesis")
+	if err != nil {
+		log.Fatalf("failed to retrieve pages with %s", err)
+	}
+	var totalSize int
+	for _, content := range contents {
+		totalSize += len(content)
+		slog.Info("retrieved page", "content", content)
+	}
+	slog.Info("total data retireved", "amount", totalSize)
 }

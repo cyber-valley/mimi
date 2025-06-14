@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"log/slog"
 	"math"
 	"strings"
 
@@ -19,27 +20,33 @@ import (
 	"mimi/internal/scraper/logseq/db"
 )
 
-func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
+type Graph struct {
+	g   *logseq.Graph
+	q   *db.Queries
+	ctx context.Context
+}
+
+func New(ctx context.Context, q *db.Queries, path string) (Graph, error) {
 	g, err := logseq.Open(ctx, path, logseq.WithInMemoryIndex())
 	if err != nil {
 		glog.Errorf("failed to open graph %s with: %s", path, err)
-		return err
+		return Graph{}, err
 	}
+	return Graph{
+		g:   g,
+		q:   q,
+		ctx: ctx,
+	}, nil
+}
 
-	glog.Infof("graph: %#v", g)
-	pages, err := g.SearchPages(ctx, logseq.WithQuery(logseq.All()), logseq.WithMaxHits(math.MaxInt))
+func (g Graph) Sync() error {
+	pages, err := g.getAllPages()
 	if err != nil {
-		glog.Errorf("failed to search pages with: %s", err)
-		return err
+		return fmt.Errorf("reading all pages failed with %w", err)
 	}
 
-	if pages.Size() != pages.Count() {
-		return fmt.Errorf("pages amount differs from total count: %d != %d", pages.Size(), pages.Count())
-	}
-
-	glog.Infof("found pages size: %d, count: %d", pages.Size(), pages.Count())
 	var errs []error
-	for _, p := range pages.Results() {
+	for _, p := range pages {
 		props := make(map[string]string)
 		var refs []string
 
@@ -72,7 +79,7 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 
 		// Persist page
 		glog.Infof("Parsed %d properties and %d refs from '%s'", len(props), len(refs), p.Title())
-		err = q.SavePage(db.SavePageParams{
+		err = g.q.SavePage(db.SavePageParams{
 			Title:   p.Title(),
 			Content: extractText(p),
 			Props:   props,
@@ -85,6 +92,42 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 	}
 
 	return errors.Join(errs...)
+}
+
+// Get relative text to the given page title
+func (g Graph) Retrieve(title string) (contents []string, err error) {
+	rels, err := g.q.FindRelatives("genesis", 2)
+	if err != nil {
+		return contents, fmt.Errorf("failed to find relatives with %w", err)
+	}
+	slog.Info("found relatives", "amount", len(rels))
+	pages, err := g.getAllPages()
+	if err != nil {
+		return
+	}
+	var errs []error
+	for _, page := range pages {
+		p, err := page.Open()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to open page with %w", err))
+			continue
+		}
+		contents = append(contents, extractText(p))
+	}
+	return contents, errors.Join(errs...)
+}
+
+func (g Graph) getAllPages() (pages []logseq.PageResult, err error) {
+	res, err := g.g.SearchPages(g.ctx, logseq.WithQuery(logseq.All()), logseq.WithMaxHits(math.MaxInt))
+	if err != nil {
+		return pages, fmt.Errorf("pages search failed with %w", err)
+	}
+
+	if res.Size() != res.Count() {
+		return pages, fmt.Errorf("res amount differs from total count: %d != %d", res.Size(), res.Count())
+	}
+
+	return res.Results(), nil
 }
 
 func walkPage[T content.Node](p logseq.Page) iter.Seq[T] {
