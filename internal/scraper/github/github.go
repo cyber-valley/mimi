@@ -30,7 +30,7 @@ func Run() error {
 func (m eventMonitor) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	payload, err := github.ValidatePayload(r, m.webhookSecretKey)
 	if err != nil {
-    glog.Errorf("signature validation %s", err)
+		glog.Errorf("signature validation %s", err)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
