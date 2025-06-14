@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/cozodb/cozo-lib-go"
 	"log"
@@ -49,7 +50,7 @@ func (q *Queries) SavePage(p SavePageParams) error {
 
 	// Save or update page
 	tx = append(tx, fmt.Sprintf(
-		`?[title, content] <- [["%s","%s"]] :put page{title, content}`,
+		`?[title, content] <- [[%s,%s]] :put page{title, content}`,
 		escape(p.Title),
 		escape(p.Content),
 	))
@@ -59,7 +60,7 @@ func (q *Queries) SavePage(p SavePageParams) error {
 		var props []string
 		for name, value := range p.Props {
 			props = append(props, fmt.Sprintf(
-				`["%s","%s","%s"]`,
+				`[%s,%s,%s]`,
 				escape(p.Title),
 				escape(name),
 				escape(value),
@@ -79,7 +80,7 @@ func (q *Queries) SavePage(p SavePageParams) error {
 		var refs []string
 		for _, ref := range p.Refs {
 			refs = append(refs, fmt.Sprintf(
-				`["%s","%s"]`,
+				`[%s,%s]`,
 				escape(p.Title),
 				escape(ref),
 			))
@@ -102,7 +103,11 @@ func (q *Queries) SavePage(p SavePageParams) error {
 }
 
 func escape(s string) string {
-	return strings.ReplaceAll(s, `"`, `\"`)
+	b, err := json.Marshal(strings.ReplaceAll(s, `"`, `'`))
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
 }
 
 func execTx(db cozo.CozoDB, queries []string) error {
