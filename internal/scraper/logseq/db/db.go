@@ -105,11 +105,13 @@ func escape(s string) string {
 }
 
 func execTx(db cozo.CozoDB, queries []string) error {
-	for _, q := range queries {
-		_, err := db.Run(q, nil, false)
-		if err != nil {
-			return err
-		}
+	wrapped := make([]string, len(queries))
+	for i, q := range queries {
+		wrapped[i] = fmt.Sprintf("{%s}", q)
+	}
+	_, err := db.Run(strings.Join(wrapped, "\n"), nil, false)
+	if err != nil {
+		return fmt.Errorf("failed to execute transaction with %w", err)
 	}
 	return nil
 }
