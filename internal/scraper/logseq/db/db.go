@@ -11,13 +11,6 @@ type Queries struct {
 	db cozo.CozoDB
 }
 
-type Page struct {
-	Title   string
-	Content string
-	Props   map[string]string
-	Refs    []string
-}
-
 func New() *Queries {
 	db, err := cozo.New("mem", "", nil)
 	if err != nil {
@@ -44,7 +37,14 @@ func (q *Queries) CreateRelations() (err error) {
 	return
 }
 
-func (q *Queries) SavePage(p Page) error {
+type SavePageParams struct {
+	Title   string
+	Content string
+	Props   map[string]string
+	Refs    []string
+}
+
+func (q *Queries) SavePageParams(p SavePageParams) error {
 	var tx []string
 
 	// Save or update page
