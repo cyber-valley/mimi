@@ -45,9 +45,10 @@ func (q *Queries) CreateRelations() (err error) {
 }
 
 func (q *Queries) SavePage(p Page) error {
-	var queries []string
+	var tx []string
+
 	// Save or update page
-	queries = append(queries, fmt.Sprintf(
+	tx = append(tx, fmt.Sprintf(
 		`?[title, content] <- [["%s","%s"]] :put page{title, content}`,
 		escape(p.Title),
 		escape(p.Content),
@@ -64,8 +65,8 @@ func (q *Queries) SavePage(p Page) error {
 				escape(value),
 			))
 		}
-		queries = append(
-			queries,
+		tx = append(
+			tx,
 			fmt.Sprintf(
 				`?[page_title, name, value] <- [%s] :put page_prop{page_title, name, value}`,
 				strings.Join(props, ", "),
@@ -83,8 +84,8 @@ func (q *Queries) SavePage(p Page) error {
 				escape(ref),
 			))
 		}
-		queries = append(
-			queries,
+		tx = append(
+			tx,
 			fmt.Sprintf(
 				`?[page_title, ref] <- [%s] :put page_ref{page_title, ref}`,
 				strings.Join(refs, ", "),
@@ -93,7 +94,7 @@ func (q *Queries) SavePage(p Page) error {
 	}
 
 	// Execute queries in transaction
-	err := execTx(q.db, queries)
+	err := execTx(q.db, tx)
 	if err != nil {
 		return fmt.Errorf("failed to save or update page '%s' with %w", p.Title, err)
 	}
