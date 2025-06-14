@@ -36,18 +36,18 @@ func SyncGraph(ctx context.Context, path string) error {
 		if err != nil {
 			glog.Warning("failed to open page with: %s", err)
 		}
-		glog.Infof("subpath: %#v", p)
 		for prop := range walkProps(p) {
 			for _, child := range prop.Children() {
 				if text, ok := child.(*content.Text); ok {
-					glog.Infof("prop %s:%#v", prop.Name, text.Value)
+					glog.Infof("prop %s:%s", prop.Name, text.Value)
 				}
 			}
 		}
 
 		for ref := range walkRefs(p) {
-			glog.Infof("ref %#v", ref)
+			glog.Infof("ref to %s", ref.GetTo())
 		}
+
 	}
 	return nil
 }

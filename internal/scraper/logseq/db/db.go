@@ -19,7 +19,7 @@ type Page struct {
 }
 
 func New() *Queries {
-	db, err := cozo.New("sqlite", "test.db", nil)
+	db, err := cozo.New("mem", "", nil)
 	if err != nil {
 		log.Fatalf("failed to connect to cozo with %s", err)
 	}
@@ -33,7 +33,7 @@ func (q *Queries) CreateRelations() (err error) {
 	if err != nil {
 		return
 	}
-	_, err = q.db.Run(":create page_ref { page_title: String, page_ref: String }", nil, false)
+	_, err = q.db.Run(":create page_ref { page_title: String, ref: String }", nil, false)
 	if err != nil {
 		return
 	}
@@ -48,7 +48,7 @@ func (q *Queries) SavePage(p Page) error {
 	var queries []string
 	// Save or update page
 	queries = append(queries, fmt.Sprintf(
-		`:put page {title: "%s", content: "%s"}`,
+		`?[title, content] <- [["%s","%s"]] :put page{title, content}`,
 		escape(p.Title),
 		escape(p.Content),
 	))
@@ -58,13 +58,19 @@ func (q *Queries) SavePage(p Page) error {
 		var props []string
 		for name, value := range p.Props {
 			props = append(props, fmt.Sprintf(
-				`{page_title: "%s", name: "%s", value: "%s"}`,
+				`["%s","%s","%s"]`,
 				escape(p.Title),
 				escape(name),
 				escape(value),
 			))
 		}
-		queries = append(queries, fmt.Sprintf(`:put page_prop %s`, strings.Join(props, ", ")))
+		queries = append(
+			queries,
+			fmt.Sprintf(
+				`?[page_title, name, value] <- [%s] :put page_prop{page_title, name, value}`,
+				strings.Join(props, ", "),
+			),
+		)
 	}
 
 	// Save or update references
@@ -72,12 +78,18 @@ func (q *Queries) SavePage(p Page) error {
 		var refs []string
 		for _, ref := range p.Refs {
 			refs = append(refs, fmt.Sprintf(
-				`{page_title: "%s", page_ref: "%s"}`,
+				`["%s","%s"]`,
 				escape(p.Title),
 				escape(ref),
 			))
 		}
-		queries = append(queries, fmt.Sprintf(`:put page_ref %s`, strings.Join(refs, ", ")))
+		queries = append(
+			queries,
+			fmt.Sprintf(
+				`?[page_title, ref] <- [%s] :put page_ref{page_title, ref}`,
+				strings.Join(refs, ", "),
+			),
+		)
 	}
 
 	// Execute queries in transaction
@@ -93,10 +105,11 @@ func escape(s string) string {
 }
 
 func execTx(db cozo.CozoDB, queries []string) error {
-	wrapped := make([]string, len(queries))
-	for i, query := range queries {
-		wrapped[i] = fmt.Sprintf("{%s}", query)
+	for _, q := range queries {
+		_, err := db.Run(q, nil, false)
+		if err != nil {
+			return err
+		}
 	}
-	_, err := db.Run(strings.Join(wrapped, "\n"), nil, false)
-	return err
+	return nil
 }
