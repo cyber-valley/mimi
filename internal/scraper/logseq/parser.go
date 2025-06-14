@@ -51,7 +51,7 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 		}
 
 		// Collect properties
-		for prop := range walkProps(p) {
+		for prop := range walkPage[*content.Property](p) {
 			for _, child := range prop.Children() {
 				if text, ok := child.(*content.Text); ok {
 					if text.Value == "" {
@@ -66,7 +66,7 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 		}
 
 		// Collect references
-		for ref := range walkRefs(p) {
+		for ref := range walkPage[content.PageRef](p) {
 			refs = append(refs, ref.GetTo())
 		}
 
@@ -87,25 +87,12 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 	return errors.Join(errs...)
 }
 
-func walkProps(p logseq.Page) iter.Seq[*content.Property] {
+func walkPage[T content.Node](p logseq.Page) iter.Seq[T] {
 	blocks := p.Blocks()
-	return func(yield func(*content.Property) bool) {
+	return func(yield func(T) bool) {
 		for _, b := range blocks {
-			for _, prop := range b.Children().FilterDeep(content.IsOfType[*content.Property]()) {
-				if !yield(prop.(*content.Property)) {
-					return
-				}
-			}
-		}
-	}
-}
-
-func walkRefs(p logseq.Page) iter.Seq[content.PageRef] {
-	blocks := p.Blocks()
-	return func(yield func(content.PageRef) bool) {
-		for _, b := range blocks {
-			for _, ref := range b.Children().FilterDeep(content.IsOfType[content.PageRef]()) {
-				if !yield(ref.(content.PageRef)) {
+			for _, ref := range b.Children().FilterDeep(content.IsOfType[T]()) {
+				if !yield(ref.(T)) {
 					return
 				}
 			}
@@ -115,10 +102,8 @@ func walkRefs(p logseq.Page) iter.Seq[content.PageRef] {
 
 func extractText(p logseq.Page) string {
 	var bob strings.Builder
-	for _, block := range p.Blocks() {
-		for _, node := range block.Content().FilterDeep(content.IsOfType[*content.Text]()) {
-			bob.WriteString(node.(*content.Text).Value)
-		}
+	for text := range walkPage[*content.Text](p) {
+		bob.WriteString(text.Value)
 	}
 	return strings.TrimSpace(bob.String())
 }
