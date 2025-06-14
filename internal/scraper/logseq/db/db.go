@@ -44,7 +44,7 @@ type SavePageParams struct {
 	Refs    []string
 }
 
-func (q *Queries) SavePageParams(p SavePageParams) error {
+func (q *Queries) SavePage(p SavePageParams) error {
 	var tx []string
 
 	// Save or update page

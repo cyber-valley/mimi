@@ -17,5 +17,11 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	logseq.SyncGraph(ctx, "/home/user/code/clone/cvland")
+	q := db.New()
+	err := q.CreateRelations()
+	if err != nil {
+		log.Fatalf("failed to create relations with %s", err)
+	}
+
+	logseq.SyncGraph(ctx, q, "/home/user/code/clone/cvland")
 }
