@@ -19,7 +19,7 @@ type Page struct {
 }
 
 func New() *Queries {
-	db, err := cozo.New("mem", "", nil)
+	db, err := cozo.New("sqlite", "test.db", nil)
 	if err != nil {
 		log.Fatalf("failed to connect to cozo with %s", err)
 	}
@@ -29,15 +29,15 @@ func New() *Queries {
 }
 
 func (q *Queries) CreateRelations() (err error) {
-	_, err = q.db.Run(":create page { title: String => content: String }", nil)
+	_, err = q.db.Run(":create page { title: String => content: String }", nil, false)
 	if err != nil {
 		return
 	}
-	_, err = q.db.Run(":create page_ref { page_title: String, page_ref: String }", nil)
+	_, err = q.db.Run(":create page_ref { page_title: String, page_ref: String }", nil, false)
 	if err != nil {
 		return
 	}
-	_, err = q.db.Run(":create page_prop { page_title: String, name: String, value: String }", nil)
+	_, err = q.db.Run(":create page_prop { page_title: String, name: String, value: String }", nil, false)
 	if err != nil {
 		return
 	}
@@ -97,6 +97,6 @@ func execTx(db cozo.CozoDB, queries []string) error {
 	for i, query := range queries {
 		wrapped[i] = fmt.Sprintf("{%s}", query)
 	}
-	_, err := db.Run(strings.Join(wrapped, "\n"), nil)
+	_, err := db.Run(strings.Join(wrapped, "\n"), nil, false)
 	return err
 }

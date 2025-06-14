@@ -18,6 +18,8 @@ require (
 	golang.org/x/time v0.11.0
 )
 
+replace github.com/cozodb/cozo-lib-go => github.com/alexeykiselev/cozo-lib-go v0.0.0-20240321135326-0c02eb09ecdf
+
 require (
 	github.com/RoaringBitmap/roaring v0.9.4 // indirect
 	github.com/axiomhq/hyperloglog v0.0.0-20191112132149-a4c4c47bc57f // indirect
