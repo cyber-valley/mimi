@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"log/slog"
 	"mimi/internal/scraper/logseq"
 	"mimi/internal/scraper/logseq/db"
 	"os"
@@ -24,4 +25,10 @@ func main() {
 	}
 
 	logseq.SyncGraph(ctx, q, "/home/user/code/clone/cvland")
+
+	rels, err := q.FindRelatives("genesis", 2)
+	if err != nil {
+		log.Fatalf("failed to find relatives with %s", err)
+	}
+	slog.Info("found relatives", "amount", len(rels))
 }

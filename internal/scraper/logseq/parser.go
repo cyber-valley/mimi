@@ -71,7 +71,7 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 		}
 
 		// Persist page
-		glog.Infof("Parsed %d properties and %d refs", len(props), len(refs))
+		glog.Infof("Parsed %d properties and %d refs from '%s'", len(props), len(refs), p.Title())
 		err = q.SavePage(db.SavePageParams{
 			Title:   p.Title(),
 			Content: extractText(p),

@@ -27,7 +27,7 @@ func (q *Queries) CreateRelations() (err error) {
 	if err != nil {
 		return
 	}
-	_, err = q.db.Run(":create page_ref { page_title: String, ref: String }", nil, false)
+	_, err = q.db.Run(":create page_ref { src: String, target: String }", nil, false)
 	if err != nil {
 		return
 	}
@@ -88,7 +88,7 @@ func (q *Queries) SavePage(p SavePageParams) error {
 		tx = append(
 			tx,
 			fmt.Sprintf(
-				`?[page_title, ref] <- [%s] :put page_ref{page_title, ref}`,
+				`?[src, target] <- [%s] :put page_ref{src, target}`,
 				strings.Join(refs, ", "),
 			),
 		)
@@ -100,6 +100,36 @@ func (q *Queries) SavePage(p SavePageParams) error {
 		return fmt.Errorf("failed to save or update page '%s' with %w", p.Title, err)
 	}
 	return nil
+}
+
+// Page titles that are relative to the given one via ref
+func (q *Queries) FindRelatives(pageTitle string, depth int) (titles []string, err error) {
+	query := fmt.Sprintf(
+		`
+		relatives[target, depth] :=
+			*page_ref{src: %s, target},
+			depth = 1
+
+		relatives[target, depth] :=
+				relatives[new_src, d],
+				*page_ref{src: new_src, target},
+				depth = d + 1,
+				depth <= %d
+
+		?[target, depth] :=
+				relatives[target, depth] 
+		`,
+		escape(pageTitle),
+		depth,
+	)
+	res, err := q.db.Run(query, nil, true)
+	if err != nil {
+		return titles, fmt.Errorf("failed to find relatives for '%s' with %w", pageTitle, err)
+	}
+	for _, row := range res.Rows {
+		titles = append(titles, row[0].(string))
+	}
+	return titles, nil
 }
 
 func escape(s string) string {
