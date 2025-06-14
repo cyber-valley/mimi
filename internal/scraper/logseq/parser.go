@@ -70,6 +70,7 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 			refs = append(refs, ref.GetTo())
 		}
 
+		// Persist page
 		glog.Infof("Parsed %d properties and %d refs", len(props), len(refs))
 		err = q.SavePage(db.SavePageParams{
 			Title:   p.Title(),
@@ -82,6 +83,7 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 			errs = append(errs, err)
 		}
 	}
+
 	return errors.Join(errs...)
 }
 
@@ -89,10 +91,7 @@ func walkProps(p logseq.Page) iter.Seq[*content.Property] {
 	blocks := p.Blocks()
 	return func(yield func(*content.Property) bool) {
 		for _, b := range blocks {
-			for _, prop := range b.Children().FilterDeep(func(node content.Node) bool {
-				_, ok := node.(*content.Property)
-				return ok
-			}) {
+			for _, prop := range b.Children().FilterDeep(content.IsOfType[*content.Property]()) {
 				if !yield(prop.(*content.Property)) {
 					return
 				}
@@ -105,10 +104,7 @@ func walkRefs(p logseq.Page) iter.Seq[content.PageRef] {
 	blocks := p.Blocks()
 	return func(yield func(content.PageRef) bool) {
 		for _, b := range blocks {
-			for _, ref := range b.Children().FilterDeep(func(node content.Node) bool {
-				_, ok := node.(content.PageRef)
-				return ok
-			}) {
+			for _, ref := range b.Children().FilterDeep(content.IsOfType[content.PageRef]()) {
 				if !yield(ref.(content.PageRef)) {
 					return
 				}
