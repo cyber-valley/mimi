@@ -57,7 +57,7 @@ func SyncGraph(ctx context.Context, q *db.Queries, path string) error {
 					if text.Value == "" {
 						continue
 					}
-					if old, ok := props[prop.Name]; ok {
+					if old, ok := props[prop.Name]; ok && old != text.Value {
 						glog.Warningf("got duplicate property name %s, old '%s', new '%s'", prop.Name, old, text.Value)
 					}
 					props[prop.Name] = text.Value
