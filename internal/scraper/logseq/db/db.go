@@ -1,10 +1,13 @@
 package db
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/cozodb/cozo-lib-go"
@@ -24,21 +27,48 @@ func New() *Queries {
 	}
 }
 
-func (q *Queries) CreateRelations() {
-	var err error
+func (q *Queries) CreateRelations() error {
+	var errs []error
 
-	_, err = q.db.Run(":create page { title: String => content: String, embedding: <F32; 1536> }", nil, false)
+	res, err := q.db.Run("::relations", nil, true)
 	if err != nil {
-		slog.Warn("failed to create 'relation' table", "with", err)
+		return fmt.Errorf("failed to get relations list with %w", err)
 	}
-	_, err = q.db.Run(":create page_ref { src: String, target: String }", nil, false)
-	if err != nil {
-		slog.Warn("failed to create 'page_ref' relation", "with", err)
+	relations := make([]string, len(res.Rows))
+	for i, row := range res.Rows {
+		relations[i] = row[0].(string)
 	}
-	_, err = q.db.Run(":create page_prop { page_title: String, name: String, value: String }", nil, false)
-	if err != nil {
-		slog.Warn("failed to create 'page_prop' relation", "with", err)
+
+	schema := map[string]string{
+		"page": `:create page {
+			title: String
+			=>
+			content: String,
+			hash: String
+		}`,
+		"page_ref": `:create page_ref {
+			src: String,
+			target: String
+		}`,
+		"page_prop": `:create page_prop {
+			page_title: String,
+			name: String,
+			value: String
+		}`,
 	}
+
+	for name, query := range schema {
+		if slices.Contains(relations, name) {
+			slog.Info("relation already exists", "name", name)
+			continue
+		}
+		_, err = q.db.Run(query, nil, false)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 type SavePageParams struct {
@@ -49,13 +79,29 @@ type SavePageParams struct {
 }
 
 func (q *Queries) SavePage(p SavePageParams) error {
+	sha := sha256.New()
+	sha.Write([]byte(p.Content))
+	h := fmt.Sprintf("%x", sha.Sum(nil))
+
+	// Check if content changed
+	changed, err := q.findContentChanged(h)
+	if err != nil {
+		return fmt.Errorf("failed to save page with %w", err)
+	}
+	if !changed {
+		return nil
+	}
+
+	slog.Info("page content changed")
+
 	var tx []string
 
 	// Save or update page
 	tx = append(tx, fmt.Sprintf(
-		`?[title, content] <- [[%s,%s]] :put page{title, content}`,
+		`?[title, content, hash] <- [[%s,%s,%s]] :put page{title, content, hash}`,
 		escape(p.Title),
 		escape(p.Content),
+		escape(h),
 	))
 
 	// Save or update page properties
@@ -98,7 +144,7 @@ func (q *Queries) SavePage(p SavePageParams) error {
 	}
 
 	// Execute queries in transaction
-	err := execTx(q.db, tx)
+	err = execTx(q.db, tx)
 	if err != nil {
 		return fmt.Errorf("failed to save or update page '%s' with %w", p.Title, err)
 	}
@@ -133,6 +179,20 @@ func (q *Queries) FindRelatives(pageTitle string, depth int) (titles []string, e
 		titles = append(titles, row[0].(string))
 	}
 	return titles, nil
+}
+
+func (q *Queries) findContentChanged(hash string) (bool, error) {
+	query := fmt.Sprintf(
+		`
+		?[title] := *page{title, hash: %s}
+		`,
+		escape(hash),
+	)
+	res, err := q.db.Run(query, nil, true)
+	if err != nil {
+		return false, fmt.Errorf("failed to check existence of page '%s' with %w", hash, err)
+	}
+	return len(res.Rows) == 0, nil
 }
 
 func escape(s string) string {

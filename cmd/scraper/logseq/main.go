@@ -23,7 +23,10 @@ func main() {
 
 	// Connect to CozoDB
 	q := db.New()
-	q.CreateRelations()
+	err := q.CreateRelations()
+	if err != nil {
+		log.Fatalf("failed to create relations with %s", err)
+	}
 
 	// Initialize indexer
 	rag := rag.New(ctx, q)
