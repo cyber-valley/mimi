@@ -11,6 +11,7 @@ import (
 	"iter"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/aholstenson/logseq-go"
@@ -96,7 +97,7 @@ func (g Graph) Sync() error {
 
 // Get relative text to the given page title
 func (g Graph) Retrieve(title string) (contents []string, err error) {
-	rels, err := g.q.FindRelatives("genesis", 2)
+	rels, err := g.q.FindRelatives(title, 5)
 	if err != nil {
 		return contents, fmt.Errorf("failed to find relatives with %w", err)
 	}
@@ -112,7 +113,11 @@ func (g Graph) Retrieve(title string) (contents []string, err error) {
 			errs = append(errs, fmt.Errorf("failed to open page with %w", err))
 			continue
 		}
+		if !slices.Contains(rels, page.Title()) {
+			continue
+		}
 		contents = append(contents, extractText(p))
+
 	}
 	return contents, errors.Join(errs...)
 }

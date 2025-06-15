@@ -42,5 +42,5 @@ func main() {
 		totalSize += len(content)
 		slog.Info("retrieved page", "content", content)
 	}
-	slog.Info("total data retireved", "amount", totalSize)
+	slog.Info("total data retrieved", "amount", totalSize)
 }
