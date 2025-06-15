@@ -6,6 +6,7 @@ package logseq
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"iter"
@@ -43,7 +44,7 @@ func New(ctx context.Context, q *db.Queries, rag rag.RAG, path string) (Graph, e
 	}, nil
 }
 
-func (g Graph) Sync() error {
+func (g Graph) Sync(ctx context.Context) error {
 	pages, err := g.getAllPages()
 	if err != nil {
 		return fmt.Errorf("reading all pages failed with %w", err)
@@ -81,17 +82,42 @@ func (g Graph) Sync() error {
 			refs = append(refs, ref.GetTo())
 		}
 
-		// Persist page
-		glog.Infof("Parsed %d properties and %d refs from '%s'", len(props), len(refs), p.Title())
+		// Check if content changed
+		content := extractText(p)
+		sha := sha256.New()
+		sha.Write([]byte(content))
+		hash := fmt.Sprintf("%x", sha.Sum(nil))
+
+		changed, err := g.q.FindContentChanged(hash)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed check if page '%s' changed with %w", p.Title(), err))
+			continue
+		}
+		if !changed {
+			continue
+		}
+
+		slog.Info("saving page", "title", p.Title())
+
+		// Calculate embedding
+		embedding, err := g.rag.Embed(ctx, content)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to index page '%s' with %w", p.Title(), err))
+		}
+
+		// Persist changed page
 		err = g.q.SavePage(db.SavePageParams{
-			Title:   p.Title(),
-			Content: extractText(p),
-			Props:   props,
-			Refs:    refs,
+			Title:     p.Title(),
+			Hash:      hash,
+			Embedding: embedding,
+			Content:   content,
+			Props:     props,
+			Refs:      refs,
 		})
 		if err != nil {
 			glog.Errorf("failed to save page with %s", err)
 			errs = append(errs, err)
+			continue
 		}
 	}
 

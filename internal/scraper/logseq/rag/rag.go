@@ -2,7 +2,9 @@ package rag
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"log/slog"
 	"os"
 
 	"github.com/firebase/genkit/go/ai"
@@ -10,6 +12,7 @@ import (
 	"github.com/firebase/genkit/go/plugins/compat_oai/openai"
 
 	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/scraper/logseq/types"
 )
 
 type RAG struct {
@@ -46,10 +49,46 @@ func New(ctx context.Context, q *db.Queries) RAG {
 	}
 }
 
-func (r RAG) Index(query string) error {
-	panic("not implemented")
+func (r RAG) Embed(ctx context.Context, content string) ([]float32, error) {
+	slog.Info("calculating embedding for content", "size", len(content))
+	v := make([]float32, 1536)
+	if len(content) == 0 {
+		return v, nil
+	}
+	resp, err := r.e.Embed(ctx, &ai.EmbedRequest{
+		Input: []*ai.Document{
+			&ai.Document{
+				Content: []*ai.Part{
+					&ai.Part{
+						Kind: ai.PartText,
+						Text: content,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return v, fmt.Errorf("failed to embed content with %w", err)
+	}
+	if len(resp.Embeddings) > 1 {
+		return v, fmt.Errorf("got more embeddings than expected %d", len(resp.Embeddings))
+	}
+	return resp.Embeddings[0].Embedding, nil
 }
 
-func (r RAG) Retrieve(query string) (*ai.RetrieverResponse, error) {
+func (r RAG) Retrieve(ctx context.Context, query string) ([]types.Page, error) {
+	// Embed query
+	vec, err := r.Embed(ctx, query)
+	if err != nil {
+		return []types.Page{}, fmt.Errorf("failed to embed for retrieve with %w", err)
+	}
+
+	slog.Info("Query", "vec", vec)
+	// Query CozoDB
+	titles, err := r.q.FindSimilarPages(vec)
+	if err != nil {
+		return []types.Page{}, fmt.Errorf("failed to find similar pages with %w", err)
+	}
+	slog.Info("found similar pages", "len", len(titles), "titles", fmt.Sprintf("%#v", titles))
 	panic("not implemented")
 }

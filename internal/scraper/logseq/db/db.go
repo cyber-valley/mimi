@@ -1,7 +1,6 @@
 package db
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,8 +43,18 @@ func (q *Queries) CreateRelations() error {
 			title: String
 			=>
 			content: String,
-			hash: String
-		}`,
+			hash: String,
+			embedding: <F32; 1536>
+		}
+		::hnsw create page:embedding_index2 {
+			dim: 1536,
+			m: 5,
+			dtype: F32,
+			fields: [embedding],
+			distance: Cosine,
+			ef_construction: 10
+		}
+		`,
 		"page_ref": `:create page_ref {
 			src: String,
 			target: String
@@ -72,36 +81,24 @@ func (q *Queries) CreateRelations() error {
 }
 
 type SavePageParams struct {
-	Title   string
-	Content string
-	Props   map[string]string
-	Refs    []string
+	Title     string
+	Hash      string
+	Content   string
+	Embedding []float32
+	Props     map[string]string
+	Refs      []string
 }
 
 func (q *Queries) SavePage(p SavePageParams) error {
-	sha := sha256.New()
-	sha.Write([]byte(p.Content))
-	h := fmt.Sprintf("%x", sha.Sum(nil))
-
-	// Check if content changed
-	changed, err := q.findContentChanged(h)
-	if err != nil {
-		return fmt.Errorf("failed to save page with %w", err)
-	}
-	if !changed {
-		return nil
-	}
-
-	slog.Info("page content changed")
-
 	var tx []string
 
 	// Save or update page
 	tx = append(tx, fmt.Sprintf(
-		`?[title, content, hash] <- [[%s,%s,%s]] :put page{title, content, hash}`,
+		`?[title, content, hash, embedding] <- [[%s,%s,%s,%s]] :put page{title, content, hash, embedding}`,
 		escape(p.Title),
 		escape(p.Content),
-		escape(h),
+		escape(p.Hash),
+		escapeSlice(p.Embedding),
 	))
 
 	// Save or update page properties
@@ -144,7 +141,7 @@ func (q *Queries) SavePage(p SavePageParams) error {
 	}
 
 	// Execute queries in transaction
-	err = execTx(q.db, tx)
+	err := execTx(q.db, tx)
 	if err != nil {
 		return fmt.Errorf("failed to save or update page '%s' with %w", p.Title, err)
 	}
@@ -181,18 +178,44 @@ func (q *Queries) FindRelatives(pageTitle string, depth int) (titles []string, e
 	return titles, nil
 }
 
-func (q *Queries) findContentChanged(hash string) (bool, error) {
+func (q *Queries) FindContentChanged(hash string) (bool, error) {
 	query := fmt.Sprintf(
 		`
 		?[title] := *page{title, hash: %s}
 		`,
 		escape(hash),
 	)
-	res, err := q.db.Run(query, nil, true)
+	res, err := q.db.Run(query, nil, false)
 	if err != nil {
 		return false, fmt.Errorf("failed to check existence of page '%s' with %w", hash, err)
 	}
 	return len(res.Rows) == 0, nil
+}
+
+func (q *Queries) FindSimilarPages(vec []float32) (titles []string, _ error) {
+	query := fmt.Sprintf(
+		`
+		?[dist, title] := 
+			~page:embedding_index2{title |
+				query: q,
+				k: 10,
+				ef: 50,
+				bind_distance: dist
+			}, q = vec(%s)
+		:order dist
+		:limit 10
+		`,
+		escapeSlice(vec),
+	)
+	res, err := q.db.Run(query, nil, false)
+	if err != nil {
+		return titles, fmt.Errorf("failed to find similar pages with %w", err)
+	}
+	for _, row := range res.Rows {
+		slog.Info("RAG row", "distance", row[0])
+		titles = append(titles, row[1].(string))
+	}
+	return titles, nil
 }
 
 func escape(s string) string {
@@ -201,6 +224,14 @@ func escape(s string) string {
 		panic(err)
 	}
 	return string(b)
+}
+
+func escapeSlice[T any](s []T) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	return strings.ReplaceAll(string(b), `"`, "")
 }
 
 func execTx(db cozo.CozoDB, queries []string) error {
