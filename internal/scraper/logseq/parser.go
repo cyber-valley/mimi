@@ -19,15 +19,17 @@ import (
 	"github.com/golang/glog"
 
 	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/scraper/logseq/rag"
 )
 
 type Graph struct {
 	g   *logseq.Graph
 	q   *db.Queries
+	rag rag.RAG
 	ctx context.Context
 }
 
-func New(ctx context.Context, q *db.Queries, path string) (Graph, error) {
+func New(ctx context.Context, q *db.Queries, rag rag.RAG, path string) (Graph, error) {
 	g, err := logseq.Open(ctx, path, logseq.WithInMemoryIndex())
 	if err != nil {
 		glog.Errorf("failed to open graph %s with: %s", path, err)
@@ -36,6 +38,7 @@ func New(ctx context.Context, q *db.Queries, path string) (Graph, error) {
 	return Graph{
 		g:   g,
 		q:   q,
+		rag: rag,
 		ctx: ctx,
 	}, nil
 }

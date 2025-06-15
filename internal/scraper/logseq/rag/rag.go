@@ -25,14 +25,8 @@ func New(ctx context.Context, q *db.Queries) RAG {
 		log.Fatalf("could not initialize Genkit: %v", err)
 	}
 
-	// Fail fast if prompt wasn't found
-	p := genkit.LookupPrompt(g, "logseq-cozo")
-	if p == nil {
-		log.Fatal("no prompt named 'menu' found")
-	}
-
 	// Setup OpenAI embedder
-	oaiKey := os.Getenv("OPENAI_API_TOKEN")
+	oaiKey := os.Getenv("OPENAI_API_KEY")
 	if oaiKey == "" {
 		log.Fatal("OPENAI_API_TOKEN env var should be set")
 	}
@@ -42,10 +36,7 @@ func New(ctx context.Context, q *db.Queries) RAG {
 	if err = oai.Init(ctx, g); err != nil {
 		log.Fatalf("failed to init OpenAI plugin with %s", err)
 	}
-	embedder, err := oai.DefineEmbedder(g, "text-embedding-3-small")
-	if err != nil {
-		log.Fatalf("failed to define OpenAI embedder with %s", err)
-	}
+	embedder := oai.Embedder(g, "text-embedding-3-small")
 
 	// Done
 	return RAG{

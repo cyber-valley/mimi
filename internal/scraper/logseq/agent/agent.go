@@ -29,7 +29,7 @@ func New(ctx context.Context, rag rag.RAG) LogseqAgent {
 	// Fail fast if prompt wasn't found
 	p := genkit.LookupPrompt(g, "logseq-cozo")
 	if p == nil {
-		log.Fatal("no prompt named 'menu' found")
+		log.Fatal("no prompt named 'logseq-cozo' found")
 	}
 
 	// Done
