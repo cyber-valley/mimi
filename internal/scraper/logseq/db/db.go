@@ -3,9 +3,11 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/cozodb/cozo-lib-go"
 	"log"
+	"log/slog"
 	"strings"
+
+	"github.com/cozodb/cozo-lib-go"
 )
 
 type Queries struct {
@@ -13,7 +15,7 @@ type Queries struct {
 }
 
 func New() *Queries {
-	db, err := cozo.New("mem", "", nil)
+	db, err := cozo.New("sqlite", "cozo.db", nil)
 	if err != nil {
 		log.Fatalf("failed to connect to cozo with %s", err)
 	}
@@ -22,20 +24,21 @@ func New() *Queries {
 	}
 }
 
-func (q *Queries) CreateRelations() (err error) {
-	_, err = q.db.Run(":create page { title: String => content: String }", nil, false)
+func (q *Queries) CreateRelations() {
+	var err error
+
+	_, err = q.db.Run(":create page { title: String => content: String, embedding: <F32; 1536> }", nil, false)
 	if err != nil {
-		return
+		slog.Warn("failed to create 'relation' table", "with", err)
 	}
 	_, err = q.db.Run(":create page_ref { src: String, target: String }", nil, false)
 	if err != nil {
-		return
+		slog.Warn("failed to create 'page_ref' relation", "with", err)
 	}
 	_, err = q.db.Run(":create page_prop { page_title: String, name: String, value: String }", nil, false)
 	if err != nil {
-		return
+		slog.Warn("failed to create 'page_prop' relation", "with", err)
 	}
-	return
 }
 
 type SavePageParams struct {
