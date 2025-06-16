@@ -1,0 +1,46 @@
+query GetOrgProject($org: String!, $projectNumber: Int!) {
+  organization(login: $org) {
+    projectV2(number: $projectNumber) {
+      id
+      title
+      shortDescription
+      closed
+      url
+      fields(first: 20) {
+        nodes {
+          ... on ProjectV2FieldCommon {
+            id
+            name
+            dataType
+          }
+        }
+      }
+      items(first: 100) {
+        nodes {
+          id
+          content {
+            ... on Issue {
+              title
+              url
+              state
+              body
+              comments(first: 20) {
+                nodes {
+                  author { login }
+                  body
+                  createdAt
+                  url
+                }
+              }
+              assignees(first: 3) {
+                nodes {
+                  login
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

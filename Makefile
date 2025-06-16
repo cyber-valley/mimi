@@ -23,7 +23,7 @@ lint: format
 pre-commit: lint
 
 test:
-	go test ./...
+	go test -v ./...
 
 run-telegram-bot: lint
 	air --build.cmd "go build -o bin/bot cmd/bot/main.go" --build.bin "./bin/bot"
