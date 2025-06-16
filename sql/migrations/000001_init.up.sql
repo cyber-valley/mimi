@@ -22,7 +22,13 @@ CREATE TABLE IF NOT EXISTS telegram_topic (
 
 CREATE TABLE IF NOT EXISTS telegram_message (
     peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id),
-    topic_id int NULL REFERENCES telegram_topic(id),
+    topic_id int NULL,
     message text NOT NULL,
-    created_at timestamp WITH time zone DEFAULT NOW()
+    created_at timestamp WITH time zone DEFAULT NOW(),
+    FOREIGN KEY (peer_id, topic_id) REFERENCES telegram_topic(peer_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS llm_chat (
+    telegram_peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id),
+    messages jsonb NOT NULL
 );

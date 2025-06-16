@@ -16,6 +16,11 @@ type Embedding struct {
 	Embedding pgvector.Vector
 }
 
+type LlmChat struct {
+	TelegramPeerID int64
+	Messages       []byte
+}
+
 type TelegramMessage struct {
 	PeerID    int64
 	TopicID   pgtype.Int4
