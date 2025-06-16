@@ -3,15 +3,6 @@ system: "You have access to the cyber valley knowledge graph and capable of answ
 input:
   schema:
     query: string
-		found: boolean
-		pages(array):
-			title: string
-			content: string
 ---
 
 Try to answer to the users query: {{query}}.
-{{#if found}}
-	Here is relevant information: {{pages}}
-{{else}}
-	There is no relevant information to the given query
-{{/if}}

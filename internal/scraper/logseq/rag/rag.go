@@ -12,7 +12,6 @@ import (
 	"github.com/firebase/genkit/go/plugins/compat_oai/openai"
 
 	"mimi/internal/scraper/logseq/db"
-	"mimi/internal/scraper/logseq/types"
 )
 
 type RAG struct {
@@ -76,19 +75,28 @@ func (r RAG) Embed(ctx context.Context, content string) ([]float32, error) {
 	return resp.Embeddings[0].Embedding, nil
 }
 
-func (r RAG) Retrieve(ctx context.Context, query string) ([]types.Page, error) {
+func (r RAG) Retrieve(ctx context.Context, query string) (docs []*ai.Document, _ error) {
 	// Embed query
 	vec, err := r.Embed(ctx, query)
 	if err != nil {
-		return []types.Page{}, fmt.Errorf("failed to embed for retrieve with %w", err)
+		return docs, fmt.Errorf("failed to embed for retrieve with %w", err)
 	}
 
-	slog.Info("Query", "vec", vec)
 	// Query CozoDB
-	titles, err := r.q.FindSimilarPages(vec)
+	pages, err := r.q.FindSimilarPages(vec)
 	if err != nil {
-		return []types.Page{}, fmt.Errorf("failed to find similar pages with %w", err)
+		return docs, fmt.Errorf("failed to find similar pages with %w", err)
 	}
-	slog.Info("found similar pages", "len", len(titles), "titles", fmt.Sprintf("%#v", titles))
-	panic("not implemented")
+	slog.Info("found similar pages", "len", len(pages))
+
+	for _, page := range pages {
+		slog.Info("retrieved", "title", page.Title, "content", page.Content)
+		docs = append(docs, &ai.Document{
+			Content: []*ai.Part{ai.NewDataPart(page.Content)},
+			Metadata: map[string]any{
+				"title": page.Title,
+			},
+		})
+	}
+	return docs, nil
 }

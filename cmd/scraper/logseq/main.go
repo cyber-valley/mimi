@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"mimi/internal/scraper/logseq"
+	"mimi/internal/scraper/logseq/agent"
 	"mimi/internal/scraper/logseq/db"
 	"mimi/internal/scraper/logseq/rag"
 	"os"
@@ -28,29 +29,24 @@ func main() {
 		log.Fatalf("failed to create relations with %s", err)
 	}
 
-	// Initialize indexer
+	// Initialize indexer & agent
 	rag := rag.New(ctx, q)
+	agent := agent.New(ctx, rag)
 
 	// LogSeq graph initialization
-	g, err := logseq.New(ctx, q, rag, "/home/user/code/clone/cvland")
+	_, err = logseq.New(ctx, q, rag, "/home/user/code/clone/cvland")
 	if err != nil {
 		log.Fatalf("failed to create graph with %s", err)
 	}
 
 	// Synchronize LogSeq contents
-	if err := g.Sync(); err != nil {
-		log.Fatalf("failed to sync graph with %s", err)
-	}
+	// if err := g.Sync(ctx); err != nil {
+	// 	log.Fatalf("failed to sync graph with %s", err)
+	// }
 
-	// Process user query with LLM
-	contents, err := g.Retrieve("genesis")
+	response, err := agent.Answer(ctx, "Tell me about token model")
 	if err != nil {
-		log.Fatalf("failed to retrieve pages with %s", err)
+		log.Fatalf("failed to query LLM with %s", err)
 	}
-	var totalSize int
-	for _, content := range contents {
-		totalSize += len(content)
-		slog.Info("retrieved page", "content", content)
-	}
-	slog.Info("total data retrieved", "amount", totalSize)
+	slog.Info("LLM", "response", response)
 }

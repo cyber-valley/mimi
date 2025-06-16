@@ -192,28 +192,55 @@ func (q *Queries) FindContentChanged(hash string) (bool, error) {
 	return len(res.Rows) == 0, nil
 }
 
-func (q *Queries) FindSimilarPages(vec []float32) (titles []string, _ error) {
+type SimilarPageRow struct {
+	Dist    float64
+	Title   string
+	Content string
+}
+
+func (q *Queries) FindSimilarPages(vec []float32) (pages []SimilarPageRow, _ error) {
 	query := fmt.Sprintf(
 		`
-		?[dist, title] := 
-			~page:embedding_index2{title |
+		?[dist, title, content] := 
+			~page:embedding_index3{title, content |
 				query: q,
-				k: 10,
-				ef: 50,
+				k: 50,
+				ef: 20,
 				bind_distance: dist
-			}, q = vec(%s)
+			}, 
+			q = vec(%s)
 		:order dist
-		:limit 10
+		:limit 20
 		`,
 		escapeSlice(vec),
 	)
 	res, err := q.db.Run(query, nil, false)
 	if err != nil {
+		return pages, fmt.Errorf("failed to find similar pages with %w", err)
+	}
+	slog.Info("retrieved", "rows", res.Rows)
+	for _, row := range res.Rows {
+		dist, ok := row[0].(float64)
+		if !ok {
+			dist = 0
+		}
+		pages = append(pages, SimilarPageRow{
+			Dist:    dist,
+			Title:   row[1].(string),
+			Content: row[2].(string),
+		})
+	}
+	return pages, nil
+}
+
+func (q *Queries) FindTitles() (titles []string, _ error) {
+	res, err := q.db.Run("?[title] := page{title}", nil, false)
+	if err != nil {
 		return titles, fmt.Errorf("failed to find similar pages with %w", err)
 	}
+	slog.Info("retrieved titles", "len", len(res.Rows))
 	for _, row := range res.Rows {
-		slog.Info("RAG row", "distance", row[0])
-		titles = append(titles, row[1].(string))
+		titles = append(titles, row[0].(string))
 	}
 	return titles, nil
 }
