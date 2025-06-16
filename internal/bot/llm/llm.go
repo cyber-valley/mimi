@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -14,7 +15,8 @@ import (
 
 type LLM struct {
 	g      *genkit.Genkit
-	agents map[string]agent.Agent
+	agents []agent.Agent
+	router *ai.Prompt
 }
 
 func New() LLM {
@@ -31,21 +33,42 @@ func New() LLM {
 		agent.NewLogseqAgent(g),
 		agent.NewFallbackAgent(g),
 	}
-	nameToAgent := make(map[string]agent.Agent)
-	for _, a := range agents {
-		nameToAgent[a.GetInfo().Name] = a
+
+	router := genkit.LookupPrompt(g, "router")
+	if router == nil {
+		log.Fatal("no prompt named 'router' found")
 	}
 
 	return LLM{
 		g:      g,
-		agents: nameToAgent,
+		agents: agents,
+		router: router,
 	}
 }
 
 func (m LLM) Answer(ctx context.Context, query string) (string, error) {
-	resp, err := genkit.Generate(ctx, m.g, ai.WithPrompt(query))
+	resp, err := m.router.Execute(ctx, ai.WithInput(map[string]any{
+		"query":  query,
+		"agents": m.getAgentsInfo(),
+	}))
 	if err != nil {
 		return "", fmt.Errorf("initial LLM call failed with %w", err)
 	}
-	return resp.Text(), nil
+	var output routerOutput
+	if err := resp.Output(&output); err != nil {
+		return "", fmt.Errorf("failed to parse router output with %w", err)
+	}
+	slog.Info("router answer", "agent", output.Agent)
+	return output.Agent, nil
+}
+
+func (m LLM) getAgentsInfo() (info []agent.Info) {
+	for _, agent := range m.agents {
+		info = append(info, agent.GetInfo())
+	}
+	return info
+}
+
+type routerOutput struct {
+	Agent string `json:"agent"`
 }

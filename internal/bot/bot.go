@@ -46,8 +46,7 @@ func (h UpdateHandler) handleMessage(m *tgbotapi.Message) error {
 	defer cancel()
 
 	// Set bot typing status
-	typing := tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping)
-	_, err := h.bot.Send(typing)
+	_, err := h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
 	if err != nil {
 		slog.Error("failed to set typing status", "with", err)
 	}
@@ -57,6 +56,7 @@ func (h UpdateHandler) handleMessage(m *tgbotapi.Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to get answer from LLM with %w", err)
 	}
+	slog.Info("got LLM answer", "text", answer)
 
 	// Response to the user's query
 	msg := tgbotapi.NewMessage(m.Chat.ID, answer)

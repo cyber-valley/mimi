@@ -6,10 +6,12 @@ input:
   agents(array):
    name: string
    description: string
+output:
+  schema:
+    agent: string
 ---
 
 Analyze given query and classify it to the following agents.
-Answer with pure category name without any formatting.
 
 Agents: {{agents}}
 Query: {{query}}

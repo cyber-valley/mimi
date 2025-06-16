@@ -16,7 +16,7 @@ func NewFallbackAgent(g *genkit.Genkit) FallbackAgent {
 
 func (a FallbackAgent) GetInfo() Info {
 	return Info{
-		Name: "fallback",
+		Name:        "fallback",
 		Description: `used if there is no any better option`,
 	}
 }
@@ -24,4 +24,3 @@ func (a FallbackAgent) GetInfo() Info {
 func (a FallbackAgent) Run(ctx context.Context, query string) (string, error) {
 	panic("not implemented")
 }
-
