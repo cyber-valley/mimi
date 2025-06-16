@@ -1,8 +1,14 @@
 ---
 system: "You have access to the cyber valley knowledge graph and capable of answering any relevant questions about it"
+config:
+  tempreature: 0.1
 input:
   schema:
     query: string
+    titles(array): string
+output:
+  schema:
+    titles(array): string
 ---
 
-Try to answer to the users query: {{query}}.
+Analyze given user query {{query}} and find the most relevant titles from the list {{titles}}. Output return title values untouched i.e. do not format them anyhow and use lowercase.

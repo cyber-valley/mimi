@@ -17,7 +17,7 @@ type Queries struct {
 }
 
 func New() *Queries {
-	db, err := cozo.New("sqlite", "cozo.db", nil)
+	db, err := cozo.New("mem", "", nil)
 	if err != nil {
 		log.Fatalf("failed to connect to cozo with %s", err)
 	}
@@ -43,16 +43,6 @@ func (q *Queries) CreateRelations() error {
 			title: String
 			=>
 			content: String,
-			hash: String,
-			embedding: <F32; 1536>
-		}
-		::hnsw create page:embedding_index2 {
-			dim: 1536,
-			m: 5,
-			dtype: F32,
-			fields: [embedding],
-			distance: Cosine,
-			ef_construction: 10
 		}
 		`,
 		"page_ref": `:create page_ref {
@@ -81,12 +71,10 @@ func (q *Queries) CreateRelations() error {
 }
 
 type SavePageParams struct {
-	Title     string
-	Hash      string
-	Content   string
-	Embedding []float32
-	Props     map[string]string
-	Refs      []string
+	Title   string
+	Content string
+	Props   map[string]string
+	Refs    []string
 }
 
 func (q *Queries) SavePage(p SavePageParams) error {
@@ -94,11 +82,9 @@ func (q *Queries) SavePage(p SavePageParams) error {
 
 	// Save or update page
 	tx = append(tx, fmt.Sprintf(
-		`?[title, content, hash, embedding] <- [[%s,%s,%s,%s]] :put page{title, content, hash, embedding}`,
+		`?[title, content] <- [[%s,%s]] :put page{title, content}`,
 		escape(p.Title),
 		escape(p.Content),
-		escape(p.Hash),
-		escapeSlice(p.Embedding),
 	))
 
 	// Save or update page properties
@@ -168,6 +154,7 @@ func (q *Queries) FindRelatives(pageTitle string, depth int) (titles []string, e
 		escape(pageTitle),
 		depth,
 	)
+	slog.Info("cozo", "query", query)
 	res, err := q.db.Run(query, nil, true)
 	if err != nil {
 		return titles, fmt.Errorf("failed to find relatives for '%s' with %w", pageTitle, err)
@@ -234,7 +221,7 @@ func (q *Queries) FindSimilarPages(vec []float32) (pages []SimilarPageRow, _ err
 }
 
 func (q *Queries) FindTitles() (titles []string, _ error) {
-	res, err := q.db.Run("?[title] := page{title}", nil, false)
+	res, err := q.db.Run("?[title] := *page{title}", nil, false)
 	if err != nil {
 		return titles, fmt.Errorf("failed to find similar pages with %w", err)
 	}
@@ -243,6 +230,22 @@ func (q *Queries) FindTitles() (titles []string, _ error) {
 		titles = append(titles, row[0].(string))
 	}
 	return titles, nil
+}
+
+func (q *Queries) FindContent(titles ...string) (contents []string, _ error) {
+	query := fmt.Sprintf(`
+		?[content] :=
+			*page{title, content},
+			title in %s
+	`, escapeSlice(titles))
+	res, err := q.db.Run(query, nil, false)
+	if err != nil {
+		return contents, fmt.Errorf("failed to find content with %w", err)
+	}
+	for _, row := range res.Rows {
+		contents = append(contents, row[0].(string))
+	}
+	return contents, nil
 }
 
 func escape(s string) string {
@@ -258,10 +261,11 @@ func escapeSlice[T any](s []T) string {
 	if err != nil {
 		panic(err)
 	}
-	return strings.ReplaceAll(string(b), `"`, "")
+	return string(b)
 }
 
 func execTx(db cozo.CozoDB, queries []string) error {
+	slog.Info("cozo", "tx", queries)
 	wrapped := make([]string, len(queries))
 	for i, q := range queries {
 		wrapped[i] = fmt.Sprintf("{%s}", q)
