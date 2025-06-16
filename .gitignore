@@ -16,3 +16,5 @@ tmp/
 /.dumbjump
 /session/
 libs/
+.cozo*
+cozo*
