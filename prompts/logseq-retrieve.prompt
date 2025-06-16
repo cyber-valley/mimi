@@ -10,4 +10,4 @@ output:
     titles(array): string
 ---
 
-Analyze given user query {{query}} and find the most relevant titles from the provided list. Output return title values untouched i.e. do not format them anyhow and use lowercase.
+Analyze given user query {{query}} and find the most relevant titles from the provided list. Output return title values untouched i.e. do not format them anyhow and use lowercase. Use "cyber valley" title as a base one if the question is abstract or too general to decide
