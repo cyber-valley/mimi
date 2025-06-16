@@ -51,9 +51,6 @@ func (g Graph) Sync(ctx context.Context) error {
 
 	var errs []error
 	for _, p := range pages {
-		if p.Title() != "cyber valley" {
-			continue
-		}
 		props := make(map[string]string)
 		var refs []string
 
@@ -86,7 +83,7 @@ func (g Graph) Sync(ctx context.Context) error {
 
 		// Check if content changed
 		content := extractText(p)
-		slog.Info("saving page", "title", p.Title(), "content", content)
+		slog.Info("saving page", "title", p.Title())
 
 		// Persist changed page
 		err = g.q.SavePage(db.SavePageParams{

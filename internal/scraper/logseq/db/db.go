@@ -154,7 +154,6 @@ func (q *Queries) FindRelatives(pageTitle string, depth int) (titles []string, e
 		escape(pageTitle),
 		depth,
 	)
-	slog.Info("cozo", "query", query)
 	res, err := q.db.Run(query, nil, true)
 	if err != nil {
 		return titles, fmt.Errorf("failed to find relatives for '%s' with %w", pageTitle, err)
@@ -205,7 +204,6 @@ func (q *Queries) FindSimilarPages(vec []float32) (pages []SimilarPageRow, _ err
 	if err != nil {
 		return pages, fmt.Errorf("failed to find similar pages with %w", err)
 	}
-	slog.Info("retrieved", "rows", res.Rows)
 	for _, row := range res.Rows {
 		dist, ok := row[0].(float64)
 		if !ok {
@@ -265,7 +263,6 @@ func escapeSlice[T any](s []T) string {
 }
 
 func execTx(db cozo.CozoDB, queries []string) error {
-	slog.Info("cozo", "tx", queries)
 	wrapped := make([]string, len(queries))
 	for i, q := range queries {
 		wrapped[i] = fmt.Sprintf("{%s}", q)

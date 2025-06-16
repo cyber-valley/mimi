@@ -25,15 +25,13 @@ func main() {
 		log.Fatalf("failed to create relations with %s", err)
 	}
 
-	// Initialize indexer & agent
+	// Initialize
 	rag := rag.New(ctx, q)
-	agent := agent.New(ctx, rag, q)
-
-	// LogSeq graph initialization
 	g, err := logseq.New(ctx, q, rag, "/home/user/code/clone/cvland")
 	if err != nil {
 		log.Fatalf("failed to create graph with %s", err)
 	}
+	agent := agent.New(ctx, q, g.Retrieve)
 
 	// Synchronize LogSeq contents
 	if err := g.Sync(ctx); err != nil {

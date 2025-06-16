@@ -12,18 +12,19 @@ import (
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 
 	"mimi/internal/scraper/logseq/db"
-	"mimi/internal/scraper/logseq/rag"
 )
 
+type Retriever = func(title string) ([]string, error)
+
 type LogseqAgent struct {
-	g        *genkit.Genkit
-	rag      rag.RAG
-	retrieve *ai.Prompt
-	eval     *ai.Prompt
-	q        *db.Queries
+	g         *genkit.Genkit
+	retriever Retriever
+	retrieve  *ai.Prompt
+	eval      *ai.Prompt
+	q         *db.Queries
 }
 
-func New(ctx context.Context, rag rag.RAG, q *db.Queries) LogseqAgent {
+func New(ctx context.Context, q *db.Queries, r Retriever) LogseqAgent {
 	// Init genkit
 	g, err := genkit.Init(
 		ctx,
@@ -46,11 +47,11 @@ func New(ctx context.Context, rag rag.RAG, q *db.Queries) LogseqAgent {
 
 	// Done
 	return LogseqAgent{
-		g:        g,
-		rag:      rag,
-		retrieve: retrieve,
-		eval:     eval,
-		q:        q,
+		g:         g,
+		retriever: r,
+		retrieve:  retrieve,
+		eval:      eval,
+		q:         q,
 	}
 }
 
@@ -61,11 +62,16 @@ func (a LogseqAgent) Answer(ctx context.Context, query string) (string, error) {
 		return "", fmt.Errorf("failed to answer to query with %w", err)
 	}
 	slog.Info("titles to choose", "titles", titles)
+	titleDocs := make([]*ai.Document, len(titles))
+	for i, t := range titles {
+		titleDocs[i] = ai.DocumentFromText(t, map[string]any{})
+	}
 
 	// Ask LLM to filter only relevant pages
 	resp, err := a.retrieve.Execute(
 		ctx,
-		ai.WithInput(map[string]any{"query": query, "titles": titles}),
+		ai.WithDocs(titleDocs...),
+		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
 		return "", fmt.Errorf("LLM request failed with %w", err)
@@ -78,14 +84,16 @@ func (a LogseqAgent) Answer(ctx context.Context, query string) (string, error) {
 
 	// Fetch relevant docs
 	var errs []error
-	var docs []string
+	var docs []*ai.Document
 	for _, t := range relevantPages["titles"] {
-		content, err := a.q.FindRelatives(t, 5)
+		contents, err := a.retriever(t)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		docs = append(docs, content...)
+		for _, text := range contents {
+			docs = append(docs, ai.DocumentFromText(text, map[string]any{"title": t}))
+		}
 	}
 	if len(errs) > 0 {
 		return "", fmt.Errorf("failed to fetch relevant pages with %w", errors.Join(errs...))
@@ -93,12 +101,13 @@ func (a LogseqAgent) Answer(ctx context.Context, query string) (string, error) {
 	if len(docs) == 0 {
 		return "", fmt.Errorf("there is no any relevant page")
 	}
-	slog.Info("relevant documents", "length", len(docs), "data", docs)
+	slog.Info("relevant documents", "length", len(docs))
 
 	// Evaluate final prompt
 	resp, err = a.eval.Execute(
 		ctx,
-		ai.WithInput(map[string]any{"query": query, "docs": docs}),
+		ai.WithDocs(docs...),
+		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate final step with %w", err)
