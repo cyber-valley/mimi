@@ -17,7 +17,7 @@ type Queries struct {
 }
 
 func New() *Queries {
-	db, err := cozo.New("mem", "", nil)
+	db, err := cozo.New("sqlite", "cozo.db", nil)
 	if err != nil {
 		log.Fatalf("failed to connect to cozo with %s", err)
 	}
@@ -134,8 +134,13 @@ func (q *Queries) SavePage(p SavePageParams) error {
 	return nil
 }
 
+type FindRelativesRow struct {
+	Title   string
+	Content string
+}
+
 // Page titles that are relative to the given one via ref
-func (q *Queries) FindRelatives(pageTitle string, depth int) (titles []string, err error) {
+func (q *Queries) FindRelatives(pageTitle string, depth int) (rows []FindRelativesRow, err error) {
 	query := fmt.Sprintf(
 		`
 		relatives[target, depth] :=
@@ -148,20 +153,24 @@ func (q *Queries) FindRelatives(pageTitle string, depth int) (titles []string, e
 				depth = d + 1,
 				depth <= %d
 
-		?[target, depth] :=
-				relatives[target, depth] 
+		?[target, content, depth] :=
+				relatives[target, depth],
+				*page{title: target, content}
 		`,
 		escape(pageTitle),
 		depth,
 	)
 	res, err := q.db.Run(query, nil, true)
 	if err != nil {
-		return titles, fmt.Errorf("failed to find relatives for '%s' with %w", pageTitle, err)
+		return rows, fmt.Errorf("failed to find relatives for '%s' with %w", pageTitle, err)
 	}
 	for _, row := range res.Rows {
-		titles = append(titles, row[0].(string))
+		rows = append(rows, FindRelativesRow{
+			Title:   row[0].(string),
+			Content: row[1].(string),
+		})
 	}
-	return titles, nil
+	return rows, nil
 }
 
 func (q *Queries) FindContentChanged(hash string) (bool, error) {

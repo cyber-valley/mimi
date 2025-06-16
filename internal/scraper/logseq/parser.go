@@ -11,7 +11,6 @@ import (
 	"iter"
 	"log/slog"
 	"math"
-	"slices"
 	"strings"
 
 	"github.com/aholstenson/logseq-go"
@@ -100,33 +99,6 @@ func (g Graph) Sync(ctx context.Context) error {
 	}
 
 	return errors.Join(errs...)
-}
-
-// Get relative text to the given page title
-func (g Graph) Retrieve(title string) (contents []string, err error) {
-	rels, err := g.q.FindRelatives(title, 5)
-	if err != nil {
-		return contents, fmt.Errorf("failed to find relatives with %w", err)
-	}
-	slog.Info("found relatives", "amount", len(rels))
-	pages, err := g.getAllPages()
-	if err != nil {
-		return
-	}
-	var errs []error
-	for _, page := range pages {
-		p, err := page.Open()
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to open page with %w", err))
-			continue
-		}
-		if !slices.Contains(rels, page.Title()) {
-			continue
-		}
-		contents = append(contents, extractText(p))
-
-	}
-	return contents, errors.Join(errs...)
 }
 
 func (g Graph) getAllPages() (pages []logseq.PageResult, err error) {

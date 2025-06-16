@@ -14,17 +14,14 @@ import (
 	"mimi/internal/scraper/logseq/db"
 )
 
-type Retriever = func(title string) ([]string, error)
-
 type LogseqAgent struct {
-	g         *genkit.Genkit
-	retriever Retriever
-	retrieve  *ai.Prompt
-	eval      *ai.Prompt
-	q         *db.Queries
+	g        *genkit.Genkit
+	q        *db.Queries
+	retrieve *ai.Prompt
+	eval     *ai.Prompt
 }
 
-func New(ctx context.Context, q *db.Queries, r Retriever) LogseqAgent {
+func New(ctx context.Context, q *db.Queries) LogseqAgent {
 	// Init genkit
 	g, err := genkit.Init(
 		ctx,
@@ -47,11 +44,10 @@ func New(ctx context.Context, q *db.Queries, r Retriever) LogseqAgent {
 
 	// Done
 	return LogseqAgent{
-		g:         g,
-		retriever: r,
-		retrieve:  retrieve,
-		eval:      eval,
-		q:         q,
+		g:        g,
+		retrieve: retrieve,
+		eval:     eval,
+		q:        q,
 	}
 }
 
@@ -61,7 +57,6 @@ func (a LogseqAgent) Answer(ctx context.Context, query string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to answer to query with %w", err)
 	}
-	slog.Info("titles to choose", "titles", titles)
 	titleDocs := make([]*ai.Document, len(titles))
 	for i, t := range titles {
 		titleDocs[i] = ai.DocumentFromText(t, map[string]any{})
@@ -86,13 +81,13 @@ func (a LogseqAgent) Answer(ctx context.Context, query string) (string, error) {
 	var errs []error
 	var docs []*ai.Document
 	for _, t := range relevantPages["titles"] {
-		contents, err := a.retriever(t)
+		rels, err := a.q.FindRelatives(t, 5)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		for _, text := range contents {
-			docs = append(docs, ai.DocumentFromText(text, map[string]any{"title": t}))
+		for _, rel := range rels {
+			docs = append(docs, ai.DocumentFromText(rel.Content, map[string]any{"title": rel.Title}))
 		}
 	}
 	if len(errs) > 0 {

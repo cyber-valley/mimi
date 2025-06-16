@@ -11,6 +11,7 @@ import (
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 
 	"mimi/internal/bot/llm/agent"
+	"mimi/internal/scraper/logseq/db"
 )
 
 type LLM struct {
@@ -30,7 +31,7 @@ func New() LLM {
 	}
 
 	agents := []agent.Agent{
-		agent.NewLogseqAgent(g),
+		agent.NewLogseqAgent(g, db.New()),
 		agent.NewFallbackAgent(g),
 	}
 
@@ -47,6 +48,7 @@ func New() LLM {
 }
 
 func (m LLM) Answer(ctx context.Context, query string) (string, error) {
+	// Route to the proper agent
 	resp, err := m.router.Execute(ctx, ai.WithInput(map[string]any{
 		"query":  query,
 		"agents": m.getAgentsInfo(),
@@ -59,7 +61,22 @@ func (m LLM) Answer(ctx context.Context, query string) (string, error) {
 		return "", fmt.Errorf("failed to parse router output with %w", err)
 	}
 	slog.Info("router answer", "agent", output.Agent)
-	return output.Agent, nil
+
+	// Run selected agent
+	var agent agent.Agent
+	for i, a := range m.agents {
+		if a.GetInfo().Name != output.Agent {
+			continue
+		}
+		agent = m.agents[i]
+		break
+	}
+	answer, err := agent.Run(ctx, query)
+	if err != nil {
+		return "", fmt.Errorf("failed to run agent with %w", err)
+	}
+
+	return answer, nil
 }
 
 func (m LLM) getAgentsInfo() (info []agent.Info) {
