@@ -30,7 +30,9 @@ func Start(token string) {
 
 	for update := range udpates {
 		if update.Message != nil && len(update.Message.Text) > 0 {
-			handler.handleMessage(update.Message)
+			if err := handler.handleMessage(update.Message); err != nil {
+				slog.Error("failed to handle message", "with", err)
+			}
 		}
 	}
 }
@@ -56,7 +58,7 @@ func (h UpdateHandler) handleMessage(m *tgbotapi.Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to get answer from LLM with %w", err)
 	}
-	slog.Info("got LLM answer", "text", answer)
+	slog.Info("got LLM answer", "length", len(answer))
 
 	// Response to the user's query
 	msg := tgbotapi.NewMessage(m.Chat.ID, answer)

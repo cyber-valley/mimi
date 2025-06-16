@@ -53,7 +53,6 @@ func (a LogseqAgent) Run(ctx context.Context, query string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to answer to query with %w", err)
 	}
-	slog.Info("titles to choose", "titles", titles)
 	titleDocs := make([]*ai.Document, len(titles))
 	for i, t := range titles {
 		titleDocs[i] = ai.DocumentFromText(t, map[string]any{})
