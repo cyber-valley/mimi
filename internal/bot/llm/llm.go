@@ -8,10 +8,13 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
+
+	"mimi/internal/bot/llm/agent"
 )
 
 type LLM struct {
-	g *genkit.Genkit
+	g      *genkit.Genkit
+	agents map[string]agent.Agent
 }
 
 func New() LLM {
@@ -23,8 +26,19 @@ func New() LLM {
 	if err != nil {
 		log.Fatalf("could not initialize Genkit: %v", err)
 	}
+
+	agents := []agent.Agent{
+		agent.NewLogseqAgent(g),
+		agent.NewFallbackAgent(g),
+	}
+	nameToAgent := make(map[string]agent.Agent)
+	for _, a := range agents {
+		nameToAgent[a.GetInfo().Name] = a
+	}
+
 	return LLM{
-		g: g,
+		g:      g,
+		agents: nameToAgent,
 	}
 }
 
