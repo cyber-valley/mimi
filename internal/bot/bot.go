@@ -3,9 +3,10 @@ package bot
 import (
 	"context"
 	"fmt"
+	"log"
+	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/golang/glog"
 
 	"mimi/internal/bot/llm"
 )
@@ -13,9 +14,9 @@ import (
 func Start(token string) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
-		glog.Fatal(err)
+		log.Fatal(err)
 	}
-	glog.Infoln("Authorized on account", bot.Self.UserName)
+	slog.Info("Authorized account", "username", bot.Self.UserName)
 
 	handler := UpdateHandler{
 		bot: bot,
@@ -40,14 +41,29 @@ type UpdateHandler struct {
 }
 
 func (h UpdateHandler) handleMessage(m *tgbotapi.Message) error {
-	glog.Infof("[%d]: %s", m.Chat.ID, m.Text)
+	slog.Info("new message", "chatId", m.Chat.ID, "text", m.Text)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Set bot typing status
+	typing := tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping)
+	_, err := h.bot.Send(typing)
+	if err != nil {
+		slog.Error("failed to set typing status", "with", err)
+	}
+
+	// Generate LLM answer
 	answer, err := h.llm.Answer(ctx, m.Text)
 	if err != nil {
 		return fmt.Errorf("failed to get answer from LLM with %w", err)
 	}
+
+	// Response to the user's query
 	msg := tgbotapi.NewMessage(m.Chat.ID, answer)
-	h.bot.Send(msg)
+	_, err = h.bot.Send(msg)
+	if err != nil {
+		return fmt.Errorf("failed to send LLM response with %w", err)
+	}
+
 	return nil
 }
