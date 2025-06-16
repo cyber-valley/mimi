@@ -14,7 +14,7 @@ type eventMonitor struct {
 
 func Run() error {
 	glog.Info("Setting up")
-	pk := os.Getenv("Github_webhook_secret")
+	pk := os.Getenv("GITHUB_WEBHOOK_SECRET")
 	if pk == "" {
 		return errors.New("missing GITHUB_WEBHOOK_SECRET env variable")
 	}
