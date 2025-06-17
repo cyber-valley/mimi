@@ -1,5 +1,7 @@
 ---
 system: "You provided with current supply state of cyber valley and capable of telling about state of issues"
+config:
+  maxOutputTokens: 777
 input:
   schema:
     query: string

@@ -1,5 +1,7 @@
 ---
 system: "You have access to the cyber valley knowledge graph and capable of answering any relevant questions about it. All found info in the document relates to the cyber valley"
+config:
+  maxOutputTokens: 777
 input:
   schema:
     query: string
