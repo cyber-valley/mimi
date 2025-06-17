@@ -9,7 +9,7 @@ import (
 	"context"
 )
 
-const findChatMessages = `-- name: FindChatMessages :many
+const findChatMessages = `-- name: FindChatMessages :one
 SELECT
     messages
 FROM
@@ -18,22 +18,29 @@ WHERE
     telegram_peer_id = $1
 `
 
-func (q *Queries) FindChatMessages(ctx context.Context, telegramPeerID int64) ([][]byte, error) {
-	rows, err := q.db.Query(ctx, findChatMessages, telegramPeerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items [][]byte
-	for rows.Next() {
-		var messages []byte
-		if err := rows.Scan(&messages); err != nil {
-			return nil, err
-		}
-		items = append(items, messages)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) FindChatMessages(ctx context.Context, telegramPeerID int64) ([]byte, error) {
+	row := q.db.QueryRow(ctx, findChatMessages, telegramPeerID)
+	var messages []byte
+	err := row.Scan(&messages)
+	return messages, err
+}
+
+const saveChatMessages = `-- name: SaveChatMessages :exec
+INSERT INTO
+    llm_chat(telegram_peer_id, messages)
+VALUES
+    ($1, $2) ON conflict (telegram_peer_id) DO
+UPDATE
+SET
+    messages = excluded.messages
+`
+
+type SaveChatMessagesParams struct {
+	TelegramPeerID int64
+	Messages       []byte
+}
+
+func (q *Queries) SaveChatMessages(ctx context.Context, arg SaveChatMessagesParams) error {
+	_, err := q.db.Exec(ctx, saveChatMessages, arg.TelegramPeerID, arg.Messages)
+	return err
 }

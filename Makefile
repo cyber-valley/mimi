@@ -58,3 +58,6 @@ podman-db:
 		-e POSTGRES_DB="$(DB_NAME)" \
 		-p "$(DB_PORT)":5432 \
 		docker.io/pgvector/pgvector:pg17
+
+psql:
+	PGPASSWORD=$(DB_PASSWORD) psql -U $(DB_USER) -d $(DB_NAME) -p $(DB_PORT) -h localhost

@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
@@ -9,18 +10,21 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/jackc/pgx/v5"
 
 	"mimi/internal/bot/llm/agent"
+	"mimi/internal/persist"
 	"mimi/internal/scraper/logseq/db"
 )
 
 type LLM struct {
 	g      *genkit.Genkit
+	q      *persist.Queries
 	agents []agent.Agent
 	router *ai.Prompt
 }
 
-func New() LLM {
+func New(q *persist.Queries) LLM {
 	ctx := context.Background()
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
@@ -43,12 +47,13 @@ func New() LLM {
 
 	return LLM{
 		g:      g,
+		q:      q,
 		agents: agents,
 		router: router,
 	}
 }
 
-func (m LLM) Answer(ctx context.Context, query string) (string, error) {
+func (m LLM) Answer(ctx context.Context, id int64, query string) (string, error) {
 	// Route to the proper agent
 	resp, err := m.router.Execute(ctx, ai.WithInput(map[string]any{
 		"query":  query,
@@ -63,6 +68,21 @@ func (m LLM) Answer(ctx context.Context, query string) (string, error) {
 	}
 	slog.Info("router answer", "agent", output.Agent)
 
+	// Retrieve messages history
+	rows, err := m.q.FindChatMessages(ctx, id)
+	var messages []*ai.Message
+	switch err {
+	case pgx.ErrNoRows:
+		break
+	case nil:
+		err = json.Unmarshal(rows, &messages)
+		if err != nil {
+			return "", fmt.Errorf("failed to unmarshal messages with %w", err)
+		}
+	default:
+		return "", fmt.Errorf("failed to find message history with %w", err)
+	}
+
 	// Run selected agent
 	var agent agent.Agent
 	for i, a := range m.agents {
@@ -72,12 +92,27 @@ func (m LLM) Answer(ctx context.Context, query string) (string, error) {
 		agent = m.agents[i]
 		break
 	}
-	answer, err := agent.Run(ctx, query)
+	resp, err = agent.Run(ctx, query, messages...)
 	if err != nil {
 		return "", fmt.Errorf("failed to run agent with %w", err)
 	}
 
-	return answer, nil
+	// Update message history
+	messages = append(messages, ai.NewTextMessage(ai.RoleUser, query))
+	messages = append(messages, resp.Message)
+	encoded, err := json.Marshal(messages)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal messages with %w", err)
+	}
+	err = m.q.SaveChatMessages(ctx, persist.SaveChatMessagesParams{
+		TelegramPeerID: id,
+		Messages:       encoded,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to save messages with %w", err)
+	}
+
+	return resp.Text(), nil
 }
 
 func (m LLM) getAgentsInfo() (info []agent.Info) {

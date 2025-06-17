@@ -47,11 +47,11 @@ func (a LogseqAgent) GetInfo() Info {
 	}
 }
 
-func (a LogseqAgent) Run(ctx context.Context, query string) (string, error) {
+func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
 	// Find relative pages
 	titles, err := a.q.FindTitles()
 	if err != nil {
-		return "", fmt.Errorf("failed to answer to query with %w", err)
+		return nil, fmt.Errorf("failed to answer to query with %w", err)
 	}
 	titleDocs := make([]*ai.Document, len(titles))
 	for i, t := range titles {
@@ -62,14 +62,15 @@ func (a LogseqAgent) Run(ctx context.Context, query string) (string, error) {
 	resp, err := a.retrievePrompt.Execute(
 		ctx,
 		ai.WithDocs(titleDocs...),
+		ai.WithMessages(msgs...),
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return "", fmt.Errorf("LLM request failed with %w", err)
+		return nil, fmt.Errorf("LLM request failed with %w", err)
 	}
 	var relevantPages map[string][]string
 	if err := resp.Output(&relevantPages); err != nil {
-		return "", fmt.Errorf("failed to parse LLM output with %w", err)
+		return nil, fmt.Errorf("failed to parse LLM output with %w", err)
 	}
 	slog.Info("relevant pages", "titles", relevantPages["titles"])
 
@@ -93,10 +94,10 @@ func (a LogseqAgent) Run(ctx context.Context, query string) (string, error) {
 		}
 	}
 	if len(errs) > 0 {
-		return "", fmt.Errorf("failed to fetch relevant pages with %w", errors.Join(errs...))
+		return nil, fmt.Errorf("failed to fetch relevant pages with %w", errors.Join(errs...))
 	}
 	if len(docs) == 0 {
-		return "", fmt.Errorf("there is no any relevant page")
+		return nil, fmt.Errorf("there is no any relevant page")
 	}
 	slog.Info("relevant documents", "length", len(docs))
 
@@ -107,8 +108,8 @@ func (a LogseqAgent) Run(ctx context.Context, query string) (string, error) {
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to evaluate final step with %w", err)
+		return nil, fmt.Errorf("failed to evaluate final step with %w", err)
 	}
 
-	return resp.Text(), nil
+	return resp, nil
 }

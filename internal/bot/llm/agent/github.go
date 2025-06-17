@@ -35,12 +35,12 @@ func (a GitHubAgent) GetInfo() Info {
 	}
 }
 
-func (a GitHubAgent) Run(ctx context.Context, query string) (string, error) {
+func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
 	// Fetch GitHub board state
 	columnNames := []string{"monthly plan", "ordered", "shipped"}
 	issues, err := a.c.GetOrgProject(ctx, "cyber-valley", 3, columnNames)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch supply board state with %w", err)
+		return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
 	}
 
 	// Setup context
@@ -57,10 +57,11 @@ func (a GitHubAgent) Run(ctx context.Context, query string) (string, error) {
 	resp, err := a.prompt.Execute(
 		ctx,
 		ai.WithDocs(docs...),
+		ai.WithMessages(msgs...),
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to evaluate final step with %w", err)
+		return nil, fmt.Errorf("failed to evaluate final step with %w", err)
 	}
-	return resp.Text(), nil
+	return resp, nil
 }

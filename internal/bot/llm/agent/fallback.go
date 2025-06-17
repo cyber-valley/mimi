@@ -23,10 +23,15 @@ func (a FallbackAgent) GetInfo() Info {
 	}
 }
 
-func (a FallbackAgent) Run(ctx context.Context, query string) (string, error) {
-	resp, err := genkit.Generate(ctx, a.g, ai.WithPrompt(query))
+func (a FallbackAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+	resp, err := genkit.Generate(
+		ctx,
+		a.g,
+		ai.WithPrompt(query),
+		ai.WithMessages(msgs...),
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to call fallback agent with %w", err)
+		return nil, fmt.Errorf("failed to call fallback agent with %w", err)
 	}
-	return resp.Text(), nil
+	return resp, nil
 }

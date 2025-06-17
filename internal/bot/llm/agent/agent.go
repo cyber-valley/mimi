@@ -2,11 +2,13 @@ package agent
 
 import (
 	"context"
+
+	"github.com/firebase/genkit/go/ai"
 )
 
 type Agent interface {
 	GetInfo() Info
-	Run(ctx context.Context, query string) (string, error)
+	Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error)
 }
 
 type Info struct {

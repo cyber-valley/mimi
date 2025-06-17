@@ -5,24 +5,34 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/ai-shift/tgmd"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/jackc/pgx/v5"
 
 	"mimi/internal/bot/llm"
+	"mimi/internal/persist"
 )
 
-func Start(token string) {
+func Start(ctx context.Context, token string) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Fatal(err)
 	}
 	slog.Info("Authorized account", "username", bot.Self.UserName)
 
+	conn, err := pgx.Connect(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatalf("failed to connect to postgres with: %s", err)
+	}
+	defer conn.Close(ctx)
+
+	q := persist.New(conn)
 	handler := UpdateHandler{
 		bot: bot,
-		llm: llm.New(),
+		llm: llm.New(q),
 	}
 
 	u := tgbotapi.NewUpdate(0)
@@ -32,9 +42,11 @@ func Start(token string) {
 
 	for update := range udpates {
 		if update.Message != nil && len(update.Message.Text) > 0 {
-			if err := handler.handleMessage(update.Message); err != nil {
+			ctx, cancel := context.WithCancel(ctx)
+			if err := handler.handleMessage(ctx, update.Message); err != nil {
 				slog.Error("failed to handle message", "with", err)
 			}
+			cancel()
 		}
 	}
 }
@@ -44,19 +56,14 @@ type UpdateHandler struct {
 	llm llm.LLM
 }
 
-func (h UpdateHandler) handleMessage(m *tgbotapi.Message) error {
+func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) error {
 	slog.Info("new message", "chatId", m.Chat.ID, "text", m.Text)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Set bot typing status
-	_, err := h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
-	if err != nil {
-		slog.Error("failed to set typing status", "with", err)
-	}
+	_, _ = h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
 
 	// Generate LLM answer
-	answer, err := h.llm.Answer(ctx, m.Text)
+	answer, err := h.llm.Answer(ctx, m.Chat.ID, m.Text)
 	if err != nil {
 		return fmt.Errorf("failed to get answer from LLM with %w", err)
 	}
