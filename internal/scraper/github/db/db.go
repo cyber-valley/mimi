@@ -48,10 +48,10 @@ type ProjectV2Response struct {
 				Nodes []struct {
 					ID      string `json:"id"`
 					Content struct {
-						Title    string `json:"title"`
-						URL      string `json:"url"`
-						State    string `json:"state"`
-						Body     string `json:"body"`
+						Title string `json:"title"`
+						URL   string `json:"url"`
+						State string `json:"state"`
+						Body  string `json:"body"`
 					} `json:"content"`
 				} `json:"nodes"`
 				PageInfo struct {
@@ -149,12 +149,12 @@ func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber in
 		nodes := resp.Organization.ProjectV2.Items.Nodes
 		for _, node := range nodes {
 			content := node.Content
-				issues = append(issues, Issue{
-					Title: content.Title,
-					URL:   content.URL,
-					State: content.State,
-					Body:  content.Body,
-				})
+			issues = append(issues, Issue{
+				Title: content.Title,
+				URL:   content.URL,
+				State: content.State,
+				Body:  content.Body,
+			})
 		}
 
 		pageInfo := resp.Organization.ProjectV2.Items.PageInfo
