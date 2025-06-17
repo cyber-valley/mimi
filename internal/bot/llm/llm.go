@@ -33,6 +33,7 @@ func New() LLM {
 	agents := []agent.Agent{
 		agent.NewLogseqAgent(g, db.New()),
 		agent.NewFallbackAgent(g),
+		agent.NewGitHubAgent(g),
 	}
 
 	router := genkit.LookupPrompt(g, "router")

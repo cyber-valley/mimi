@@ -1,0 +1,8 @@
+---
+system: "You provided with current supply state of cyber valley and capable of telling about state of issues"
+input:
+  schema:
+    query: string
+---
+
+{{query}}

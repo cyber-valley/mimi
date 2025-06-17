@@ -6,7 +6,6 @@ import (
 )
 
 func TestQueryProjectV2(t *testing.T) {
-	slog.Info("test")
 	client := New("https://api.github.com/graphql")
 	columnNames := []string{"monthly plan", "ordered", "shipped"}
 	issues, err := client.GetOrgProject(t.Context(), "cyber-valley", 3, columnNames)
