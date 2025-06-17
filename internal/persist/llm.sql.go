@@ -15,11 +15,11 @@ SELECT
 FROM
     llm_chat
 WHERE
-    telegram_peer_id = $1
+    telegram_id = $1
 `
 
-func (q *Queries) FindChatMessages(ctx context.Context, telegramPeerID int64) ([]byte, error) {
-	row := q.db.QueryRow(ctx, findChatMessages, telegramPeerID)
+func (q *Queries) FindChatMessages(ctx context.Context, telegramID int64) ([]byte, error) {
+	row := q.db.QueryRow(ctx, findChatMessages, telegramID)
 	var messages []byte
 	err := row.Scan(&messages)
 	return messages, err
@@ -27,20 +27,20 @@ func (q *Queries) FindChatMessages(ctx context.Context, telegramPeerID int64) ([
 
 const saveChatMessages = `-- name: SaveChatMessages :exec
 INSERT INTO
-    llm_chat(telegram_peer_id, messages)
+    llm_chat(telegram_id, messages)
 VALUES
-    ($1, $2) ON conflict (telegram_peer_id) DO
+    ($1, $2) ON conflict (telegram_id) DO
 UPDATE
 SET
     messages = excluded.messages
 `
 
 type SaveChatMessagesParams struct {
-	TelegramPeerID int64
-	Messages       []byte
+	TelegramID int64
+	Messages   []byte
 }
 
 func (q *Queries) SaveChatMessages(ctx context.Context, arg SaveChatMessagesParams) error {
-	_, err := q.db.Exec(ctx, saveChatMessages, arg.TelegramPeerID, arg.Messages)
+	_, err := q.db.Exec(ctx, saveChatMessages, arg.TelegramID, arg.Messages)
 	return err
 }

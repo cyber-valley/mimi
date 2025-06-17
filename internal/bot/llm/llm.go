@@ -105,8 +105,8 @@ func (m LLM) Answer(ctx context.Context, id int64, query string) (string, error)
 		return "", fmt.Errorf("failed to marshal messages with %w", err)
 	}
 	err = m.q.SaveChatMessages(ctx, persist.SaveChatMessagesParams{
-		TelegramPeerID: id,
-		Messages:       encoded,
+		TelegramID: id,
+		Messages:   encoded,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to save messages with %w", err)

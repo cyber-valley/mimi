@@ -29,6 +29,6 @@ CREATE TABLE IF NOT EXISTS telegram_message (
 );
 
 CREATE TABLE IF NOT EXISTS llm_chat (
-    telegram_peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id),
+    telegram_id bigint PRIMARY KEY,
     messages jsonb NOT NULL
 );

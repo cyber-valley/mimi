@@ -17,8 +17,8 @@ type Embedding struct {
 }
 
 type LlmChat struct {
-	TelegramPeerID int64
-	Messages       []byte
+	TelegramID int64
+	Messages   []byte
 }
 
 type TelegramMessage struct {
