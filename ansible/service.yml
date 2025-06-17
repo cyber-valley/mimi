@@ -1,0 +1,31 @@
+---
+- hosts: all
+  vars_files:
+    - vars/common.yml
+  tasks:
+    - name: "Build image"
+      delegate_to: localhost
+      command:
+        chdir: ".."
+        cmd: "make build-image"
+
+    - name: "Transfer image"
+      delegate_to: localhost
+      shell: >-
+        podman save {{ image_name }}
+        | ssh {{ inventory_hostname }} podman load
+
+    - name: "Start container"
+      containers.podman.podman_container:
+        name: "{{ image_name }}"
+        image: "{{ image_name }}"
+        state: started
+        restart_policy: always
+        recreate: true
+        network: "{{ podman_network }}"
+        env:
+          GEMINI_API_KEY: "{{ lookup('ansible.builtin.env', 'GEMINI_API_KEY', default=undef()) }}" 
+          TELEGRAM_BOT_API_TOKEN: "{{ lookup('ansible.builtin.env', 'TELEGRAM_BOT_API_TOKEN', default=undef()) }}"
+          GITHUB_TOKEN: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN', default=undef()) }}"
+          DATABASE_URL: "{{ lookup('ansible.builtin.env', 'DATABASE_URL', default=undef()) }}"
+

@@ -1,0 +1,23 @@
+---
+- name: "Setup Debian"
+  hosts: all
+  tasks:
+    - name: "Install packages"
+      become: true
+      become_user: root
+      ansible.builtin.package:
+        update_cache: true
+        name:
+          - podman
+
+    - name: "Extend bash profile"
+      ansible.builtin.blockinfile:
+        state: present
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        block: |
+          alias p='podman'
+          alias pl="p logs --tail=50"
+          alias plf="pl -f"
+          df -h
+          p ps -a
+

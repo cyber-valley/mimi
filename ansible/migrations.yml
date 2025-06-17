@@ -1,0 +1,23 @@
+---
+- name: "Run migrations"
+  hosts: all
+  vars_files:
+    - vars/common.yml
+  tasks:
+    - name: "Copy migrations files"
+      ansible.builtin.copy:
+        src: "{{ geni_migration_path }}"
+        dest: "{{ geni_volume_path }}"
+    - name: "Start container"
+      containers.podman.podman_container:
+        name: "{{ geni_container }}"
+        image: "{{ geni_image }}"
+        network: "{{ podman_network }}"
+        volume:
+          - "{{ geni_volume_path }}:/migrations"
+        env:
+          DATABASE_URL: "{{ lookup('ansible.builtin.env', 'DATABASE_URL', default=undef()) }}"
+          DATABASE_MIGRATIONS_FOLDER: "/migrations"
+        command:
+          - up
+        state: started

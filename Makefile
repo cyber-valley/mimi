@@ -26,7 +26,10 @@ test:
 	go test -v ./...
 
 run-telegram-bot: lint
-	air --build.cmd "go build -o bin/bot cmd/bot/main.go" --build.bin "./bin/bot"
+	air --build.cmd "go build -o tmp/bot cmd/bot/main.go" --build.bin "./bin/bot"
+
+run-bin-telegram-bot: lint
+	./bin/bot
 
 run-telegram-scraper: lint
 	go run cmd/scraper/telegram.go
@@ -61,3 +64,7 @@ podman-db:
 
 psql:
 	PGPASSWORD=$(DB_PASSWORD) psql -U $(DB_USER) -d $(DB_NAME) -p $(DB_PORT) -h localhost
+
+build-image:
+	test -n $(IMAGE_NAME) || exit 1
+	podman build -t $(IMAGE_NAME) .

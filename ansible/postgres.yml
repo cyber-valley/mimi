@@ -1,0 +1,29 @@
+---
+- name: "Setup containerized postgres"
+  hosts: all
+  vars_files:
+    - vars/common.yml
+  tasks:
+    - name: "Create volume path directory"
+      ansible.builtin.file:
+        path: "{{ postgres_volume_path }}"
+        state: directory
+
+    - name: "Create a podman network"
+      containers.podman.podman_network:
+        name: "{{ podman_network }}"
+
+    - name: "Start container"
+      containers.podman.podman_container:
+        name: "{{ postgres_container }}"
+        image: "{{ postgres_image }}"
+        network: "{{ podman_network }}"
+        volume:
+          - "{{ postgres_volume_path }}:/var/lib/postgresql/data"
+        env:
+          POSTGRES_USER: "{{ postgres_user }}"
+          POSTGRES_PASSWORD: "{{ postgres_password }}"
+          POSTGRES_DB: "{{ postgres_db }}"
+          POSTGRES_PORT: "{{ postgres_port }}"
+        state: started
+        restart_policy: always

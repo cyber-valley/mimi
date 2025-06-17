@@ -18,3 +18,4 @@ tmp/
 libs/
 .cozo*
 cozo*
+.env.production
