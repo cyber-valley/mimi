@@ -1,4 +1,8 @@
-query GetOrgProject($org: String!, $projectNumber: Int!) {
+query GetOrgProjectWithComments(
+  $org: String!, 
+  $projectNumber: Int!, 
+  $after: String
+) {
   organization(login: $org) {
     projectV2(number: $projectNumber) {
       id
@@ -6,39 +10,20 @@ query GetOrgProject($org: String!, $projectNumber: Int!) {
       shortDescription
       closed
       url
-      fields(first: 20) {
+      items(first: 100, after: $after) {
         nodes {
-          ... on ProjectV2FieldCommon {
-            id
-            name
-            dataType
-          }
-        }
-      }
-      items(first: 100) {
-        nodes {
-          id
           content {
             ... on Issue {
               title
               url
               state
               body
-              comments(first: 20) {
-                nodes {
-                  author { login }
-                  body
-                  createdAt
-                  url
-                }
-              }
-              assignees(first: 3) {
-                nodes {
-                  login
-                }
-              }
             }
           }
+        }
+        pageInfo {
+          endCursor
+          hasNextPage
         }
       }
     }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -47,27 +48,16 @@ type ProjectV2Response struct {
 				Nodes []struct {
 					ID      string `json:"id"`
 					Content struct {
-						Title     string `json:"title"`
-						URL       string `json:"url"`
-						State     string `json:"state"`
-						Body          string `json:"body"`
-						Comments      struct {
-							Nodes []struct {
-								Author struct {
-									Login string `json:"login"`
-								} `json:"author"`
-								Body      string    `json:"body"`
-								CreatedAt time.Time `json:"createdAt"`
-								URL       string    `json:"url"`
-							} `json:"nodes"`
-						} `json:"comments"`
-						Assignees struct {
-							Nodes []struct {
-								Login string `json:"login"`
-							} `json:"nodes"`
-						} `json:"assignees"`
+						Title    string `json:"title"`
+						URL      string `json:"url"`
+						State    string `json:"state"`
+						Body     string `json:"body"`
 					} `json:"content"`
 				} `json:"nodes"`
+				PageInfo struct {
+					EndCursor   string `json:"endCursor"`
+					HasNextPage bool   `json:"hasNextPage"`
+				} `json:"pageInfo"`
 			} `json:"items"`
 		} `json:"projectV2"`
 	} `json:"organization"`
@@ -134,15 +124,53 @@ func (c *Client) DoQuery(ctx context.Context, query string, variables map[string
 }
 
 // GetOrgProject queries organization project board information.
-func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber int) (*ProjectV2Response, error) {
-	variables := map[string]interface{}{
-		"org":           org,
-		"projectNumber": projectNumber,
+func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber int, columnNames []string) ([]Issue, error) {
+	var issues []Issue
+	after := ""
+	var times int
+
+	for {
+		variables := map[string]interface{}{
+			"org":           org,
+			"projectNumber": projectNumber,
+			"columnNames":   columnNames,
+			"after":         nil,
+		}
+		if after != "" {
+			variables["after"] = after
+		}
+
+		var resp ProjectV2Response
+		err := c.DoQuery(ctx, projectQuery, variables, &resp)
+		if err != nil {
+			return issues, err
+		}
+
+		nodes := resp.Organization.ProjectV2.Items.Nodes
+		for _, node := range nodes {
+			content := node.Content
+				issues = append(issues, Issue{
+					Title: content.Title,
+					URL:   content.URL,
+					State: content.State,
+					Body:  content.Body,
+				})
+		}
+
+		pageInfo := resp.Organization.ProjectV2.Items.PageInfo
+		if !pageInfo.HasNextPage || pageInfo.EndCursor == "" {
+			break
+		}
+		after = pageInfo.EndCursor
+		times += 1
 	}
-	var res ProjectV2Response
-	err := c.DoQuery(ctx, projectQuery, variables, &res)
-	if err != nil {
-		return nil, err
-	}
-	return &res, nil
+	slog.Info("GraphQL was queried", "times", times)
+	return issues, nil
+}
+
+type Issue struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+	State string `json:"state"`
+	Body  string `json:"body"`
 }
