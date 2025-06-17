@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"strings"
 
+	"github.com/ai-shift/tgmd"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"mimi/internal/bot/llm"
@@ -61,7 +63,9 @@ func (h UpdateHandler) handleMessage(m *tgbotapi.Message) error {
 	slog.Info("got LLM answer", "length", len(answer))
 
 	// Response to the user's query
-	msg := tgbotapi.NewMessage(m.Chat.ID, answer)
+	escaped := tgmd.Telegramify(strings.ReplaceAll(answer, "\n\n", "\n"))
+	msg := tgbotapi.NewMessage(m.Chat.ID, escaped)
+	msg.ParseMode = "MarkdownV2"
 	_, err = h.bot.Send(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send LLM response with %w", err)
