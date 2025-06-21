@@ -28,9 +28,6 @@ test:
 run-telegram-bot: lint
 	air --build.cmd "go build -o tmp/bot cmd/bot/main.go" --build.bin "./bin/bot"
 
-run-bin-telegram-bot: lint
-	./bin/bot
-
 run-telegram-scraper: lint
 	go run cmd/scraper/telegram.go
 
