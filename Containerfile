@@ -20,6 +20,8 @@ COPY --from=build /app/app .
 COPY prompts prompts
 COPY cozo.db .
 
-RUN apk --no-cache add gcompat ca-certificates tzdata
+RUN apk upgrade
+RUN apk --no-cache add gcompat ca-certificates tzdata nodejs npm
+RUN npm install --global logseq-query
 
 ENTRYPOINT ["/app/app"]
