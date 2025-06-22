@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strings"
 
 	"github.com/aholstenson/logseq-go"
+	"github.com/aholstenson/logseq-go/content"
 
 	"mimi/internal/scraper/logseq/query/sexp"
 )
@@ -20,10 +22,12 @@ type State struct{}
 type pageFilter = func(pages logseq.Page) bool
 
 var (
-	queryRegex      = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
-	mentionRegex    = regexp.MustCompile(`\[\[\@(.*)\]\]`)
-	ErrRedundantAnd = fmt.Errorf("redundant 'and' statement")
-	ErrEmptyNot     = fmt.Errorf("empty 'not' statement")
+	queryRegex               = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
+	mentionRegex             = regexp.MustCompile(`\[\[\@(.*)\]\]`)
+	ErrRedundantAnd          = fmt.Errorf("redundant 'and' statement")
+	ErrRedundantPageProperty = fmt.Errorf("redundant 'page-property' statement")
+	ErrIncorrectPageProperty = fmt.Errorf("incorrect 'page-property' statement")
+	ErrNotSyntaxError        = fmt.Errorf("'not' accepts only one atom")
 )
 
 func New() *State {
@@ -80,10 +84,11 @@ func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
 }
 
 func (s *State) evalAnd(l sexp.List) (pageFilter, error) {
+	slog.Info("translating 'and' expression")
 	if len(l) == 1 {
 		return emptyFilter, ErrRedundantAnd
 	}
-	filters := make([]pageFilter, len(l)-2)
+	filters := make([]pageFilter, len(l)-1)
 	for i := 1; i < len(l); i++ {
 		filter, err := s.eval(l[i])
 		if err != nil {
@@ -91,30 +96,65 @@ func (s *State) evalAnd(l sexp.List) (pageFilter, error) {
 		}
 		filters[i-1] = filter
 	}
-	return conjuction(filters...), nil
+	return func(p logseq.Page) bool {
+		for _, filter := range filters {
+			if !(filter(p)) {
+				return false
+			}
+		}
+		return true
+	}, nil
 }
 
 func (s *State) evalNot(l sexp.List) (pageFilter, error) {
-	if len(l) == 1 {
-		return emptyFilter, ErrEmptyNot
+	slog.Info("translating 'not' expression")
+	if len(l) != 2 {
+		return emptyFilter, ErrNotSyntaxError
 	}
-	panic("not implemented")
+	filter, err := s.eval(l[1])
+	if err != nil {
+		return emptyFilter, fmt.Errorf("failed to eval 'not' operand with %w", err)
+	}
+	return func(p logseq.Page) bool {
+		return !filter(p)
+	}, nil
 }
 
 func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
-	switch len(l) {
-	case 0:
-		return emptyFilter, fmt.Errorf("got empty page property list")
-	case 1:
-		slog.Info("should filter all pages with", "property", l[0])
-	default:
-		prop := l[0]
-		for i := 1; i < len(l); i++ {
-			value := l[i]
-			slog.Info("should filter pages with", "property", prop, "value", value)
-		}
+	slog.Info("translating 'page-property' expression")
+	if len(l) == 1 {
+		return emptyFilter, ErrRedundantPageProperty
 	}
-	panic("not implemented")
+
+	if len(l) > 3 {
+		return emptyFilter, ErrIncorrectPageProperty
+	}
+
+	// Collect params
+	cdr := make([]string, len(l)-1)
+	for i := 1; i < len(l); i++ {
+		atom, ok := l[i].I.(string)
+		if !ok {
+			return emptyFilter, fmt.Errorf("got unexpected 'page-property' value %#v", atom)
+		}
+		cdr[i] = atom
+	}
+
+	// Build filter
+	return func(p logseq.Page) bool {
+		propName = strings.TrimPrefix(cdr[0], ":")
+		nodes := props.Get(propName)
+		if len(cdr) == 1 {
+			return len(nodes) > 0
+		}
+		propValue = cdr[1]
+		for _, txt := range nodes.FilterDeep(content.IsOfType[*content.Text]()) {
+			if txt.(*content.Text).Value == propValue {
+				return true
+			}
+		}
+		return false
+	}, nil
 }
 
 func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
@@ -136,10 +176,6 @@ func (s *State) evalString(str string) (pageFilter, error) {
 		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
 	}
 	slog.Info("got mention filter")
-	panic("not implemented")
-}
-
-func conjuction(filters ...pageFilter) pageFilter {
 	panic("not implemented")
 }
 
