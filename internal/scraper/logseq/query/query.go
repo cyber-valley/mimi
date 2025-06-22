@@ -1,8 +1,10 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"regexp"
 	"strings"
 
@@ -24,18 +26,19 @@ type pageFilter = func(pages logseq.Page) bool
 var (
 	queryRegex               = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
 	mentionRegex             = regexp.MustCompile(`\[\[\@(.*)\]\]`)
-	ErrRedundantAnd          = fmt.Errorf("redundant 'and' statement")
 	ErrRedundantPageProperty = fmt.Errorf("redundant 'page-property' statement")
 	ErrIncorrectPageProperty = fmt.Errorf("incorrect 'page-property' statement")
 	ErrNotSyntaxError        = fmt.Errorf("'not' accepts only one atom")
 	ErrIncorrectPageTags     = fmt.Errorf("incorrect 'page-tags' statement")
+	ErrIncorrectProperty     = fmt.Errorf("incorrect 'property' statement")
+	ErrIncorrectAnd          = fmt.Errorf("incorrect 'property' statement")
 )
 
 func New() *State {
 	return &State{}
 }
 
-func (s *State) Eval(q string) (res QueryResult, _ error) {
+func (s *State) Eval(ctx context.Context, g *logseq.Graph, q string) (res []logseq.Page, _ error) {
 	// Parse query
 	parsed, err := parseQuery(q)
 	if err != nil {
@@ -43,9 +46,23 @@ func (s *State) Eval(q string) (res QueryResult, _ error) {
 	}
 
 	// Evaluate state
-	_, err = s.eval(parsed)
+	filter, err := s.eval(parsed)
 	if err != nil {
 		return res, fmt.Errorf("failed to evaluate state with %w", err)
+	}
+
+	// Read pages
+	pages, err := getAllPages(ctx, g)
+	if err != nil {
+		return res, fmt.Errorf("failed to get graph pages with %w", err)
+	}
+
+	// Filter pages
+	for _, page := range pages {
+		if !filter(page) {
+			continue
+		}
+		res = append(res, page)
 	}
 
 	return res, nil
@@ -71,6 +88,8 @@ func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
 				return s.evalPageProperty(sex)
 			case "page-tags":
 				return s.evalPageTags(sex)
+			case "property":
+				return s.evalProperty(sex)
 			default:
 				return emptyFilter, fmt.Errorf("unexpected string list entry %s", head)
 			}
@@ -87,7 +106,7 @@ func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
 func (s *State) evalAnd(l sexp.List) (pageFilter, error) {
 	slog.Info("translating 'and' expression")
 	if len(l) == 1 {
-		return emptyFilter, ErrRedundantAnd
+		return emptyFilter, ErrIncorrectAnd
 	}
 	filters := make([]pageFilter, len(l)-1)
 	for i := 1; i < len(l); i++ {
@@ -123,11 +142,7 @@ func (s *State) evalNot(l sexp.List) (pageFilter, error) {
 
 func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 	slog.Info("translating 'page-property' expression")
-	if len(l) == 1 {
-		return emptyFilter, ErrRedundantPageProperty
-	}
-
-	if len(l) > 3 {
+	if len(l) < 2 || len(l) > 3 {
 		return emptyFilter, ErrIncorrectPageProperty
 	}
 
@@ -185,6 +200,38 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 	}, nil
 }
 
+func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
+	if len(l) < 2 || len(l) > 3 {
+		return emptyFilter, ErrIncorrectProperty
+	}
+
+	// Collect params
+	cdr := make([]string, len(l)-1)
+	for i := 1; i < len(l); i++ {
+		atom, ok := l[i].I.(string)
+		if !ok {
+			return emptyFilter, fmt.Errorf("got unexpected 'page-property' value %#v", atom)
+		}
+		cdr[i-1] = atom
+	}
+
+	// Build filter
+	return func(p logseq.Page) bool {
+		propName := strings.TrimPrefix(cdr[0], ":")
+		nodes := p.Properties().Get(propName)
+		if len(cdr) == 1 {
+			return len(nodes) > 0
+		}
+		propValue := cdr[1]
+		for _, txt := range nodes.FilterDeep(content.IsOfType[*content.Text]()) {
+			if txt.(*content.Text).Value == propValue {
+				return true
+			}
+		}
+		return false
+	}, nil
+}
+
 func (s *State) evalString(str string) (pageFilter, error) {
 	if !mentionRegex.MatchString(str) {
 		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
@@ -221,4 +268,25 @@ func parseQuery(q string) (s sexp.Sexp, err error) {
 
 func emptyFilter(pages logseq.Page) bool {
 	return false
+}
+
+func getAllPages(ctx context.Context, g *logseq.Graph) (pages []logseq.Page, err error) {
+	res, err := g.SearchPages(ctx, logseq.WithQuery(logseq.All()), logseq.WithMaxHits(math.MaxInt))
+	if err != nil {
+		return pages, fmt.Errorf("pages search failed with %w", err)
+	}
+
+	if res.Size() != res.Count() {
+		return pages, fmt.Errorf("res amount differs from total count: %d != %d", res.Size(), res.Count())
+	}
+
+	for _, res := range res.Results() {
+		page, err := res.Open()
+		if err != nil {
+			return pages, fmt.Errorf("failed to open page from result with %w", err)
+		}
+		pages = append(pages, page)
+	}
+
+	return pages, nil
 }

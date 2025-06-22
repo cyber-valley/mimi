@@ -3,19 +3,37 @@ package query
 import (
 	"log/slog"
 	"testing"
+
+	"github.com/aholstenson/logseq-go"
 )
 
+const (
+	// FIXME: Simplify graph and store in the project
+	graphPath = "/home/user/code/clone/cvland"
+)
+
+func getGraph(t *testing.T) *logseq.Graph {
+	g, err := logseq.Open(t.Context(), graphPath, logseq.WithInMemoryIndex())
+	if err != nil {
+		t.Errorf("failed to open graph %s with: %s", graphPath, err)
+		t.Fail()
+	}
+	return g
+}
+
 func TestEval(t *testing.T) {
-	s := New()
 	queries := []string{
 		`{{query (page-property :wood-durability)}}`,
 		`{{query [[@master]]}}`,
 		`{{query (page-tags [[psycho]])}}`,
 		`{{query (and (page-tags [[species]]) (not (page-tags [[class]])))}}`,
 	}
+	s := New()
+	g := getGraph(t)
+
 	errs := make(map[string]error)
 	for _, q := range queries {
-		_, err := s.Eval(q)
+		_, err := s.Eval(t.Context(), g, q)
 		if err != nil {
 			errs[q] = err
 		}
@@ -29,12 +47,15 @@ func TestEval(t *testing.T) {
 }
 
 func TestEval_Fails(t *testing.T) {
-	s := New()
 	before2expected := map[string]string{
 		`{{query (and [] (page-tags [[species]]) (not (page-tags [[class]])))}}`: `failed to evaluate state with failed to evaluate 'and' with unexpected string atom '[]'`,
 	}
+
+	s := New()
+	g := getGraph(t)
+
 	for before, expected := range before2expected {
-		_, err := s.Eval(before)
+		_, err := s.Eval(t.Context(), g, before)
 		if err == nil || err.Error() != expected {
 			t.Errorf("query '%s' should fail with '%s' but failed with '%s'", before, expected, err)
 			t.Fail()
