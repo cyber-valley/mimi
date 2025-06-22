@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+func TestExecute(t *testing.T) {
+	queries := []string{
+		`{{query (page-property :wood-durability)}}`,
+	}
+	errs := make(map[string]error)
+	for _, q := range queries {
+		_, err := Execute(q)
+		if err != nil {
+			errs[q] = err
+		}
+	}
+	if len(errs) > 0 {
+		for q, err := range errs {
+			slog.Error("failed", "query", q, "with", err)
+		}
+		t.Fail()
+	}
+}
+
 func TestParsing_RawEDN(t *testing.T) {
 	queries := []string{
 		`{{query (page-property :wood-durability)}}`,
@@ -18,7 +37,7 @@ func TestParsing_RawEDN(t *testing.T) {
 	}
 	errs := make(map[string]error)
 	for _, q := range queries {
-		_, err := parseQuery([]byte(q))
+		_, err := parseQuery(q)
 		if err != nil {
 			errs[q] = err
 		}
