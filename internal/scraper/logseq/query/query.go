@@ -21,42 +21,59 @@ var (
 func Execute(q string) (res QueryResult, _ error) {
 	parsed, err := parseQuery(q)
 	if err != nil {
-		return QueryResult{}, fmt.Errorf("failed to parse query with %w", err)
+		return res, fmt.Errorf("failed to parse query with %w", err)
 	}
-	switch p := parsed.I.(type) {
+	err = execute(parsed)
+	if err != nil {
+		return res, fmt.Errorf("failed to execute sexp with %w", err)
+	}
+	return res, nil
+}
+
+func execute(s sexp.Sexp) error {
+	switch s := s.I.(type) {
 	default:
-		return res, fmt.Errorf("unexpected sexp format with value %#v", p)
+		return fmt.Errorf("unexpected sexp format with value %#v", s)
 	case sexp.List:
-		if len(p) == 0 {
+		if len(s) == 0 {
 			slog.Warn("got empty list")
 			break
 		}
-		switch head := p[0].I.(type) {
+		switch head := s[0].I.(type) {
 		case string:
 			switch head {
-			case "page-property":
-				err = executePageProperty(p)
+			case "and":
+				err := executeAnd(s)
 				if err != nil {
-					return res, fmt.Errorf("failed to execute page property with %w", err)
+					return fmt.Errorf("failed to execute 'and' with %w", err)
+				}
+			case "page-property":
+				err := executePageProperty(s)
+				if err != nil {
+					return fmt.Errorf("failed to execute 'page-property' with %w", err)
 				}
 			case "page-tags":
-				err = executePageTags(p)
+				err := executePageTags(s)
 				if err != nil {
-					return res, fmt.Errorf("failed to execute page tags with %w", err)
+					return fmt.Errorf("failed to execute 'page-tags' with %w", err)
 				}
 			default:
-				return res, fmt.Errorf("unexpected string list entry %s", head)
+				return fmt.Errorf("unexpected string list entry %s", head)
 			}
 		default:
-			return res, fmt.Errorf("unexpected list head type %#v", head)
+			return fmt.Errorf("unexpected list head type %#v", head)
 		}
 	case string:
-		err = executeString(p)
+		err := executeString(s)
 		if err != nil {
-			return res, fmt.Errorf("failed to execute string with %w", err)
+			return fmt.Errorf("failed to execute string with %w", err)
 		}
 	}
-	return QueryResult{}, nil
+	return nil
+}
+
+func executeAnd(l sexp.List) error {
+	return nil
 }
 
 func executePageProperty(l sexp.List) error {
