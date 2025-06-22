@@ -56,25 +56,27 @@ func (s *State) eval(sex sexp.Sexp) error {
 	default:
 		return fmt.Errorf("unexpected sexp format with value %#v", sex)
 	case sexp.List:
+		// Most of the query logic sits inside of a list
 		if len(sex) == 0 {
 			slog.Warn("got empty list")
 			break
 		}
 		switch head := sex[0].I.(type) {
 		case string:
+			// Find out filter and execute it
 			switch head {
 			case "and":
-				err := s.executeAnd(sex)
+				err := s.evalAnd(sex)
 				if err != nil {
 					return fmt.Errorf("failed to execute 'and' with %w", err)
 				}
 			case "page-property":
-				err := s.executePageProperty(sex)
+				err := s.evalPageProperty(sex)
 				if err != nil {
 					return fmt.Errorf("failed to execute 'page-property' with %w", err)
 				}
 			case "page-tags":
-				err := s.executePageTags(sex)
+				err := s.evalPageTags(sex)
 				if err != nil {
 					return fmt.Errorf("failed to execute 'page-tags' with %w", err)
 				}
@@ -85,7 +87,7 @@ func (s *State) eval(sex sexp.Sexp) error {
 			return fmt.Errorf("unexpected list head type %#v", head)
 		}
 	case string:
-		err := s.executeString(sex)
+		err := s.evalString(sex)
 		if err != nil {
 			return fmt.Errorf("failed to execute string with %w", err)
 		}
@@ -93,14 +95,14 @@ func (s *State) eval(sex sexp.Sexp) error {
 	return nil
 }
 
-func (s *State) executeAnd(l sexp.List) error {
+func (s *State) evalAnd(l sexp.List) error {
 	if len(l) == 1 {
 		return ErrRedundantAnd
 	}
 	return nil
 }
 
-func (s *State) executePageProperty(l sexp.List) error {
+func (s *State) evalPageProperty(l sexp.List) error {
 	switch len(l) {
 	case 0:
 		return fmt.Errorf("got empty page property list")
@@ -116,7 +118,7 @@ func (s *State) executePageProperty(l sexp.List) error {
 	return nil
 }
 
-func (s *State) executePageTags(l sexp.List) error {
+func (s *State) evalPageTags(l sexp.List) error {
 	switch len(l) {
 	case 0:
 		return fmt.Errorf("got empty page tags list")
@@ -130,7 +132,7 @@ func (s *State) executePageTags(l sexp.List) error {
 	return nil
 }
 
-func (s *State) executeString(str string) error {
+func (s *State) evalString(str string) error {
 	if !mentionRegex.MatchString(str) {
 		return fmt.Errorf("unexpected string atom '%s'", str)
 	}
