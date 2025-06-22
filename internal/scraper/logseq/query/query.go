@@ -17,18 +17,51 @@ var (
 	queryRegex = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
 )
 
-func Execute(q string) (QueryResult, error) {
+func Execute(q string) (res QueryResult, _ error) {
 	parsed, err := parseQuery(q)
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("failed to parse query with %w", err)
 	}
 	switch p := parsed.I.(type) {
+	default:
+		return res, fmt.Errorf("unexpected sexp format with value %#v", p)
 	case sexp.List:
-		for _, item := range p {
-			slog.Info("got parsed item", "value", item)
+		if len(p) == 0 {
+			slog.Warn("got empty list")
+			break
+		}
+		switch head := p[0].I.(type) {
+		case string:
+			switch head {
+			case "page-property":
+				err = executePageProperty(p)
+				if err != nil {
+					return res, fmt.Errorf("failed to execute page property with %w", err)
+				}
+			default:
+				return res, fmt.Errorf("unexpected string list entry %s", head)
+			}
+		default:
+			return res, fmt.Errorf("unexpected list head type %#v", head)
 		}
 	}
 	return QueryResult{}, nil
+}
+
+func executePageProperty(l sexp.List) error {
+	switch len(l) {
+	case 0:
+		return fmt.Errorf("got empty page property list")
+	case 1:
+		slog.Info("should filter all pages", "tag", l[0])
+	default:
+		tag := l[0]
+		for i := 1; i < len(l); i++ {
+			value := l[i]
+			slog.Info("should filter all pages", "tag", tag, "value", value)
+		}
+	}
+	return nil
 }
 
 func parseQuery(q string) (s sexp.Sexp, err error) {
