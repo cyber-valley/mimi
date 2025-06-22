@@ -15,16 +15,15 @@ type QueryResult struct {
 	Rows [][]string
 }
 
-type State struct {
-	filter pageFilter
-}
+type State struct{}
 
 type pageFilter = func(pages logseq.Page) bool
 
 var (
 	queryRegex      = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
 	mentionRegex    = regexp.MustCompile(`\[\[\@(.*)\]\]`)
-	ErrRedundantAnd = fmt.Errorf("redundant and statement")
+	ErrRedundantAnd = fmt.Errorf("redundant 'and' statement")
+	ErrEmptyNot     = fmt.Errorf("empty 'not' statement")
 )
 
 func New() *State {
@@ -49,8 +48,6 @@ func (s *State) Eval(q string) (res QueryResult, _ error) {
 
 func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
 	switch sex := sex.I.(type) {
-	default:
-		return emptyFilter, fmt.Errorf("unexpected sexp format with value %#v", sex)
 	case sexp.List:
 		// Most of the query logic sits inside of a list
 		if len(sex) == 0 {
@@ -63,19 +60,23 @@ func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
 			switch head {
 			case "and":
 				return s.evalAnd(sex)
+			case "not":
+				return s.evalNot(sex)
 			case "page-property":
 				return s.evalPageProperty(sex)
 			case "page-tags":
 				return s.evalPageTags(sex)
 			default:
-				return fmt.Errorf("unexpected string list entry %s", head)
+				return emptyFilter, fmt.Errorf("unexpected string list entry %s", head)
 			}
 		default:
-			return fmt.Errorf("unexpected list head type %#v", head)
+			return emptyFilter, fmt.Errorf("unexpected list head type %#v", head)
 		}
 	case string:
 		return s.evalString(sex)
 	}
+
+	return emptyFilter, fmt.Errorf("unexpected sexp format with value %#v", sex)
 }
 
 func (s *State) evalAnd(l sexp.List) (pageFilter, error) {
@@ -90,13 +91,20 @@ func (s *State) evalAnd(l sexp.List) (pageFilter, error) {
 		}
 		filters[i-1] = filter
 	}
-	return andFilters(filters...), nil
+	return conjuction(filters...), nil
+}
+
+func (s *State) evalNot(l sexp.List) (pageFilter, error) {
+	if len(l) == 1 {
+		return emptyFilter, ErrEmptyNot
+	}
+	panic("not implemented")
 }
 
 func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 	switch len(l) {
 	case 0:
-		return fmt.Errorf("got empty page property list")
+		return emptyFilter, fmt.Errorf("got empty page property list")
 	case 1:
 		slog.Info("should filter all pages with", "property", l[0])
 	default:
@@ -112,7 +120,7 @@ func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 	switch len(l) {
 	case 0:
-		return fmt.Errorf("got empty page tags list")
+		return emptyFilter, fmt.Errorf("got empty page tags list")
 	case 1:
 		slog.Info("should filter all pages with", "tag", l[0])
 	default:
@@ -125,17 +133,13 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 
 func (s *State) evalString(str string) (pageFilter, error) {
 	if !mentionRegex.MatchString(str) {
-		return fmt.Errorf("unexpected string atom '%s'", str)
+		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
 	}
 	slog.Info("got mention filter")
 	panic("not implemented")
 }
 
-func (f pageFilter) execute() (QueryResult, error) {
-	panic("not implemented")
-}
-
-func andFilters(filters ...pageFilter) pageFilter {
+func conjuction(filters ...pageFilter) pageFilter {
 	panic("not implemented")
 }
 
