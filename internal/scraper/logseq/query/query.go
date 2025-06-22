@@ -236,8 +236,10 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 		for _, block := range p.Blocks() {
 			values := block.Properties().Get(propName)
 			if len(cdr) == 1 {
+				// Got only property name
 				return len(values) > 0
 			} else {
+				// Should match given property with value
 				for _, node := range values {
 					switch node := node.(type) {
 					case *content.Text:
