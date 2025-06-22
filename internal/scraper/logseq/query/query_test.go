@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestExecute(t *testing.T) {
+func TestEval(t *testing.T) {
 	s := New()
 	queries := []string{
 		`{{query (page-property :wood-durability)}}`,
