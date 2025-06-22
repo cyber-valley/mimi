@@ -28,6 +28,7 @@ var (
 	ErrRedundantPageProperty = fmt.Errorf("redundant 'page-property' statement")
 	ErrIncorrectPageProperty = fmt.Errorf("incorrect 'page-property' statement")
 	ErrNotSyntaxError        = fmt.Errorf("'not' accepts only one atom")
+	ErrIncorrectPageTags     = fmt.Errorf("incorrect 'page-tags' statement")
 )
 
 func New() *State {
@@ -137,17 +138,17 @@ func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 		if !ok {
 			return emptyFilter, fmt.Errorf("got unexpected 'page-property' value %#v", atom)
 		}
-		cdr[i] = atom
+		cdr[i-1] = atom
 	}
 
 	// Build filter
 	return func(p logseq.Page) bool {
-		propName = strings.TrimPrefix(cdr[0], ":")
-		nodes := props.Get(propName)
+		propName := strings.TrimPrefix(cdr[0], ":")
+		nodes := p.Properties().Get(propName)
 		if len(cdr) == 1 {
 			return len(nodes) > 0
 		}
-		propValue = cdr[1]
+		propValue := cdr[1]
 		for _, txt := range nodes.FilterDeep(content.IsOfType[*content.Text]()) {
 			if txt.(*content.Text).Value == propValue {
 				return true
@@ -158,17 +159,30 @@ func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 }
 
 func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
-	switch len(l) {
-	case 0:
-		return emptyFilter, fmt.Errorf("got empty page tags list")
-	case 1:
-		slog.Info("should filter all pages with", "tag", l[0])
-	default:
-		for _, tag := range l {
-			slog.Info("should filter pages with", "tag", tag)
-		}
+	if len(l) == 1 {
+		return emptyFilter, ErrIncorrectPageTags
 	}
-	panic("not implemented")
+
+	cdr := make([]string, len(l)-1)
+	for i := 1; i < len(l); i++ {
+		tag, ok := l[i].I.(string)
+		if !ok {
+			return emptyFilter, ErrIncorrectPageTags
+		}
+		cdr[i-1] = tag
+	}
+	slog.Info("tags to be queried", "value", cdr)
+
+	return func(p logseq.Page) bool {
+		tags := p.Properties().Get("tags")
+		if len(tags) == 0 {
+			return false
+		}
+		for _, tag := range tags {
+			slog.Info("got tag", "value", fmt.Sprintf("%#v", tag))
+		}
+		return false
+	}, nil
 }
 
 func (s *State) evalString(str string) (pageFilter, error) {
@@ -176,7 +190,7 @@ func (s *State) evalString(str string) (pageFilter, error) {
 		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
 	}
 	slog.Info("got mention filter")
-	panic("not implemented")
+	return emptyFilter, nil
 }
 
 func parseQuery(q string) (s sexp.Sexp, err error) {

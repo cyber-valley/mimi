@@ -11,7 +11,7 @@ func TestEval(t *testing.T) {
 		`{{query (page-property :wood-durability)}}`,
 		`{{query [[@master]]}}`,
 		`{{query (page-tags [[psycho]])}}`,
-		`{{query (and [] (page-tags [[species]]) (not (page-tags [[class]])))}}`,
+		`{{query (and (page-tags [[species]]) (not (page-tags [[class]])))}}`,
 	}
 	errs := make(map[string]error)
 	for _, q := range queries {
