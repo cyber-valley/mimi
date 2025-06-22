@@ -22,9 +22,23 @@ func TestEval(t *testing.T) {
 	}
 	if len(errs) > 0 {
 		for q, err := range errs {
-			slog.Error("failed", "query", q, "with", err)
+			t.Log("failed", "query", q, "with", err)
 		}
 		t.Fail()
+	}
+}
+
+func TestEval_Fails(t *testing.T) {
+	s := New()
+	before2expected := map[string]string{
+		`{{query (and [] (page-tags [[species]]) (not (page-tags [[class]])))}}`: `failed to evaluate state with failed to evaluate 'and' with unexpected string atom '[]'`,
+	}
+	for before, expected := range before2expected {
+		_, err := s.Eval(before)
+		if err == nil || err.Error() != expected {
+			t.Errorf("query '%s' should fail with '%s' but failed with '%s'", before, expected, err)
+			t.Fail()
+		}
 	}
 }
 
