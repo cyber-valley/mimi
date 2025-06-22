@@ -14,8 +14,9 @@ type QueryResult struct {
 }
 
 var (
-	queryRegex   = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
-	mentionRegex = regexp.MustCompile(`\[\[\@(.*)\]\]`)
+	queryRegex      = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
+	mentionRegex    = regexp.MustCompile(`\[\[\@(.*)\]\]`)
+	ErrRedundantAnd = fmt.Errorf("redundant and statement")
 )
 
 func Execute(q string) (res QueryResult, _ error) {
@@ -73,6 +74,9 @@ func execute(s sexp.Sexp) error {
 }
 
 func executeAnd(l sexp.List) error {
+	if len(l) == 1 {
+		return ErrRedundantAnd
+	}
 	return nil
 }
 
