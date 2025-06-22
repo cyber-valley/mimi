@@ -1,7 +1,6 @@
 package query
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -15,7 +14,6 @@ type QueryResult struct {
 }
 
 type State struct {
-	errs   []error
 	filter pageFilter
 }
 
@@ -39,9 +37,9 @@ func (s *State) Eval(q string) (res QueryResult, _ error) {
 	}
 
 	// Evaluate state
-	s.eval(parsed)
-	if len(s.errs) > 0 {
-		return res, fmt.Errorf("failed to evaluate state with %w", errors.Join(s.errs...))
+	err = s.eval(parsed)
+	if err != nil {
+		return res, fmt.Errorf("failed to evaluate state with %w", err)
 	}
 
 	// Execute filtering
