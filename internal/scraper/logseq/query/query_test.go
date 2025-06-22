@@ -22,27 +22,24 @@ func getGraph(t *testing.T) *logseq.Graph {
 }
 
 func TestEval(t *testing.T) {
-	queries := []string{
-		`{{query (page-property :wood-durability)}}`,
-		`{{query [[@master]]}}`,
-		`{{query (page-tags [[psycho]])}}`,
-		`{{query (and (page-tags [[species]]) (not (page-tags [[class]])))}}`,
+	query2expected := map[string]int{
+		`{{query (property :supply "next-month")}}`:                           80,
+		`{{query (page-property :wood-durability)}}`:                          35,
+		`{{query [[@master]]}}`:                                               0,
+		`{{query (page-tags [[psycho]])}}`:                                    0,
+		`{{query (and (page-tags [[species]]) (not (page-tags [[class]])))}}`: 0,
 	}
 	s := New()
 	g := getGraph(t)
 
-	errs := make(map[string]error)
-	for _, q := range queries {
-		_, err := s.Eval(t.Context(), g, q)
+	for q, expected := range query2expected {
+		pages, err := s.Eval(t.Context(), g, q)
 		if err != nil {
-			errs[q] = err
+			t.Errorf("failed to eval query '%s' with %s", q, err)
 		}
-	}
-	if len(errs) > 0 {
-		for q, err := range errs {
-			t.Log("failed", "query", q, "with", err)
+		if len(pages) != expected {
+			t.Errorf("got %d pages instead of %d for '%s'", len(pages), expected, q)
 		}
-		t.Fail()
 	}
 }
 

@@ -1,3 +1,4 @@
+// Origin https://rosettacode.org/wiki/S-expressions#Go
 package sexp
 
 import (

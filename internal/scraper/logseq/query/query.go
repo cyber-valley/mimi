@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aholstenson/logseq-go"
@@ -65,6 +66,7 @@ func (s *State) Eval(ctx context.Context, g *logseq.Graph, q string) (res []logs
 		res = append(res, page)
 	}
 
+	slog.Info("query result", "size", len(res))
 	return res, nil
 }
 
@@ -194,7 +196,14 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 			return false
 		}
 		for _, tag := range tags {
-			slog.Info("got tag", "value", fmt.Sprintf("%#v", tag))
+			tag, ok := tag.(*content.Text)
+			if !ok {
+				slog.Error("got unexpected tag type", "value", fmt.Sprintf("%#v", tag))
+				continue
+			}
+			if slices.Contains(cdr, tag.Value) {
+				return true
+			}
 		}
 		return false
 	}, nil
@@ -208,24 +217,37 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 	// Collect params
 	cdr := make([]string, len(l)-1)
 	for i := 1; i < len(l); i++ {
-		atom, ok := l[i].I.(string)
-		if !ok {
-			return emptyFilter, fmt.Errorf("got unexpected 'page-property' value %#v", atom)
+		switch el := l[i].I.(type) {
+		case string:
+			cdr[i-1] = el
+		case sexp.QString:
+			// TODO: May face escaped sequences
+			cdr[i-1] = strings.TrimPrefix(strings.TrimSuffix(string(el), `"`), `"`)
+		default:
+			return emptyFilter, fmt.Errorf("got unexpected 'property' value '%#v', list '%#v'", l[i].I, l)
 		}
-		cdr[i-1] = atom
 	}
+
+	slog.Info("eval property", "cdr", cdr)
 
 	// Build filter
 	return func(p logseq.Page) bool {
 		propName := strings.TrimPrefix(cdr[0], ":")
-		nodes := p.Properties().Get(propName)
-		if len(cdr) == 1 {
-			return len(nodes) > 0
-		}
-		propValue := cdr[1]
-		for _, txt := range nodes.FilterDeep(content.IsOfType[*content.Text]()) {
-			if txt.(*content.Text).Value == propValue {
-				return true
+		for _, block := range p.Blocks() {
+			values := block.Properties().Get(propName)
+			if len(cdr) == 1 {
+				return len(values) > 0
+			} else {
+				for _, node := range values {
+					switch node := node.(type) {
+					case *content.Text:
+						if node.Value == cdr[1] {
+							return true
+						}
+					default:
+						slog.Error("got unexpected property value type", "value", fmt.Sprintf("%#v", node))
+					}
+				}
 			}
 		}
 		return false
