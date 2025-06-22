@@ -8,6 +8,7 @@ import (
 func TestExecute(t *testing.T) {
 	queries := []string{
 		`{{query (page-property :wood-durability)}}`,
+		`{{query [[@master]]}}`,
 	}
 	errs := make(map[string]error)
 	for _, q := range queries {

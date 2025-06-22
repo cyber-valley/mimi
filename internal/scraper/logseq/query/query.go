@@ -14,7 +14,8 @@ type QueryResult struct {
 }
 
 var (
-	queryRegex = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
+	queryRegex   = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
+	mentionRegex = regexp.MustCompile(`\[\[\@(.*)\]\]`)
 )
 
 func Execute(q string) (res QueryResult, _ error) {
@@ -44,6 +45,11 @@ func Execute(q string) (res QueryResult, _ error) {
 		default:
 			return res, fmt.Errorf("unexpected list head type %#v", head)
 		}
+	case string:
+		err = executeString(p)
+		if err != nil {
+			return res, fmt.Errorf("failed to execute string with %w", err)
+		}
 	}
 	return QueryResult{}, nil
 }
@@ -61,6 +67,14 @@ func executePageProperty(l sexp.List) error {
 			slog.Info("should filter all pages", "tag", tag, "value", value)
 		}
 	}
+	return nil
+}
+
+func executeString(s string) error {
+	if !mentionRegex.MatchString(s) {
+		return fmt.Errorf("unexpected string atom '%s'", s)
+	}
+	slog.Info("got mention filter")
 	return nil
 }
 
