@@ -1,6 +1,7 @@
 package query
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -13,48 +14,69 @@ type QueryResult struct {
 	Rows [][]string
 }
 
+type State struct {
+	errs   []error
+	filter pageFilter
+}
+
+type pageFilter struct{}
+
 var (
 	queryRegex      = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
 	mentionRegex    = regexp.MustCompile(`\[\[\@(.*)\]\]`)
 	ErrRedundantAnd = fmt.Errorf("redundant and statement")
 )
 
-func Execute(q string) (res QueryResult, _ error) {
+func New() *State {
+	return &State{}
+}
+
+func (s *State) Eval(q string) (res QueryResult, _ error) {
+	// Parse query
 	parsed, err := parseQuery(q)
 	if err != nil {
 		return res, fmt.Errorf("failed to parse query with %w", err)
 	}
-	err = execute(parsed)
-	if err != nil {
-		return res, fmt.Errorf("failed to execute sexp with %w", err)
+
+	// Evaluate state
+	s.eval(parsed)
+	if len(s.errs) > 0 {
+		return res, fmt.Errorf("failed to evaluate state with %w", errors.Join(s.errs...))
 	}
+
+	// Execute filtering
+	res, err = s.filter.execute()
+	if err != nil {
+		return res, fmt.Errorf("failed to execute page filter with %w", err)
+	}
+
 	return res, nil
 }
 
-func execute(s sexp.Sexp) error {
-	switch s := s.I.(type) {
+func (s *State) eval(sex sexp.Sexp) error {
+	switch sex := sex.I.(type) {
 	default:
-		return fmt.Errorf("unexpected sexp format with value %#v", s)
+		return fmt.Errorf("unexpected sexp format with value %#v", sex)
 	case sexp.List:
-		if len(s) == 0 {
+		if len(sex) == 0 {
 			slog.Warn("got empty list")
 			break
 		}
-		switch head := s[0].I.(type) {
+		switch head := sex[0].I.(type) {
 		case string:
 			switch head {
 			case "and":
-				err := executeAnd(s)
+				err := s.executeAnd(sex)
 				if err != nil {
 					return fmt.Errorf("failed to execute 'and' with %w", err)
 				}
 			case "page-property":
-				err := executePageProperty(s)
+				err := s.executePageProperty(sex)
 				if err != nil {
 					return fmt.Errorf("failed to execute 'page-property' with %w", err)
 				}
 			case "page-tags":
-				err := executePageTags(s)
+				err := s.executePageTags(sex)
 				if err != nil {
 					return fmt.Errorf("failed to execute 'page-tags' with %w", err)
 				}
@@ -65,7 +87,7 @@ func execute(s sexp.Sexp) error {
 			return fmt.Errorf("unexpected list head type %#v", head)
 		}
 	case string:
-		err := executeString(s)
+		err := s.executeString(sex)
 		if err != nil {
 			return fmt.Errorf("failed to execute string with %w", err)
 		}
@@ -73,14 +95,14 @@ func execute(s sexp.Sexp) error {
 	return nil
 }
 
-func executeAnd(l sexp.List) error {
+func (s *State) executeAnd(l sexp.List) error {
 	if len(l) == 1 {
 		return ErrRedundantAnd
 	}
 	return nil
 }
 
-func executePageProperty(l sexp.List) error {
+func (s *State) executePageProperty(l sexp.List) error {
 	switch len(l) {
 	case 0:
 		return fmt.Errorf("got empty page property list")
@@ -96,7 +118,7 @@ func executePageProperty(l sexp.List) error {
 	return nil
 }
 
-func executePageTags(l sexp.List) error {
+func (s *State) executePageTags(l sexp.List) error {
 	switch len(l) {
 	case 0:
 		return fmt.Errorf("got empty page tags list")
@@ -110,12 +132,16 @@ func executePageTags(l sexp.List) error {
 	return nil
 }
 
-func executeString(s string) error {
-	if !mentionRegex.MatchString(s) {
-		return fmt.Errorf("unexpected string atom '%s'", s)
+func (s *State) executeString(str string) error {
+	if !mentionRegex.MatchString(str) {
+		return fmt.Errorf("unexpected string atom '%s'", str)
 	}
 	slog.Info("got mention filter")
 	return nil
+}
+
+func (f pageFilter) execute() (QueryResult, error) {
+	panic("not implemented")
 }
 
 func parseQuery(q string) (s sexp.Sexp, err error) {

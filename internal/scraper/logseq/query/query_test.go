@@ -6,6 +6,7 @@ import (
 )
 
 func TestExecute(t *testing.T) {
+	s := New()
 	queries := []string{
 		`{{query (page-property :wood-durability)}}`,
 		`{{query [[@master]]}}`,
@@ -14,7 +15,7 @@ func TestExecute(t *testing.T) {
 	}
 	errs := make(map[string]error)
 	for _, q := range queries {
-		_, err := Execute(q)
+		_, err := s.Eval(q)
 		if err != nil {
 			errs[q] = err
 		}
