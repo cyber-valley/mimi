@@ -39,6 +39,11 @@ func Execute(q string) (res QueryResult, _ error) {
 				if err != nil {
 					return res, fmt.Errorf("failed to execute page property with %w", err)
 				}
+			case "page-tags":
+				err = executePageTags(p)
+				if err != nil {
+					return res, fmt.Errorf("failed to execute page tags with %w", err)
+				}
 			default:
 				return res, fmt.Errorf("unexpected string list entry %s", head)
 			}
@@ -59,12 +64,26 @@ func executePageProperty(l sexp.List) error {
 	case 0:
 		return fmt.Errorf("got empty page property list")
 	case 1:
-		slog.Info("should filter all pages", "tag", l[0])
+		slog.Info("should filter all pages with", "property", l[0])
 	default:
-		tag := l[0]
+		prop := l[0]
 		for i := 1; i < len(l); i++ {
 			value := l[i]
-			slog.Info("should filter all pages", "tag", tag, "value", value)
+			slog.Info("should filter pages with", "property", prop, "value", value)
+		}
+	}
+	return nil
+}
+
+func executePageTags(l sexp.List) error {
+	switch len(l) {
+	case 0:
+		return fmt.Errorf("got empty page tags list")
+	case 1:
+		slog.Info("should filter all pages with", "tag", l[0])
+	default:
+		for _, tag := range l {
+			slog.Info("should filter pages with", "tag", tag)
 		}
 	}
 	return nil
