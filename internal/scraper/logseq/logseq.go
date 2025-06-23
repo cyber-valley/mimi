@@ -18,6 +18,11 @@ var (
 	propertyRegexp = regexp.MustCompile(`(\w[\w_-]*\w):: (.+)$`)
 )
 
+const (
+	PageLevel  = "page"
+	BlockLevel = "block"
+)
+
 type RegexGraph struct {
 	path string
 }
@@ -86,7 +91,7 @@ func (p Properties) AllTags() (names []string, ok bool) {
 
 func (p Properties) PageLevelTags() (names []string, ok bool) {
 	for _, p := range p.Result {
-		if p.Name != "tags" || p.Level != "page" {
+		if p.Name != "tags" || p.Level != PageLevel {
 			continue
 		}
 		return slices.Concat(names, p.Values), true
@@ -134,9 +139,9 @@ func FindProperties(r io.Reader) (Properties, error) {
 
 		// Set property level
 		if pageStart {
-			propertyLevel = "page"
+			propertyLevel = PageLevel
 		} else {
-			propertyLevel = "block"
+			propertyLevel = BlockLevel
 		}
 
 		props.Result = append(props.Result, Property{

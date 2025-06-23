@@ -19,17 +19,17 @@ func TestFindProperties(t *testing.T) {
 			Property{
 				Name:   "alias",
 				Values: []string{"damiana"},
-				Level:  "page",
+				Level:  PageLevel,
 			},
 			Property{
 				Name:   "tags",
 				Values: []string{"species", "research", "psycho"},
-				Level:  "page",
+				Level:  PageLevel,
 			},
 			Property{
 				Name:   "supply",
 				Values: []string{"next-month"},
-				Level:  "block",
+				Level:  BlockLevel,
 			},
 		},
 	}
