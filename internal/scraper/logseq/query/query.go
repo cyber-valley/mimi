@@ -28,7 +28,7 @@ type pageFilter = func(pages logseq.Page) bool
 
 var (
 	queryRegex               = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
-	refRegex                = regexp.MustCompile(`\[\[(.*)\]\]`)
+	linkRegex                = regexp.MustCompile(`\[\[(.*)\]\]`)
 	ErrRedundantPageProperty = fmt.Errorf("redundant 'page-property' statement")
 	ErrIncorrectPageProperty = fmt.Errorf("incorrect 'page-property' statement")
 	ErrNotSyntaxError        = fmt.Errorf("'not' accepts only one atom")
@@ -275,7 +275,7 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 }
 
 func (s *State) evalString(str string) (pageFilter, error) {
-	match := refRegex.FindStringSubmatch(str)
+	match := linkRegex.FindStringSubmatch(str)
 
 	switch len(match) {
 	case 0:
