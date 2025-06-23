@@ -28,7 +28,7 @@ type pageFilter = func(pages logseq.Page) bool
 
 var (
 	queryRegex               = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
-	mentionRegex             = regexp.MustCompile(`\[\[\@(.*)\]\]`)
+	refRegex                = regexp.MustCompile(`\[\[(.*)\]\]`)
 	ErrRedundantPageProperty = fmt.Errorf("redundant 'page-property' statement")
 	ErrIncorrectPageProperty = fmt.Errorf("incorrect 'page-property' statement")
 	ErrNotSyntaxError        = fmt.Errorf("'not' accepts only one atom")
@@ -275,11 +275,24 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 }
 
 func (s *State) evalString(str string) (pageFilter, error) {
-	if !mentionRegex.MatchString(str) {
+	match := refRegex.FindStringSubmatch(str)
+
+	switch len(match) {
+	case 0:
 		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
+	case 2:
+		return func(p logseq.Page) bool {
+			to := match[1]
+			for ref := range logseqext.WalkPage[content.PageRef](p) {
+				if ref.GetTo() == to {
+					return true
+				}
+			}
+			return false
+		}, nil
 	}
-	slog.Info("got mention filter")
-	return emptyFilter, nil
+
+	return emptyFilter, fmt.Errorf("unexpected string atom '%s' match '%s'", str, match)
 }
 
 func parseQuery(q string) (s sexp.Sexp, err error) {
