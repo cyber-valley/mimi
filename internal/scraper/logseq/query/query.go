@@ -13,6 +13,7 @@ import (
 	"github.com/aholstenson/logseq-go"
 	"github.com/aholstenson/logseq-go/content"
 
+	"mimi/internal/scraper/logseq/logseqext"
 	"mimi/internal/scraper/logseq/query/sexp"
 )
 
@@ -254,22 +255,18 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 
 		// Properties inside of lists are not parsed properly
 		// so their match checked by simple string equality
-		for _, block := range p.Blocks() {
-			for _, prop := range block.Children().FilterDeep(content.IsOfType[*content.Text]()) {
-				prop := prop.(*content.Text)
+		for prop := range logseqext.WalkPage[*content.Text](p) {
+			var val string
+			if len(cdr) > 1 {
+				// We need only property existence
+				val = fmt.Sprintf("%s:: %s", propName, cdr[1])
+			} else {
+				// Should ensure value match
+				val = fmt.Sprintf("%s::", propName)
+			}
 
-				var val string
-				if len(cdr) > 1 {
-					// We need only property existence
-					val = fmt.Sprintf("%s:: %s", propName, cdr[1])
-				} else {
-					// Should ensure value match
-					val = fmt.Sprintf("%s::", propName)
-				}
-
-				if strings.Contains(prop.Value, val) {
-					return true
-				}
+			if strings.Contains(prop.Value, val) {
+				return true
 			}
 		}
 
