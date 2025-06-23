@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math"
 	"regexp"
 	"slices"
@@ -59,12 +60,14 @@ func (s *State) Eval(ctx context.Context, g *logseq.Graph, q string) (res []logs
 	}
 
 	// Filter pages
+	pageSet := make(map[string]logseq.Page)
 	for _, page := range pages {
 		if !filter(page) {
 			continue
 		}
-		res = append(res, page)
+		pageSet[page.Title()] = page
 	}
+	res = slices.Collect(maps.Values(pageSet))
 
 	slog.Info("query result", "size", len(res))
 	return res, nil
