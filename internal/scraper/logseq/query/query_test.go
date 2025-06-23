@@ -23,7 +23,7 @@ func getGraph(t *testing.T) *logseq.Graph {
 
 func TestEval(t *testing.T) {
 	query2expected := map[string]int{
-		`{{query (property :supply "next-month")}}`:                           80,
+		`{{query (property :supply "next-month")}}`:                           75,
 		`{{query (page-property :wood-durability)}}`:                          35,
 		`{{query [[@master]]}}`:                                               0,
 		`{{query (page-tags [[psycho]])}}`:                                    0,

@@ -233,25 +233,43 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 	// Build filter
 	return func(p logseq.Page) bool {
 		propName := strings.TrimPrefix(cdr[0], ":")
-		for _, block := range p.Blocks() {
-			values := block.Properties().Get(propName)
-			if len(cdr) == 1 {
-				// Got only property name
-				return len(values) > 0
-			} else {
-				// Should match given property with value
-				for _, node := range values {
-					switch node := node.(type) {
-					case *content.Text:
-						if node.Value == cdr[1] {
-							return true
-						}
-					default:
-						slog.Error("got unexpected property value type", "value", fmt.Sprintf("%#v", node))
-					}
+
+		// Check page props
+		pageProps := p.Properties().Get(propName)
+		if len(cdr) == 1 {
+			// We need only property existence
+			return len(pageProps) > 0
+		} else {
+			// Should ensure value match
+			for _, prop := range pageProps {
+				prop := prop.(*content.Text)
+				if prop.Value == cdr[1] {
+					return true
 				}
 			}
 		}
+
+		// Properties inside of lists are not parsed properly
+		// so their match checked by simple string equality
+		for _, block := range p.Blocks() {
+			for _, prop := range block.Children().FilterDeep(content.IsOfType[*content.Text]()) {
+				prop := prop.(*content.Text)
+
+				var val string
+				if len(cdr) > 1 {
+					// We need only property existence
+					val = fmt.Sprintf("%s:: %s", propName, cdr[1])
+				} else {
+					// Should ensure value match
+					val = fmt.Sprintf("%s::", propName)
+				}
+
+				if strings.Contains(prop.Value, val) {
+					return true
+				}
+			}
+		}
+
 		return false
 	}, nil
 }
