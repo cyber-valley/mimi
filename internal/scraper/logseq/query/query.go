@@ -5,15 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"math"
 	"regexp"
 	"slices"
 	"strings"
 
-	"github.com/aholstenson/logseq-go"
-	"github.com/aholstenson/logseq-go/content"
-
-	"mimi/internal/scraper/logseq/logseqext"
+	"mimi/internal/scraper/logseq"
 	"mimi/internal/scraper/logseq/query/sexp"
 )
 
@@ -41,7 +37,7 @@ func New() *State {
 	return &State{}
 }
 
-func (s *State) Eval(ctx context.Context, g *logseq.Graph, q string) (res []logseq.Page, _ error) {
+func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string) (res []logseq.Page, _ error) {
 	// Parse query
 	parsed, err := parseQuery(q)
 	if err != nil {
@@ -54,15 +50,9 @@ func (s *State) Eval(ctx context.Context, g *logseq.Graph, q string) (res []logs
 		return res, fmt.Errorf("failed to evaluate state with %w", err)
 	}
 
-	// Read pages
-	pages, err := getAllPages(ctx, g)
-	if err != nil {
-		return res, fmt.Errorf("failed to get graph pages with %w", err)
-	}
-
 	// Filter pages
 	pageSet := make(map[string]logseq.Page)
-	for _, page := range pages {
+	for page := range g.WalkPages() {
 		if !filter(page) {
 			continue
 		}
@@ -165,13 +155,16 @@ func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 	// Build filter
 	return func(p logseq.Page) bool {
 		propName := strings.TrimPrefix(cdr[0], ":")
-		nodes := p.Properties().Get(propName)
+		values, ok := p.Properties.Get(propName)
+		if !ok {
+			return false
+		}
 		if len(cdr) == 1 {
-			return len(nodes) > 0
+			return len(values) > 0
 		}
 		propValue := cdr[1]
-		for _, txt := range nodes.FilterDeep(content.IsOfType[*content.Text]()) {
-			if txt.(*content.Text).Value == propValue {
+		for _, value := range values {
+			if value == propValue {
 				return true
 			}
 		}
@@ -195,28 +188,17 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 	slog.Info("tags to be queried", "value", cdr)
 
 	return func(p logseq.Page) bool {
-		if p.Title() != "psilocybe" {
-			return false
-		}
-		tags := p.Properties().Get("tags")
-		if len(tags) == 0 {
+		tags, ok := p.Properties.Get("tags")
+		if !ok {
 			return false
 		}
 
-		slog.Info("psilo tags", "properties", p.Properties())
-		for _, child := range p.Properties().Children() {
-			for _, c := range child.(*content.Property).Children() {
-				slog.Info("psilo tags", "child", c)
-			}
-		}
-
-		for _, tag := range tags.FilterDeep(content.IsOfType[*content.Text]()) {
-			tag := tag.(*content.Text)
-			slog.Info("psilo tags", "value", tag.Value)
-			if slices.Contains(cdr, tag.Value) {
+		for _, tag := range tags {
+			if slices.Contains(cdr, tag) {
 				return true
 			}
 		}
+
 		return false
 	}, nil
 }
@@ -247,33 +229,16 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 		propName := strings.TrimPrefix(cdr[0], ":")
 
 		// Check page props
-		pageProps := p.Properties().Get(propName)
+		pageProps, ok := p.Properties.Get(propName)
+		if !ok {
+			return false
+		}
 		if len(cdr) == 1 {
 			// We need only property existence
 			return len(pageProps) > 0
 		} else {
 			// Should ensure value match
-			for _, prop := range pageProps {
-				prop := prop.(*content.Text)
-				if prop.Value == cdr[1] {
-					return true
-				}
-			}
-		}
-
-		// Properties inside of lists are not parsed properly
-		// so their match checked by simple string equality
-		for prop := range logseqext.WalkPage[*content.Text](p) {
-			var val string
-			if len(cdr) > 1 {
-				// We need only property existence
-				val = fmt.Sprintf("%s:: %s", propName, cdr[1])
-			} else {
-				// Should ensure value match
-				val = fmt.Sprintf("%s::", propName)
-			}
-
-			if strings.Contains(prop.Value, val) {
+			if slices.Contains(pageProps, cdr[1]) {
 				return true
 			}
 		}
@@ -290,13 +255,7 @@ func (s *State) evalString(str string) (pageFilter, error) {
 		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
 	case 2:
 		return func(p logseq.Page) bool {
-			to := match[1]
-			for ref := range logseqext.WalkPage[content.PageRef](p) {
-				if ref.GetTo() == to {
-					return true
-				}
-			}
-			return false
+			panic("not implemented")
 		}, nil
 	}
 
@@ -331,25 +290,4 @@ func parseQuery(q string) (s sexp.Sexp, err error) {
 
 func emptyFilter(pages logseq.Page) bool {
 	return false
-}
-
-func getAllPages(ctx context.Context, g *logseq.Graph) (pages []logseq.Page, err error) {
-	res, err := g.SearchPages(ctx, logseq.WithQuery(logseq.All()), logseq.WithMaxHits(math.MaxInt))
-	if err != nil {
-		return pages, fmt.Errorf("pages search failed with %w", err)
-	}
-
-	if res.Size() != res.Count() {
-		return pages, fmt.Errorf("res amount differs from total count: %d != %d", res.Size(), res.Count())
-	}
-
-	for _, res := range res.Results() {
-		page, err := res.Open()
-		if err != nil {
-			return pages, fmt.Errorf("failed to open page from result with %w", err)
-		}
-		pages = append(pages, page)
-	}
-
-	return pages, nil
 }

@@ -27,13 +27,13 @@ type RegexGraph struct {
 	path string
 }
 
-func NewRegexGraph(path string) *RegexGraph {
-	return &RegexGraph{
+func NewRegexGraph(path string) RegexGraph {
+	return RegexGraph{
 		path: path,
 	}
 }
 
-func (g RegexGraph) Pages() iter.Seq[Page] {
+func (g RegexGraph) WalkPages() iter.Seq[Page] {
 	return func(yield func(p Page) bool) {
 		_ = filepath.Walk(g.path, func(path string, fs fs.FileInfo, err error) error {
 			if err != nil {
@@ -45,7 +45,12 @@ func (g RegexGraph) Pages() iter.Seq[Page] {
 				return nil
 			}
 
-			if !yield(Page{Path: path}) {
+			page, err := NewPage(path)
+			if err != nil {
+				return err
+			}
+
+			if !yield(page) {
 				return fmt.Errorf("pages walk iteration stopped")
 			}
 
@@ -55,18 +60,32 @@ func (g RegexGraph) Pages() iter.Seq[Page] {
 }
 
 type Page struct {
-	Path string
+	Path       string
+	Properties Properties
 }
 
-func (p Page) FindProperties() (Properties, error) {
+func NewPage(path string) (Page, error) {
 	// Open page for reading
-	file, err := os.Open(p.Path)
+	file, err := os.Open(path)
 	if err != nil {
-		return Properties{}, fmt.Errorf("failed to open page with %w", err)
+		return Page{}, fmt.Errorf("failed to open page with %w", err)
 	}
 	defer file.Close()
 
-	return FindProperties(file)
+	props, err := FindProperties(file)
+	if err != nil {
+		return Page{}, fmt.Errorf("failed to read page properties with %w", err)
+	}
+
+	return Page{
+		Path:       path,
+		Properties: props,
+	}, nil
+}
+
+func (p Page) Title() string {
+	fileName := filepath.Base(p.Path)
+	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
 }
 
 type Properties struct {

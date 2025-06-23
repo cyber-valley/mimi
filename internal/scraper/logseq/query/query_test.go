@@ -4,22 +4,13 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/aholstenson/logseq-go"
+	"mimi/internal/scraper/logseq"
 )
 
 const (
 	// FIXME: Simplify graph and store in the project
 	graphPath = "/home/user/code/clone/cvland"
 )
-
-func getGraph(t *testing.T) *logseq.Graph {
-	g, err := logseq.Open(t.Context(), graphPath, logseq.WithInMemoryIndex())
-	if err != nil {
-		t.Errorf("failed to open graph %s with: %s", graphPath, err)
-		t.Fail()
-	}
-	return g
-}
 
 func TestEval(t *testing.T) {
 	query2expected := map[string]int{
@@ -30,7 +21,7 @@ func TestEval(t *testing.T) {
 		// `{{query (and (page-tags [[species]]) (not (page-tags [[class]])))}}`: 0,
 	}
 	s := New()
-	g := getGraph(t)
+	g := logseq.NewRegexGraph(graphPath)
 
 	for q, expected := range query2expected {
 		pages, err := s.Eval(t.Context(), g, q)
@@ -49,7 +40,7 @@ func TestEval_Fails(t *testing.T) {
 	}
 
 	s := New()
-	g := getGraph(t)
+	g := logseq.NewRegexGraph(graphPath)
 
 	for before, expected := range before2expected {
 		_, err := s.Eval(t.Context(), g, before)
