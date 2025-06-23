@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -52,15 +53,19 @@ type Page struct {
 	Path string
 }
 
-func (p Page) FindProperties() ([]Property, error) {
+func (p Page) FindProperties() (Properties, error) {
 	// Open page for reading
 	file, err := os.Open(p.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open page with %w", err)
+		return Properties{}, fmt.Errorf("failed to open page with %w", err)
 	}
 	defer file.Close()
 
 	return FindProperties(file)
+}
+
+type Properties struct {
+	Result []Property
 }
 
 type Property struct {
@@ -69,8 +74,38 @@ type Property struct {
 	Level  string
 }
 
-func FindProperties(r io.Reader) ([]Property, error) {
-	var props []Property
+func (p Properties) AllTags() (names []string, ok bool) {
+	for _, p := range p.Result {
+		if p.Name != "tags" {
+			continue
+		}
+		return slices.Concat(names, p.Values), true
+	}
+	return names, false
+}
+
+func (p Properties) PageLevelTags() (names []string, ok bool) {
+	for _, p := range p.Result {
+		if p.Name != "tags" || p.Level != "page" {
+			continue
+		}
+		return slices.Concat(names, p.Values), true
+	}
+	return names, false
+}
+
+func (p Properties) Get(name string) (values []string, ok bool) {
+	for _, p := range p.Result {
+		if p.Name != name {
+			continue
+		}
+		return p.Values, true
+	}
+	return values, false
+}
+
+func FindProperties(r io.Reader) (Properties, error) {
+	var props Properties
 	var propertyLevel string
 	pageStart := true
 
@@ -104,7 +139,7 @@ func FindProperties(r io.Reader) ([]Property, error) {
 			propertyLevel = "block"
 		}
 
-		props = append(props, Property{
+		props.Result = append(props.Result, Property{
 			Name:   propertyName,
 			Values: propertyValues,
 			Level:  propertyLevel,
