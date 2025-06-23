@@ -3,6 +3,7 @@ package markdown
 import (
 	"regexp"
 	"strings"
+	"log/slog"
 
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"
@@ -71,22 +72,31 @@ func (t *propertiesASTTransformer) transformTextBlockOrParagraph(node ast.Node, 
 
 	var next ast.Node
 	for child := node.FirstChild(); child != nil; child = next {
+		slog.Info("iter")
 		next = child.NextSibling()
+		if next == nil {
+			slog.Info("got nil next")
+		}
 
 		if currentProperty != nil {
 			// Currently reading the value of a property
 			textNode, isText := child.(*ast.Text)
 			if isText {
-				if !textNode.Segment.IsEmpty() {
+				// FIXME: Do valid segment check & save prop values fully
+				if reader.Value(textNode.Segment) != "" {
+					slog.Info("no way", "value", reader.Value(textNode.Segment))
 					currentProperty.AppendChild(currentProperty, child)
 				} else {
+					slog.Info("why remove child here")
 					textNode.Parent().RemoveChild(textNode.Parent(), child)
 				}
 			} else {
+				slog.Info("adding child")
 				currentProperty.AppendChild(currentProperty, child)
 			}
 
-			if isText && (textNode.HardLineBreak() || textNode.SoftLineBreak()) {
+			if isText && textNode.HardLineBreak() {
+				slog.Info("hard line break")
 				// End of the property value due to a line break
 				currentProperty = nil
 
@@ -96,19 +106,24 @@ func (t *propertiesASTTransformer) transformTextBlockOrParagraph(node ast.Node, 
 				wasPreviousLinebreak = true
 			}
 		} else {
+			slog.Info("cooking")
 			textNode, isText := child.(*ast.Text)
 			if !isText {
+				slog.Info("not a text")
 				node = maybeSplitParagraph(node, currentProperties, child)
 
 				currentProperties = nil
 				wasPreviousLinebreak = false
+				slog.Info("finish in not text")
 				continue
 			}
 
 			if wasPreviousLinebreak {
+				slog.Info("line break was before")
 				// Potentially a new property
 				potentialName := string(reader.Value(textNode.Segment))
 
+				slog.Info("potential name", "value", reader.Value(textNode.Segment))
 				// In Goldmark the space after :: will either be part of the
 				// current text node or the next one.
 				matches := propertyRegex.FindStringSubmatchIndex(potentialName)
@@ -116,25 +131,37 @@ func (t *propertiesASTTransformer) transformTextBlockOrParagraph(node ast.Node, 
 					// Not a property
 					node = maybeSplitParagraph(node, currentProperties, child)
 					currentProperties = nil
-					wasPreviousLinebreak = textNode.HardLineBreak() || textNode.SoftLineBreak()
+					wasPreviousLinebreak = textNode.HardLineBreak()
+					slog.Info("finish in no match")
 					continue
 				}
 
+				slog.Info("cmoon")
+
 				// Check if there is a space after the ::
 				if !strings.HasPrefix(potentialName[matches[3]+2:], " ") {
+					slog.Info("there is no space")
 					// There isn't a space after :: in the current text node
 					nextTextNode, _ := next.(*ast.Text)
+
+					slog.Info("potential name", "value", reader.Value(textNode.Segment), "next", reader.Value(nextTextNode.Segment))
+
 					if startsWithSpace(nextTextNode, reader) {
+						slog.Info("but starts with space")
 						// The text node has a space, update it to remove the space
 						nextTextNode.Segment = nextTextNode.Segment.WithStart(nextTextNode.Segment.Start + 1)
 					} else {
+						slog.Info("for sure")
 						// The space is missing, not parsing as property
 						node = maybeSplitParagraph(node, currentProperties, child)
 						currentProperties = nil
-						wasPreviousLinebreak = textNode.HardLineBreak() || textNode.SoftLineBreak()
+						wasPreviousLinebreak = textNode.HardLineBreak()
+						slog.Info("finish in no space")
 						continue
 					}
 				}
+
+				slog.Info("fuck")
 
 				if currentProperties == nil {
 					// This is a new block of properties that splits the paragraph
@@ -164,14 +191,16 @@ func (t *propertiesASTTransformer) transformTextBlockOrParagraph(node ast.Node, 
 				}
 
 				// Remove the text node with the parameter name
+				slog.Info("remove child")
 				node.RemoveChild(node, child)
 			} else {
-				wasPreviousLinebreak = textNode.HardLineBreak() || textNode.SoftLineBreak()
+				wasPreviousLinebreak = textNode.HardLineBreak()
 			}
 		}
 	}
 
 	if node.FirstChild() == nil {
+		slog.Info("remove first child")
 		// The paragraph is now empty
 		node.Parent().RemoveChild(node.Parent(), node)
 	}
@@ -183,6 +212,7 @@ func startsWithSpace(node *ast.Text, reader text.Reader) bool {
 	}
 
 	value := string(reader.Value(node.Segment))
+	slog.Info("starts with space", "value", value)
 	return strings.HasPrefix(value, " ")
 }
 

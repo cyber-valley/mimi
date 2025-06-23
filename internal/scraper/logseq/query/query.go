@@ -195,16 +195,24 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 	slog.Info("tags to be queried", "value", cdr)
 
 	return func(p logseq.Page) bool {
+		if p.Title() != "psilocybe" {
+			return false
+		}
 		tags := p.Properties().Get("tags")
 		if len(tags) == 0 {
 			return false
 		}
-		for _, tag := range tags {
-			tag, ok := tag.(*content.Text)
-			if !ok {
-				slog.Error("got unexpected tag type", "value", fmt.Sprintf("%#v", tag))
-				continue
+
+		slog.Info("psilo tags", "properties", p.Properties())
+		for _, child := range p.Properties().Children() {
+			for _, c := range child.(*content.Property).Children() {
+				slog.Info("psilo tags", "child", c)
 			}
+		}
+
+		for _, tag := range tags.FilterDeep(content.IsOfType[*content.Text]()) {
+			tag := tag.(*content.Text)
+			slog.Info("psilo tags", "value", tag.Value)
 			if slices.Contains(cdr, tag.Value) {
 				return true
 			}

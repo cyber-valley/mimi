@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"unicode"
+	"log/slog"
 
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/parser"
@@ -33,10 +34,13 @@ func (t *tagParser) Trigger() []byte {
 func (t *tagParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
 	line, seg := block.PeekLine()
 
+	slog.Info("got line", "value", line)
+
 	if len(line) == 0 || line[0] != '#' {
 		return nil
 	}
 	line = line[1:]
+
 
 	end := 0
 	var value []byte

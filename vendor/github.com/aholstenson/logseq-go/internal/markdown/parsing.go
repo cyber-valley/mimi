@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"log/slog"
 
 	"github.com/aholstenson/logseq-go/content"
 	"github.com/yuin/goldmark/ast"
@@ -549,6 +550,10 @@ func convertProperties(src []byte, node *properties) (*content.Properties, error
 		p, ok := child.(*property)
 		if !ok {
 			return nil, errors.New("Invalid child in properties")
+		}
+
+		if p.Name == "tags" {
+			slog.Info("convert properties", "child", fmt.Sprintf("%#v", p))
 		}
 
 		prop := content.NewProperty(p.Name)
