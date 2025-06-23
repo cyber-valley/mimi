@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
 	"log/slog"
 	"math"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/golang/glog"
 
 	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/scraper/logseq/logseqext"
 	"mimi/internal/scraper/logseq/rag"
 )
 
@@ -61,7 +61,7 @@ func (g Graph) Sync(ctx context.Context) error {
 		}
 
 		// Collect properties
-		for prop := range walkPage[*content.Property](p) {
+		for prop := range logseqext.WalkPage[*content.Property](p) {
 			for _, child := range prop.Children() {
 				if text, ok := child.(*content.Text); ok {
 					if text.Value == "" {
@@ -76,7 +76,7 @@ func (g Graph) Sync(ctx context.Context) error {
 		}
 
 		// Collect references
-		for ref := range walkPage[content.PageRef](p) {
+		for ref := range logseqext.WalkPage[content.PageRef](p) {
 			refs = append(refs, ref.GetTo())
 		}
 
@@ -114,22 +114,9 @@ func (g Graph) getAllPages() (pages []logseq.PageResult, err error) {
 	return res.Results(), nil
 }
 
-func walkPage[T content.Node](p logseq.Page) iter.Seq[T] {
-	blocks := p.Blocks()
-	return func(yield func(T) bool) {
-		for _, b := range blocks {
-			for _, ref := range b.Children().FilterDeep(content.IsOfType[T]()) {
-				if !yield(ref.(T)) {
-					return
-				}
-			}
-		}
-	}
-}
-
 func extractText(p logseq.Page) string {
 	var bob strings.Builder
-	for text := range walkPage[*content.Text](p) {
+	for text := range logseqext.WalkPage[*content.Text](p) {
 		bob.WriteString(text.Value)
 	}
 	return strings.TrimSpace(bob.String())
