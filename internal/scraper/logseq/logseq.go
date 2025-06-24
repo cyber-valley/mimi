@@ -172,3 +172,7 @@ func FindProperties(r io.Reader) (Properties, error) {
 
 	return props, nil
 }
+
+func ExtractReference(ref string) string {
+	return strings.TrimPrefix(strings.TrimSuffix(ref, "]]"), "[[")
+}

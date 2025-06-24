@@ -183,7 +183,7 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 		if !ok {
 			return emptyFilter, ErrIncorrectPageTags
 		}
-		tag = strings.TrimPrefix(strings.TrimSuffix(tag, "]]"), "[[")
+		tag = logseq.ExtractReference(tag)
 		cdr[i-1] = tag
 	}
 	slog.Info("tags to be queried", "value", cdr)
@@ -256,7 +256,16 @@ func (s *State) evalString(str string) (pageFilter, error) {
 		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
 	case 2:
 		return func(p logseq.Page) bool {
-			panic("not implemented")
+			tag := logseq.ExtractReference(match[2])
+			if p.Title() == tag {
+				return true
+			}
+			for _, prop := range p.Properties.Result {
+				if slices.Contains(prop.Values, tag) {
+					return true
+				}
+			}
+			return false
 		}, nil
 	}
 
