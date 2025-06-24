@@ -25,6 +25,8 @@ type pageFilter = func(pages logseq.Page) bool
 
 var (
 	queryRegex               = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
+	queryOptRegex            = regexp.MustCompile(`\s*([\w\-_]+)::\s*(.*)`)
+	queryOptPropertyValue            = regexp.MustCompile(`:([\w\-_]+)\s?`)
 	linkRegex                = regexp.MustCompile(`\[\[(.*)\]\]`)
 	ErrRedundantPageProperty = fmt.Errorf("redundant 'page-property' statement")
 	ErrIncorrectPageProperty = fmt.Errorf("incorrect 'page-property' statement")
@@ -44,8 +46,8 @@ type QueryOptions struct {
 	sortDesc   bool
 }
 
-func defaultQueryOptions() *QueryOptions {
-	return &QueryOptions{
+func defaultQueryOptions() QueryOptions {
+	return QueryOptions{
 		properties: []string{"page"},
 		sortBy:     "page",
 		sortDesc:   true,
@@ -82,13 +84,7 @@ type Result struct {
 	Table [][]string
 }
 
-func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ...Option) (res Result, _ error) {
-	// Init options
-	queryOpts := defaultQueryOptions()
-	for _, opt := range opts {
-		opt(queryOpts)
-	}
-
+func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string) (res Result, _ error) {
 	// Parse query
 	parsed, err := parseQuery(q)
 	if err != nil {
@@ -96,7 +92,7 @@ func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ..
 	}
 
 	// Evaluate state
-	filter, err := s.eval(parsed)
+	filter, err := s.eval(parsed.s)
 	if err != nil {
 		return res, fmt.Errorf("failed to evaluate state with %w", err)
 	}
@@ -112,7 +108,7 @@ func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ..
 	res.Pages = slices.Collect(maps.Values(pageSet))
 
 	// Build table
-	res.Table = buildTable(res.Pages, *queryOpts)
+	res.Table = buildTable(res.Pages, parsed.opts)
 
 	return res, nil
 }
@@ -325,8 +321,14 @@ func (s *State) evalString(str string) (pageFilter, error) {
 	return emptyFilter, fmt.Errorf("unexpected string atom '%s' match '%s'", str, match)
 }
 
-func parseQuery(q string) (s sexp.Sexp, err error) {
-	slog.Info("parsing", "query", q)
+type Query struct {
+	s    sexp.Sexp
+	opts QueryOptions
+}
+
+func parseQuery(q string) (res Query, err error) {
+	slog.Info("parsing", "query", res)
+	lines := strings.Split(q, "\n")
 
 	// Strip {{query <actual query>}} formatting
 	matches := queryRegex.FindSubmatch([]byte(q))
@@ -337,15 +339,42 @@ func parseQuery(q string) (s sexp.Sexp, err error) {
 		// Raw query or something unexpected that will fail later
 		break
 	default:
-		return s, fmt.Errorf("got unexpected query format (%d matches) in '%s'", len(matches), q)
+		return res, fmt.Errorf("got unexpected query format (%d matches) in '%s'", len(matches), q)
 	}
 
 	// Deserialize
-	s, err = sexp.Parse(q)
+	res.s, err = sexp.Parse(q)
 	if err != nil {
 		err = fmt.Errorf("failed to parse query with %w", err)
 	} else {
-		slog.Info("parsed", "query", fmt.Sprintf("%#v", s))
+		slog.Info("parsed", "query", fmt.Sprintf("%#v", res.s))
+	}
+
+	// Parse options
+	res.opts = defaultQueryOptions()
+	if len(lines) > 1 {
+		for i := 1; i < len(lines); i++ {
+			match := queryOptRegex.FindStringSubmatchIndex(lines[i])
+			if match == nil {
+				return res, fmt.Errorf("unknwon query option %s", lines[i])
+			}
+			value := lines[i][match[4]:match[5]]
+			switch lines[i][match[2]:match[3]] {
+			case "query-properties":
+				match := queryOptPropertyValue.FindAllStringSubmatch(value, -1)
+				if match == nil {
+					return res, fmt.Errorf("unknwon 'query-properties' value %s", value)
+				}
+				res.opts.properties = make([]string, len(match))
+				for i, match := range match {
+					res.opts.properties[i] = match[1]
+				}
+			case "query-sort-by":
+				res.opts.sortBy = value
+			case "query-sort-desc":
+				res.opts.sortDesc = value == "true"
+			}
+		}
 	}
 
 	return

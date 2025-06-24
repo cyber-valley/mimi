@@ -84,6 +84,42 @@ func TestParsing_RawEDN(t *testing.T) {
 	}
 }
 
+func TestParsing_Options(t *testing.T) {
+	query2expected := map[string]QueryOptions{
+		`{{query (page-tags [[super]])}}
+  query-properties:: [:page :tags :alias]
+  query-sort-by:: page
+	query-sort-desc:: true`: QueryOptions{
+			properties: []string{"page", "tags", "alias"},
+			sortBy:     "page",
+			sortDesc:   true,
+		},
+	}
+
+	for query, expected := range query2expected {
+		got, err := parseQuery(query)
+		if err != nil {
+			t.Errorf("failed to parse query %s with %s", query, err)
+		}
+		if got.opts.sortBy != expected.sortBy {
+			goto testFailed
+		}
+
+		if got.opts.sortDesc != expected.sortDesc {
+			goto testFailed
+		}
+
+		if !slices.Equal(got.opts.properties, expected.properties) {
+			goto testFailed
+		}
+
+		continue
+
+	testFailed:
+		t.Errorf("got %#v, expected %#v", got, expected)
+	}
+}
+
 func TestBuildTable(t *testing.T) {
 	pages := [][]logseq.Page{
 		[]logseq.Page{
