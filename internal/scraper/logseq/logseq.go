@@ -90,6 +90,18 @@ func (p Page) Title() string {
 	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
 }
 
+func (p Page) Read() (string, error) {
+	file, err := os.Open(p.Path)
+	if err != nil {
+		return "", fmt.Errorf("failed to open page '%s' file with %w", p.Title(), err)
+	}
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to read page '%s' file with %w", p.Title(), err)
+	}
+	return string(content), nil
+}
+
 type PageInfo struct {
 	Props []Property
 	Refs  []string

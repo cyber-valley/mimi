@@ -1,7 +1,6 @@
 package query
 
 import (
-	"log/slog"
 	"slices"
 	"testing"
 
@@ -66,7 +65,6 @@ func TestParsing_RawEDN(t *testing.T) {
 		`{{query (and (page-tags [[genus]]) (not (page-tags [[class]])) (not (page-tags [[research]])) (not (page-tags [[prohibited]])))}}`,
 		`{{query (page-property :type "sector")}}`,
 	}
-	errs := make(map[string]error)
 	for _, q := range queries {
 		_, err := parseQuery(q)
 		if err != nil {

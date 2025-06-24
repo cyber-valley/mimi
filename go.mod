@@ -3,7 +3,6 @@ module mimi
 go 1.24.3
 
 require (
-	github.com/aholstenson/logseq-go v0.0.0-20240211185252-504b4e13ddcd
 	github.com/ai-shift/tgmd v0.1.2
 	github.com/cozodb/cozo-lib-go v0.7.5
 	github.com/firebase/genkit/go v0.6.0

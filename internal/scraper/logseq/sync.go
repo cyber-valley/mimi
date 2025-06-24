@@ -1,0 +1,49 @@
+package logseq
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"strings"
+
+	"mimi/internal/scraper/logseq/db"
+)
+
+func Sync(ctx context.Context, g RegexGraph, q *db.Queries) error {
+	props := make(map[string]string)
+
+	var errs []error
+	for p := range g.WalkPages() {
+		// Get page data
+		content, err := p.Read()
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		// Collect properties
+		for _, prop := range p.Info.Props {
+			value := strings.Join(prop.Values, ", ")
+			if old, ok := props[prop.Name]; ok && old != value {
+				value += old
+			}
+			props[prop.Name] = value
+		}
+
+		// Persist changed page
+		slog.Info("saving page", "title", p.Title())
+		err = q.SavePage(db.SavePageParams{
+			Title:   p.Title(),
+			Content: content,
+			Props:   props,
+			Refs:    p.Info.Refs,
+		})
+		if err != nil {
+			slog.Error("failed to save page", "with", err)
+			errs = append(errs, err)
+			continue
+		}
+	}
+
+	return errors.Join(errs...)
+}

@@ -8,7 +8,6 @@ import (
 
 	"mimi/internal/scraper/logseq"
 	"mimi/internal/scraper/logseq/db"
-	"mimi/internal/scraper/logseq/rag"
 )
 
 func main() {
@@ -24,14 +23,13 @@ func main() {
 	}
 
 	// Initialize
-	rag := rag.New(ctx, q)
-	g, err := logseq.New(ctx, q, rag, "/home/user/code/clone/cvland")
+	g := logseq.NewRegexGraph("/home/user/code/clone/cvland")
 	if err != nil {
 		log.Fatalf("failed to create graph with %s", err)
 	}
 
 	// Synchronize LogSeq contents
-	if err := g.Sync(ctx); err != nil {
+	if err := logseq.Sync(ctx, g, q); err != nil {
 		log.Fatalf("failed to sync graph with %s", err)
 	}
 }
