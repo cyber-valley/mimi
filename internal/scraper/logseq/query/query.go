@@ -55,7 +55,10 @@ type Option = func(*QueryOptions)
 
 func WithProperties(props []string) Option {
 	return func(opts *QueryOptions) {
-		opts.properties = props
+		opts.properties = make([]string, len(props))
+		for i, prop := range props {
+			opts.properties[i] = strings.TrimLeft(prop, ":")
+		}
 	}
 }
 
