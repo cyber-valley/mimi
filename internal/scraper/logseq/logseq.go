@@ -177,6 +177,8 @@ func FindPageInfo(r io.Reader) (PageInfo, error) {
 			propertyLevel = BlockLevel
 		}
 
+		// TODO: Collects all properties, but may contain
+		// elements with equal Name and differenc Values
 		props.Props = append(props.Props, Property{
 			Name:   propertyName,
 			Values: propertyValues,
