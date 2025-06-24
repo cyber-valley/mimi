@@ -16,8 +16,8 @@ func TestEval(t *testing.T) {
 	query2expected := map[string]int{
 		`{{query (property :supply "next-month")}}`:  76,
 		`{{query (page-property :wood-durability)}}`: 35,
-		// `{{query [[@master]]}}`:                                               5,
-		`{{query (page-tags [[psycho]])}}`: 5,
+		`{{query [[@master]]}}`:                      7,
+		`{{query (page-tags [[psycho]])}}`:           5,
 		// `{{query (and (page-tags [[species]]) (not (page-tags [[class]])))}}`: 0,
 	}
 	s := New()

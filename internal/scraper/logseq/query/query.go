@@ -256,7 +256,7 @@ func (s *State) evalString(str string) (pageFilter, error) {
 		return emptyFilter, fmt.Errorf("unexpected string atom '%s'", str)
 	case 2:
 		return func(p logseq.Page) bool {
-			tag := logseq.ExtractReference(match[2])
+			tag := logseq.ExtractReference(match[1])
 			if p.Title() == tag {
 				return true
 			}
