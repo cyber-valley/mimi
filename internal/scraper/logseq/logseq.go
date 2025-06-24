@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 )
 
@@ -41,19 +40,21 @@ func (g RegexGraph) WalkPages() iter.Seq[Page] {
 				return nil
 			}
 
-			if strings.HasSuffix(fs.Name(), ".md") {
+			if !strings.HasSuffix(fs.Name(), ".md") {
 				return nil
 			}
 
 			page, err := NewPage(path)
 			if err != nil {
-				return err
+				slog.Error("failed to create new page", "with", err)
+				return nil
 			}
 
 			if !yield(page) {
 				return fmt.Errorf("pages walk iteration stopped")
 			}
 
+			slog.Info("yielded page", "title", page.Title())
 			return nil
 		})
 	}
@@ -98,24 +99,24 @@ type Property struct {
 	Level  string
 }
 
-func (p Properties) AllTags() (names []string, ok bool) {
+func (p Properties) AllTags() ([]string, bool) {
 	for _, p := range p.Result {
 		if p.Name != "tags" {
 			continue
 		}
-		return slices.Concat(names, p.Values), true
+		return p.Values, true
 	}
-	return names, false
+	return nil, false
 }
 
-func (p Properties) PageLevelTags() (names []string, ok bool) {
+func (p Properties) PageLevelTags() ([]string, bool) {
 	for _, p := range p.Result {
 		if p.Name != "tags" || p.Level != PageLevel {
 			continue
 		}
-		return slices.Concat(names, p.Values), true
+		return p.Values, true
 	}
-	return names, false
+	return nil, false
 }
 
 func (p Properties) Get(name string) (values []string, ok bool) {

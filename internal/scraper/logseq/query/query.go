@@ -183,15 +183,19 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 		if !ok {
 			return emptyFilter, ErrIncorrectPageTags
 		}
+		tag = strings.TrimPrefix(strings.TrimSuffix(tag, "]]"), "[[")
 		cdr[i-1] = tag
 	}
 	slog.Info("tags to be queried", "value", cdr)
 
 	return func(p logseq.Page) bool {
-		tags, ok := p.Properties.Get("tags")
+		tags, ok := p.Properties.PageLevelTags()
 		if !ok {
+			slog.Error("failed to get page level tags", "props", p.Properties)
 			return false
 		}
+
+		slog.Info("got tags", "value", tags, "cdr", cdr)
 
 		for _, tag := range tags {
 			if slices.Contains(cdr, tag) {
