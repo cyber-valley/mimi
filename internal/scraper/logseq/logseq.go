@@ -54,7 +54,6 @@ func (g RegexGraph) WalkPages() iter.Seq[Page] {
 				return fmt.Errorf("pages walk iteration stopped")
 			}
 
-			slog.Info("yielded page", "title", page.Title())
 			return nil
 		})
 	}
