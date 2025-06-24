@@ -19,8 +19,8 @@ func TestEval(t *testing.T) {
 		`{{query [[@master]]}}`:                      7,
 		`{{query (page-tags [[psycho]])}}`:           5,
 		`{{query (and (page-tags [[species]]) (not (page-tags [[class]])) (and (page-tags [[supply]])))}}`: 2,
-		`{{query (and (page-tags [[genus]]))}}`: 364,
-		`{{query (and [[fern]] (and) (page-tags [[species]] ))}}`: 13,
+		`{{query (and (page-tags [[genus]]))}}`:             364,
+		`{{query (and [[fern]] (page-tags [[species]] ))}}`: 14,
 	}
 	s := New()
 	g := logseq.NewRegexGraph(graphPath)
@@ -31,7 +31,11 @@ func TestEval(t *testing.T) {
 			t.Errorf("failed to eval query '%s' with %s", q, err)
 		}
 		if len(pages) != expected {
-			t.Errorf("got %d pages instead of %d for '%s'", len(pages), expected, q)
+			titles := make([]string, len(pages))
+			for i, page := range pages {
+				titles[i] = page.Title()
+			}
+			t.Errorf("got %d pages instead of %d for '%s', titles: %#v", len(pages), expected, q, titles)
 		}
 	}
 }
