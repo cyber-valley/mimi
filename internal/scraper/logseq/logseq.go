@@ -15,6 +15,7 @@ import (
 
 var (
 	propertyRegexp = regexp.MustCompile(`(\w[\w_-]*\w):: (.+)$`)
+	refRegexp      = regexp.MustCompile(`\[\[(@?[\w_-]*\w)\]\]`)
 )
 
 const (
@@ -90,6 +91,7 @@ func (p Page) Title() string {
 
 type PageInfo struct {
 	Props []Property
+	Refs  []string
 }
 
 type Property struct {
@@ -142,6 +144,13 @@ func FindPageInfo(r io.Reader) (PageInfo, error) {
 			pageStart = false
 			continue
 		}
+		// Collect references
+		matches := refRegexp.FindAllStringSubmatchIndex(line, -1)
+		for _, match := range matches {
+			props.Refs = append(props.Refs, line[match[2]:match[3]])
+		}
+
+		// Is there any properties
 		match := propertyRegexp.FindStringSubmatchIndex(line)
 		if match == nil {
 			continue
