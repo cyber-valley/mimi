@@ -2,6 +2,7 @@ package query
 
 import (
 	"log/slog"
+	"slices"
 	"testing"
 
 	"mimi/internal/scraper/logseq"
@@ -80,5 +81,53 @@ func TestParsing_RawEDN(t *testing.T) {
 			slog.Error("failed", "query", q, "with", err)
 		}
 		t.Fail()
+	}
+}
+
+func TestBuildTable(t *testing.T) {
+	pages := [][]logseq.Page{
+		[]logseq.Page{
+			logseq.Page{
+				Path: "foo.md",
+				Info: logseq.PageInfo{
+					Props: []logseq.Property{
+						logseq.Property{
+							Name:   "tags",
+							Values: []string{"1", "2", "3"},
+							Level:  logseq.PageLevel,
+						},
+						logseq.Property{
+							Name:   "alias",
+							Values: []string{"bar"},
+							Level:  logseq.PageLevel,
+						},
+					},
+					Refs: []string{},
+				},
+			},
+		},
+	}
+	opts := []QueryOptions{
+		QueryOptions{
+			properties: []string{"page", "tags", "alias"},
+		},
+	}
+	expected := [][][]string{
+		[][]string{
+			[]string{"page", "tags", "alias"},
+			[]string{"foo", "1, 2, 3", "bar"},
+		},
+	}
+
+	if len(pages) != len(opts) || len(opts) != len(expected) {
+		t.Errorf("wrong test setup")
+	}
+
+	for i := 0; i < len(pages); i++ {
+		table := buildTable(pages[i], opts[i])
+		if slices.EqualFunc(table, expected[i], slices.Equal) {
+			continue
+		}
+		t.Errorf("expected %#v, got %#v", expected[i], table)
 	}
 }

@@ -131,6 +131,16 @@ func (p PageInfo) Get(name string) (values []string, ok bool) {
 	return values, false
 }
 
+func (p PageInfo) PageLevelGet(name string) (values []string, ok bool) {
+	for _, p := range p.Props {
+		if p.Name != name || p.Level != PageLevel {
+			continue
+		}
+		return p.Values, true
+	}
+	return values, false
+}
+
 func FindPageInfo(r io.Reader) (PageInfo, error) {
 	var props PageInfo
 	var propertyLevel string

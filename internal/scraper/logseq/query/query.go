@@ -1,6 +1,7 @@
 package query
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -109,9 +110,9 @@ func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ..
 		pageSet[page.Title()] = page
 	}
 	res.Pages = slices.Collect(maps.Values(pageSet))
-	slog.Info("query result", "size", len(res.Pages))
 
-	res.Table = [][]string{[]string{"page"}}
+	// Build table
+	res.Table = buildTable(res.Pages, *queryOpts)
 
 	return res, nil
 }
@@ -350,6 +351,42 @@ func parseQuery(q string) (s sexp.Sexp, err error) {
 	return
 }
 
-func emptyFilter(pages logseq.Page) bool {
+func emptyFilter(page logseq.Page) bool {
 	return false
+}
+
+func buildTable(pages []logseq.Page, queryOpts QueryOptions) [][]string {
+	table := [][]string{queryOpts.properties}
+
+	// Collect rows
+	rows := make([][]string, len(pages))
+	for i, page := range pages {
+		rows[i] = make([]string, len(queryOpts.properties))
+		for j, prop := range queryOpts.properties {
+			switch prop {
+			case "page":
+				rows[i][j] = page.Title()
+			default:
+				props, ok := page.Info.PageLevelGet(prop)
+				if !ok {
+					rows[i][j] = ""
+					continue
+				}
+				rows[i][j] = strings.Join(props, ", ")
+			}
+		}
+	}
+
+	// Sort table
+	sortByIdx := slices.Index(queryOpts.properties, queryOpts.sortBy)
+	slices.SortFunc(rows, func(lhs, rhs []string) int {
+		res := cmp.Compare(lhs[sortByIdx], rhs[sortByIdx])
+		if queryOpts.sortDesc {
+			return -1 * res
+		}
+		return res
+	})
+
+	table = slices.Concat(table, rows)
+	return table
 }
