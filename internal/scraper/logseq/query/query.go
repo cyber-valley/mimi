@@ -37,7 +37,39 @@ func New() *State {
 	return &State{}
 }
 
-func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string) (res []logseq.Page, _ error) {
+type QueryOptions struct {
+	properties []string
+	sortBy     string
+	sortDesc   bool
+}
+
+type Option = func(*QueryOptions)
+
+func WithProperties(props []string) Option {
+	return func(opts *QueryOptions) {
+		opts.properties = props
+	}
+}
+
+func WithSortBy(by string) Option {
+	return func(opts *QueryOptions) {
+		opts.sortBy = by
+	}
+}
+
+func WithSortDesc(desc bool) Option {
+	return func(opts *QueryOptions) {
+		opts.sortDesc = desc
+	}
+}
+
+func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ...Option) (res []logseq.Page, _ error) {
+	// Init options
+	queryOpts := &QueryOptions{}
+	for _, opt := range opts {
+		opt(queryOpts)
+	}
+
 	// Parse query
 	parsed, err := parseQuery(q)
 	if err != nil {
