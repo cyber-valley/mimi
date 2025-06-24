@@ -105,17 +105,49 @@ func TestBuildTable(t *testing.T) {
 					Refs: []string{},
 				},
 			},
+			logseq.Page{
+				Path: "bar.md",
+				Info: logseq.PageInfo{
+					Props: []logseq.Property{
+						logseq.Property{
+							Name:   "tags",
+							Values: []string{"baz", "huz"},
+							Level:  logseq.PageLevel,
+						},
+					},
+					Refs: []string{},
+				},
+			},
+		},
+		[]logseq.Page{
+			logseq.Page{Path: "foo.md"},
+			logseq.Page{Path: "bar.md"},
+			logseq.Page{Path: "buz.md"},
 		},
 	}
 	opts := []QueryOptions{
 		QueryOptions{
 			properties: []string{"page", "tags", "alias"},
+			sortBy:     "alias",
+			sortDesc:   true,
+		},
+		QueryOptions{
+			properties: []string{"page"},
+			sortBy:     "page",
+			sortDesc:   false,
 		},
 	}
 	expected := [][][]string{
 		[][]string{
 			[]string{"page", "tags", "alias"},
 			[]string{"foo", "1, 2, 3", "bar"},
+			[]string{"bar", "baz, huz", ""},
+		},
+		[][]string{
+			[]string{"page"},
+			[]string{"bar"},
+			[]string{"buz"},
+			[]string{"foo"},
 		},
 	}
 
@@ -124,6 +156,7 @@ func TestBuildTable(t *testing.T) {
 	}
 
 	for i := 0; i < len(pages); i++ {
+		t.Logf("Checking %#v", opts[i])
 		table := buildTable(pages[i], opts[i])
 		if slices.EqualFunc(table, expected[i], slices.Equal) {
 			continue

@@ -379,6 +379,7 @@ func buildTable(pages []logseq.Page, queryOpts QueryOptions) [][]string {
 
 	// Sort table
 	sortByIdx := slices.Index(queryOpts.properties, queryOpts.sortBy)
+
 	slices.SortFunc(rows, func(lhs, rhs []string) int {
 		res := cmp.Compare(lhs[sortByIdx], rhs[sortByIdx])
 		if queryOpts.sortDesc {
