@@ -19,14 +19,12 @@ type QueryResult struct {
 	Rows [][]string
 }
 
-type State struct{}
-
 type pageFilter = func(pages logseq.Page) bool
 
 var (
 	queryRegex               = regexp.MustCompile(`\{\{query\s?(.*)\}\}`)
 	queryOptRegex            = regexp.MustCompile(`\s*([\w\-_]+)::\s*(.*)`)
-	queryOptPropertyValue            = regexp.MustCompile(`:([\w\-_]+)\s?`)
+	queryOptPropertyValue    = regexp.MustCompile(`:([\w\-_]+)\s?`)
 	linkRegex                = regexp.MustCompile(`\[\[(.*)\]\]`)
 	ErrRedundantPageProperty = fmt.Errorf("redundant 'page-property' statement")
 	ErrIncorrectPageProperty = fmt.Errorf("incorrect 'page-property' statement")
@@ -35,10 +33,6 @@ var (
 	ErrIncorrectProperty     = fmt.Errorf("incorrect 'property' statement")
 	ErrIncorrectAnd          = fmt.Errorf("incorrect 'and' statement")
 )
-
-func New() *State {
-	return &State{}
-}
 
 type QueryOptions struct {
 	properties []string
@@ -84,7 +78,7 @@ type Result struct {
 	Table [][]string
 }
 
-func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string) (res Result, _ error) {
+func Eval(ctx context.Context, g logseq.RegexGraph, q string) (res Result, _ error) {
 	// Parse query
 	parsed, err := parseQuery(q)
 	if err != nil {
@@ -92,7 +86,7 @@ func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string) (res Re
 	}
 
 	// Evaluate state
-	filter, err := s.eval(parsed.s)
+	filter, err := eval(parsed.s)
 	if err != nil {
 		return res, fmt.Errorf("failed to evaluate state with %w", err)
 	}
@@ -113,7 +107,7 @@ func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string) (res Re
 	return res, nil
 }
 
-func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
+func eval(sex sexp.Sexp) (pageFilter, error) {
 	switch sex := sex.I.(type) {
 	case sexp.List:
 		// Most of the query logic sits inside of a list
@@ -126,15 +120,15 @@ func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
 			// Find out filter and execute it
 			switch head {
 			case "and":
-				return s.evalAnd(sex)
+				return evalAnd(sex)
 			case "not":
-				return s.evalNot(sex)
+				return evalNot(sex)
 			case "page-property":
-				return s.evalPageProperty(sex)
+				return evalPageProperty(sex)
 			case "page-tags":
-				return s.evalPageTags(sex)
+				return evalPageTags(sex)
 			case "property":
-				return s.evalProperty(sex)
+				return evalProperty(sex)
 			default:
 				return emptyFilter, fmt.Errorf("unexpected string list entry %s", head)
 			}
@@ -142,20 +136,20 @@ func (s *State) eval(sex sexp.Sexp) (pageFilter, error) {
 			return emptyFilter, fmt.Errorf("unexpected list head type %#v", head)
 		}
 	case string:
-		return s.evalString(sex)
+		return evalString(sex)
 	}
 
 	return emptyFilter, fmt.Errorf("unexpected sexp format with value %#v", sex)
 }
 
-func (s *State) evalAnd(l sexp.List) (pageFilter, error) {
+func evalAnd(l sexp.List) (pageFilter, error) {
 	slog.Info("translating 'and' expression")
 	if len(l) == 1 {
 		return emptyFilter, ErrIncorrectAnd
 	}
 	filters := make([]pageFilter, len(l)-1)
 	for i := 1; i < len(l); i++ {
-		filter, err := s.eval(l[i])
+		filter, err := eval(l[i])
 		if err != nil {
 			return emptyFilter, fmt.Errorf("failed to evaluate 'and' with %w", err)
 		}
@@ -171,12 +165,12 @@ func (s *State) evalAnd(l sexp.List) (pageFilter, error) {
 	}, nil
 }
 
-func (s *State) evalNot(l sexp.List) (pageFilter, error) {
+func evalNot(l sexp.List) (pageFilter, error) {
 	slog.Info("translating 'not' expression")
 	if len(l) != 2 {
 		return emptyFilter, ErrNotSyntaxError
 	}
-	filter, err := s.eval(l[1])
+	filter, err := eval(l[1])
 	if err != nil {
 		return emptyFilter, fmt.Errorf("failed to eval 'not' operand with %w", err)
 	}
@@ -185,7 +179,7 @@ func (s *State) evalNot(l sexp.List) (pageFilter, error) {
 	}, nil
 }
 
-func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
+func evalPageProperty(l sexp.List) (pageFilter, error) {
 	slog.Info("translating 'page-property' expression")
 	if len(l) < 2 || len(l) > 3 {
 		return emptyFilter, ErrIncorrectPageProperty
@@ -221,7 +215,7 @@ func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 	}, nil
 }
 
-func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
+func evalPageTags(l sexp.List) (pageFilter, error) {
 	if len(l) == 1 {
 		return emptyFilter, ErrIncorrectPageTags
 	}
@@ -253,7 +247,7 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 	}, nil
 }
 
-func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
+func evalProperty(l sexp.List) (pageFilter, error) {
 	if len(l) < 2 || len(l) > 3 {
 		return emptyFilter, ErrIncorrectProperty
 	}
@@ -297,7 +291,7 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 	}, nil
 }
 
-func (s *State) evalString(str string) (pageFilter, error) {
+func evalString(str string) (pageFilter, error) {
 	match := linkRegex.FindStringSubmatch(str)
 
 	switch len(match) {

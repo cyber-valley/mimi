@@ -23,11 +23,10 @@ func TestEval(t *testing.T) {
 		`{{query (and (page-tags [[genus]]))}}`:             364,
 		`{{query (and [[fern]] (page-tags [[species]] ))}}`: 14,
 	}
-	s := New()
 	g := logseq.NewRegexGraph(graphPath)
 
 	for q, expected := range query2expected {
-		res, err := s.Eval(t.Context(), g, q)
+		res, err := Eval(t.Context(), g, q)
 		if err != nil {
 			t.Errorf("failed to eval query '%s' with %s", q, err)
 		}
@@ -46,11 +45,10 @@ func TestEval_Fails(t *testing.T) {
 		`{{query (and [] (page-tags [[species]]) (not (page-tags [[class]])))}}`: `failed to evaluate state with failed to evaluate 'and' with unexpected string atom '[]'`,
 	}
 
-	s := New()
 	g := logseq.NewRegexGraph(graphPath)
 
 	for before, expected := range before2expected {
-		_, err := s.Eval(t.Context(), g, before)
+		_, err := Eval(t.Context(), g, before)
 		if err == nil || err.Error() != expected {
 			t.Errorf("query '%s' should fail with '%s' but failed with '%s'", before, expected, err)
 			t.Fail()
