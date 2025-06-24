@@ -19,6 +19,8 @@ func TestEval(t *testing.T) {
 		`{{query [[@master]]}}`:                      7,
 		`{{query (page-tags [[psycho]])}}`:           5,
 		`{{query (and (page-tags [[species]]) (not (page-tags [[class]])) (and (page-tags [[supply]])))}}`: 2,
+		`{{query (and (page-tags [[genus]]))}}`: 364,
+		`{{query (and [[fern]] (and) (page-tags [[species]] ))}}`: 13,
 	}
 	s := New()
 	g := logseq.NewRegexGraph(graphPath)
