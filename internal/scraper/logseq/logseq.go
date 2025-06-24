@@ -147,7 +147,12 @@ func FindPageInfo(r io.Reader) (PageInfo, error) {
 		// Collect references
 		matches := refRegexp.FindAllStringSubmatchIndex(line, -1)
 		for _, match := range matches {
-			props.Refs = append(props.Refs, line[match[2]:match[3]])
+			ref := line[match[2]:match[3]]
+			// Collect only unique references
+			if slices.Contains(props.Refs, ref) {
+				continue
+			}
+			props.Refs = append(props.Refs, ref)
 		}
 
 		// Is there any properties
