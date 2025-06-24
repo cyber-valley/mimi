@@ -30,7 +30,7 @@ var (
 	ErrNotSyntaxError        = fmt.Errorf("'not' accepts only one atom")
 	ErrIncorrectPageTags     = fmt.Errorf("incorrect 'page-tags' statement")
 	ErrIncorrectProperty     = fmt.Errorf("incorrect 'property' statement")
-	ErrIncorrectAnd          = fmt.Errorf("incorrect 'property' statement")
+	ErrIncorrectAnd          = fmt.Errorf("incorrect 'and' statement")
 )
 
 func New() *State {
