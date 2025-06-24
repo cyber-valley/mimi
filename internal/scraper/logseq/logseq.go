@@ -60,8 +60,8 @@ func (g RegexGraph) WalkPages() iter.Seq[Page] {
 }
 
 type Page struct {
-	Path       string
-	Properties Properties
+	Path string
+	Info PageInfo
 }
 
 func NewPage(path string) (Page, error) {
@@ -72,14 +72,14 @@ func NewPage(path string) (Page, error) {
 	}
 	defer file.Close()
 
-	props, err := FindProperties(file)
+	info, err := FindPageInfo(file)
 	if err != nil {
 		return Page{}, fmt.Errorf("failed to read page properties with %w", err)
 	}
 
 	return Page{
-		Path:       path,
-		Properties: props,
+		Path: path,
+		Info: info,
 	}, nil
 }
 
@@ -88,8 +88,8 @@ func (p Page) Title() string {
 	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
 }
 
-type Properties struct {
-	Result []Property
+type PageInfo struct {
+	Props []Property
 }
 
 type Property struct {
@@ -98,8 +98,8 @@ type Property struct {
 	Level  string
 }
 
-func (p Properties) AllTags() ([]string, bool) {
-	for _, p := range p.Result {
+func (p PageInfo) AllTags() ([]string, bool) {
+	for _, p := range p.Props {
 		if p.Name != "tags" {
 			continue
 		}
@@ -108,8 +108,8 @@ func (p Properties) AllTags() ([]string, bool) {
 	return nil, false
 }
 
-func (p Properties) PageLevelTags() ([]string, bool) {
-	for _, p := range p.Result {
+func (p PageInfo) PageLevelTags() ([]string, bool) {
+	for _, p := range p.Props {
 		if p.Name != "tags" || p.Level != PageLevel {
 			continue
 		}
@@ -118,8 +118,8 @@ func (p Properties) PageLevelTags() ([]string, bool) {
 	return nil, false
 }
 
-func (p Properties) Get(name string) (values []string, ok bool) {
-	for _, p := range p.Result {
+func (p PageInfo) Get(name string) (values []string, ok bool) {
+	for _, p := range p.Props {
 		if p.Name != name {
 			continue
 		}
@@ -128,8 +128,8 @@ func (p Properties) Get(name string) (values []string, ok bool) {
 	return values, false
 }
 
-func FindProperties(r io.Reader) (Properties, error) {
-	var props Properties
+func FindPageInfo(r io.Reader) (PageInfo, error) {
+	var props PageInfo
 	var propertyLevel string
 	pageStart := true
 
@@ -163,7 +163,7 @@ func FindProperties(r io.Reader) (Properties, error) {
 			propertyLevel = BlockLevel
 		}
 
-		props.Result = append(props.Result, Property{
+		props.Props = append(props.Props, Property{
 			Name:   propertyName,
 			Values: propertyValues,
 			Level:  propertyLevel,

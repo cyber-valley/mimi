@@ -155,7 +155,7 @@ func (s *State) evalPageProperty(l sexp.List) (pageFilter, error) {
 	// Build filter
 	return func(p logseq.Page) bool {
 		propName := strings.TrimPrefix(cdr[0], ":")
-		values, ok := p.Properties.Get(propName)
+		values, ok := p.Info.Get(propName)
 		if !ok {
 			return false
 		}
@@ -189,7 +189,7 @@ func (s *State) evalPageTags(l sexp.List) (pageFilter, error) {
 	slog.Info("tags to be queried", "value", cdr)
 
 	return func(p logseq.Page) bool {
-		tags, ok := p.Properties.PageLevelTags()
+		tags, ok := p.Info.PageLevelTags()
 		if !ok {
 			return false
 		}
@@ -230,7 +230,7 @@ func (s *State) evalProperty(l sexp.List) (pageFilter, error) {
 		propName := strings.TrimPrefix(cdr[0], ":")
 
 		// Check page props
-		pageProps, ok := p.Properties.Get(propName)
+		pageProps, ok := p.Info.Get(propName)
 		if !ok {
 			return false
 		}
@@ -260,7 +260,7 @@ func (s *State) evalString(str string) (pageFilter, error) {
 			if p.Title() == tag {
 				return true
 			}
-			for _, prop := range p.Properties.Result {
+			for _, prop := range p.Info.Props {
 				if slices.Contains(prop.Values, tag) {
 					return true
 				}
