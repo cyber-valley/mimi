@@ -51,7 +51,6 @@ func TestEval_Fails(t *testing.T) {
 		_, err := Eval(t.Context(), g, before)
 		if err == nil || err.Error() != expected {
 			t.Errorf("query '%s' should fail with '%s' but failed with '%s'", before, expected, err)
-			t.Fail()
 		}
 	}
 }
@@ -71,14 +70,8 @@ func TestParsing_RawEDN(t *testing.T) {
 	for _, q := range queries {
 		_, err := parseQuery(q)
 		if err != nil {
-			errs[q] = err
+			t.Errorf("failed query %s with %s", q, err)
 		}
-	}
-	if len(errs) > 0 {
-		for q, err := range errs {
-			slog.Error("failed", "query", q, "with", err)
-		}
-		t.Fail()
 	}
 }
 
