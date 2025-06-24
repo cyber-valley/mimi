@@ -26,16 +26,16 @@ func TestEval(t *testing.T) {
 	g := logseq.NewRegexGraph(graphPath)
 
 	for q, expected := range query2expected {
-		pages, err := s.Eval(t.Context(), g, q)
+		res, err := s.Eval(t.Context(), g, q)
 		if err != nil {
 			t.Errorf("failed to eval query '%s' with %s", q, err)
 		}
-		if len(pages) != expected {
-			titles := make([]string, len(pages))
-			for i, page := range pages {
+		if len(res.Pages) != expected {
+			titles := make([]string, len(res.Pages))
+			for i, page := range res.Pages {
 				titles[i] = page.Title()
 			}
-			t.Errorf("got %d pages instead of %d for '%s', titles: %#v", len(pages), expected, q, titles)
+			t.Errorf("got %d pages instead of %d for '%s', titles: %#v", len(res.Pages), expected, q, titles)
 		}
 	}
 }

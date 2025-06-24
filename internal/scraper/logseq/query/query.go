@@ -63,7 +63,14 @@ func WithSortDesc(desc bool) Option {
 	}
 }
 
-func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ...Option) (res []logseq.Page, _ error) {
+type Result struct {
+	Pages []logseq.Page
+	// First slice is always a header
+	// all others are rows
+	Table [][]string
+}
+
+func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ...Option) (res Result, _ error) {
 	// Init options
 	queryOpts := &QueryOptions{}
 	for _, opt := range opts {
@@ -90,9 +97,9 @@ func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ..
 		}
 		pageSet[page.Title()] = page
 	}
-	res = slices.Collect(maps.Values(pageSet))
+	res.Pages = slices.Collect(maps.Values(pageSet))
+	slog.Info("query result", "size", len(res.Pages))
 
-	slog.Info("query result", "size", len(res))
 	return res, nil
 }
 
