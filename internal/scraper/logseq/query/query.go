@@ -265,7 +265,7 @@ func (s *State) evalString(str string) (pageFilter, error) {
 					return true
 				}
 			}
-			return false
+			return slices.Contains(p.Info.Refs, tag)
 		}, nil
 	}
 
