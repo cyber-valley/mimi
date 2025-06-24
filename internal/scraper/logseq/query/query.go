@@ -43,6 +43,14 @@ type QueryOptions struct {
 	sortDesc   bool
 }
 
+func defaultQueryOptions() *QueryOptions {
+	return &QueryOptions{
+		properties: []string{"page"},
+		sortBy:     "page",
+		sortDesc:   true,
+	}
+}
+
 type Option = func(*QueryOptions)
 
 func WithProperties(props []string) Option {
@@ -72,7 +80,7 @@ type Result struct {
 
 func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ...Option) (res Result, _ error) {
 	// Init options
-	queryOpts := &QueryOptions{}
+	queryOpts := defaultQueryOptions()
 	for _, opt := range opts {
 		opt(queryOpts)
 	}
@@ -99,6 +107,8 @@ func (s *State) Eval(ctx context.Context, g logseq.RegexGraph, q string, opts ..
 	}
 	res.Pages = slices.Collect(maps.Values(pageSet))
 	slog.Info("query result", "size", len(res.Pages))
+
+	res.Table = [][]string{[]string{"page"}}
 
 	return res, nil
 }
