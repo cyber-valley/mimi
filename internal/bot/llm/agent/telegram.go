@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"encoding/json"
+	"os"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -15,12 +16,14 @@ import (
 const (
 	retrievePromptName = "telegram-retrieve"
 	evalPromptName = "telegram-eval"
+	telegramSchemaPath = "sql/migrations/000001_telegram.up.sql"
 )
 
 type TelegramAgent struct {
 	conn              *pgx.Conn
 	retrievePrompt *ai.Prompt
 	evalPrompt     *ai.Prompt
+	sqlSchema string
 }
 
 func NewTelegramAgent(g *genkit.Genkit, conn *pgx.Conn) TelegramAgent {
@@ -34,10 +37,17 @@ func NewTelegramAgent(g *genkit.Genkit, conn *pgx.Conn) TelegramAgent {
 		log.Fatalf("no prompt named '%s' found", evalPromptName)
 	}
 
+	// Read telegram Schema
+	schema, err := os.ReadFile(telegramSchemaPath)
+	if err != nil {
+		log.Fatalf("failed to read schema from %s with %s", telegramSchemaPath, err)
+	}
+
 	return TelegramAgent{
 		conn:              conn,
 		retrievePrompt: retrieve,
 		evalPrompt:     eval,
+		sqlSchema: string(schema),
 	}
 }
 
@@ -57,7 +67,7 @@ func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Messag
 	resp, err := a.retrievePrompt.Execute(
 		ctx,
 		ai.WithMessages(msgs...),
-		ai.WithInput(map[string]any{"query": query}),
+		ai.WithInput(map[string]any{"query": query, "schema": a.sqlSchema}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("LLM request failed with %w", err)
