@@ -34,8 +34,6 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 		return fmt.Errorf("phone env variable %s is missing", tgPhone)
 	}
 
-	q := persist.New(conn)
-
 	dispatcher := tg.NewUpdateDispatcher()
 
 	gaps := updates.New(updates.Config{
@@ -61,7 +59,7 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 	api := client.API()
 	session := newSession()
 
-	setupDispatcher(ctx, &dispatcher, client, q, session)
+	setupDispatcher(ctx, &dispatcher, client, conn, session)
 
 	flow := auth.NewFlow(terminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
@@ -94,7 +92,8 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 	})
 }
 
-func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Client, q *persist.Queries, s *session) error {
+func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Client, db *pgx.Conn, s *session) error {
+	q := persist.New(db)
 	subscribeTo, err := q.FindChannelsToFollow(ctx)
 	if err != nil {
 		glog.Error("failed to find peers to subscribe ", err)
@@ -115,12 +114,14 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		if !ok {
 			glog.Warning("failed to extract channel from ", msg.PeerID)
 		}
+
 		// Process only subscribed channels / groups
 		if slices.IndexFunc(subscribeTo, func(s persist.FindChannelsToFollowRow) bool {
 			return s.ID == channel.ChannelID
 		}) == -1 {
 			return nil
 		}
+
 		// Extract forum topic info if exists
 		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
 		if !ok {
@@ -129,6 +130,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		}
 		var (
 			topicID int32
+			topicTitle string
 			found   bool
 		)
 		if replyTo.ForumTopic {
@@ -138,18 +140,42 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 				return err
 			}
 			topicID = int32(t.ID)
+			topicTitle = t.Title
 			found = true
 		}
-		// Persist message
-		err := q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+
+		// Begin transaction
+		tx, err := db.Begin(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction with %w", err)
+		}
+		defer tx.Rollback(ctx)
+
+		qtx := q.WithTx(tx)
+
+		// Save topic if does not exists
+		if found {
+			err = qtx.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
+				ID: topicID,
+				PeerID: channel.ChannelID,
+				Title: topicTitle,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to save telegram topic with %w", err)
+			}
+		}
+
+		// Save message
+		err = qtx.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
 			PeerID:  channel.ChannelID,
 			TopicID: pgtype.Int4{Int32: topicID, Valid: found},
+			Message: msg.Message,
 		})
 		if err != nil {
-			glog.Error("failed to save telegram message with ", err)
-			return err
+			return fmt.Errorf("failed to save telegram message with %w", err)
 		}
-		return nil
+
+		return tx.Commit(ctx)
 	})
 
 	return nil

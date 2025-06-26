@@ -63,3 +63,24 @@ func (q *Queries) SaveTelegramMessage(ctx context.Context, arg SaveTelegramMessa
 	_, err := q.db.Exec(ctx, saveTelegramMessage, arg.PeerID, arg.TopicID, arg.Message)
 	return err
 }
+
+const saveTelegramTopic = `-- name: SaveTelegramTopic :exec
+INSERT INTO
+    telegram_topic (id, peer_id, title)
+VALUES
+    ($1, $2, $3) ON conflict (id, peer_id) DO
+UPDATE
+SET
+    title = excluded.title
+`
+
+type SaveTelegramTopicParams struct {
+	ID     int32
+	PeerID int64
+	Title  string
+}
+
+func (q *Queries) SaveTelegramTopic(ctx context.Context, arg SaveTelegramTopicParams) error {
+	_, err := q.db.Exec(ctx, saveTelegramTopic, arg.ID, arg.PeerID, arg.Title)
+	return err
+}

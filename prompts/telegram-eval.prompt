@@ -1,0 +1,6 @@
+---
+system: "Given related database rows to the user's query, generate a proper answer to it"
+input:
+  schema:
+    query: string
+---

@@ -6,15 +6,7 @@ package persist
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 )
-
-type Embedding struct {
-	ID        pgtype.UUID
-	Text      string
-	Metadata  []byte
-	Embedding pgvector.Vector
-}
 
 type LlmChat struct {
 	TelegramID int64

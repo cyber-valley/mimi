@@ -1,0 +1,12 @@
+---
+system: "Given an input question, create a syntatically correct PostgreSQL query to run to help find the answer"
+input:
+  schema:
+    query: string
+		schema: string
+output:
+  schema:
+		sql: string
+---
+
+

@@ -1,9 +1,12 @@
+-- Contains information about telegram groups and channels
 CREATE TABLE IF NOT EXISTS telegram_peer (
     id bigint PRIMARY KEY,
     chat_name text NOT NULL,
+    -- Set to false if given peer should not be used
     enabled boolean NOT NULL DEFAULT TRUE
 );
 
+-- Megagroups in telegram i.e. forums contain different topics
 CREATE TABLE IF NOT EXISTS telegram_topic (
     id int,
     peer_id bigint NOT NULL REFERENCES telegram_peer(id),
@@ -11,6 +14,7 @@ CREATE TABLE IF NOT EXISTS telegram_topic (
     PRIMARY KEY (id, peer_id)
 );
 
+-- Each telegram peer contains multiple messages
 CREATE TABLE IF NOT EXISTS telegram_message (
     peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id),
     topic_id int NULL,
