@@ -14,7 +14,6 @@ install:
 format:
 	sleek ./sql/migrations/*
 	sleek ./sql/queries/*
-	golangci-lint fmt ./...
 
 lint: format
 	go vet ./...
