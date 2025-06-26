@@ -14,6 +14,7 @@ import (
 
 	"mimi/internal/bot/llm/agent"
 	"mimi/internal/persist"
+	"mimi/internal/scraper/logseq"
 	"mimi/internal/scraper/logseq/db"
 )
 
@@ -24,7 +25,7 @@ type LLM struct {
 	router *ai.Prompt
 }
 
-func New(q *persist.Queries) LLM {
+func New(q *persist.Queries, graph logseq.RegexGraph) LLM {
 	ctx := context.Background()
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
@@ -36,6 +37,7 @@ func New(q *persist.Queries) LLM {
 
 	agents := []agent.Agent{
 		agent.NewLogseqAgent(g, db.New()),
+		agent.NewLogseqQueryAgent(graph),
 		agent.NewFallbackAgent(g),
 		agent.NewGitHubAgent(g),
 	}

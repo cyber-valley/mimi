@@ -14,9 +14,10 @@ import (
 
 	"mimi/internal/bot/llm"
 	"mimi/internal/persist"
+	"mimi/internal/scraper/logseq"
 )
 
-func Start(ctx context.Context, token string) {
+func Start(ctx context.Context, token string, logseqPath string) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Fatal(err)
@@ -30,9 +31,11 @@ func Start(ctx context.Context, token string) {
 	defer conn.Close(ctx)
 
 	q := persist.New(conn)
+	g := logseq.NewRegexGraph(logseqPath)
 	handler := UpdateHandler{
 		bot: bot,
-		llm: llm.New(q),
+		g:   g,
+		llm: llm.New(q, g),
 	}
 
 	u := tgbotapi.NewUpdate(0)
@@ -60,6 +63,7 @@ func Start(ctx context.Context, token string) {
 
 type UpdateHandler struct {
 	bot *tgbotapi.BotAPI
+	g   logseq.RegexGraph
 	llm llm.LLM
 }
 
