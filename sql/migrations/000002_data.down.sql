@@ -1,4 +1,4 @@
 DELETE FROM
     telegram_peers
 WHERE
-    peer_id IN (2594250873);
+    peer_id IN (2572439595, 4588050232, 2245058785, 4104563751);

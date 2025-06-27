@@ -9,18 +9,18 @@ CREATE TABLE IF NOT EXISTS telegram_peer (
 -- Megagroups in telegram i.e. forums contain different topics
 CREATE TABLE IF NOT EXISTS telegram_topic (
     id int,
-    peer_id bigint NOT NULL REFERENCES telegram_peer(id),
+    peer_id bigint NOT NULL REFERENCES telegram_peer(id) ON DELETE CASCADE,
     title text NOT NULL,
     PRIMARY KEY (id, peer_id)
 );
 
 -- Each telegram peer contains multiple messages
 CREATE TABLE IF NOT EXISTS telegram_message (
-    peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id),
+    peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id) ON DELETE CASCADE,
     topic_id int NULL,
     message text NOT NULL,
     created_at timestamp WITH time zone DEFAULT NOW(),
-    FOREIGN KEY (peer_id, topic_id) REFERENCES telegram_topic(peer_id, id)
+    FOREIGN KEY (peer_id, topic_id) REFERENCES telegram_topic(peer_id, id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS llm_chat (

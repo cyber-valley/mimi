@@ -1,4 +1,7 @@
 INSERT INTO
-    telegram_peer (id, chat_name)
+    telegram_peer (chat_name, id)
 VALUES
-    (2594250873, 'test-megagroup');
+    ('cyber devops force', 2572439595),
+    ('cyber devops force', 4588050232),
+    ('rockets', 2245058785),
+    ('cyber valley core', 4104563751);
