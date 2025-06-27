@@ -124,33 +124,34 @@ func DoQuery[T any](ctx context.Context, c *Client, query string, variables map[
 	if len(gqlResp.Errors) > 0 {
 		return result, fmt.Errorf("failed to execute project GraphQL with %#v", gqlResp.Errors)
 	}
-	err = json.Unmarshal(gqlResp.Data, result)
+	err = json.Unmarshal(gqlResp.Data, &result)
 	return result, err
 }
 
-type ListProjectsResponse struct {
-	Data struct {
-		Organization struct {
-			ProjectsV2 struct {
-				Nodes []struct {
-					Title string `json:"title"`
-					ShortDescription string `json:"shortDescription"`
-				} `json:"nodes"`
-			} `json:"projectsv2"`
-		} `json:"organization"`
-	} `json:"data"`
+type listProjectsResponse struct {
+	Organization struct {
+		ProjectsV2 struct {
+			Nodes []ProjectInfo `json:"nodes"`
+		} `json:"projectsv2"`
+	} `json:"organization"`
+}
+
+type ProjectInfo struct {
+	Id int `json:"number"`
+	Title string `json:"title"`
+	ShortDescription string `json:"shortDescription"`
 }
 
 // ListProjects queries all organization's projects
-func (c *Client) ListProjects(ctx context.Context, org string) (ListProjectsResponse, error) {
+func (c *Client) ListProjects(ctx context.Context, org string) (projects []ProjectInfo, _ error) {
 	variables := map[string]any{
-		"org":           org,
+		"orgName":           org,
 	}
-	resp, err := DoQuery[ListProjectsResponse](ctx, c, listProjectsQuery, variables)
+	resp, err := DoQuery[listProjectsResponse](ctx, c, listProjectsQuery, variables)
 	if err != nil {
-		return resp, fmt.Errorf("failed to execute GraphQL with %w", err)
+		return projects, fmt.Errorf("failed to list projects for org '%s' with %w", org, err)
 	}
-	panic("not implemented")
+	return resp.Organization.ProjectsV2.Nodes, nil
 }
 
 // GetOrgProject queries organization project board information.

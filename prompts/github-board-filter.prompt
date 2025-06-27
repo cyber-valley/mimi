@@ -1,0 +1,13 @@
+---
+system: "You provided with user's query and list of existing github projects with their descriptions. Return only related project ids"
+input:
+  schema:
+    query: string
+output:
+  schema:
+    projects(array):
+		  id: integer
+			title: string
+---
+
+{{query}}

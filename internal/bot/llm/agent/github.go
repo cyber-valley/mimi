@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"encoding/json"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -11,28 +12,38 @@ import (
 	"mimi/internal/scraper/github/db"
 )
 
+const (
+	githubEvalPromptName = "github-board-eval.prompt"
+	filterProjectsPromptName = "github-board-filter.prompt"
+)
+
 type GitHubAgent struct {
 	g      *genkit.Genkit
 	c      *db.Client
-	prompt *ai.Prompt
-	projects db.ListProjectsResponse
+	org string
+	eval *ai.Prompt
+	projectsFilter *ai.Prompt
 }
 
 func NewGitHubAgent(g *genkit.Genkit, org string) GitHubAgent {
-	prompt := genkit.LookupPrompt(g, "supply-state")
-	if prompt == nil {
-		panic("failed to load 'supply-state' prompt")
+	// Fail fast if any dot prompt doesn't exist
+	eval := genkit.LookupPrompt(g, githubEvalPromptName)
+	if eval == nil {
+		log.Fatalf("failed to load '%s' prompt", githubEvalPromptName)
 	}
+	projectsFilter := genkit.LookupPrompt(g, filterProjectsPromptName)
+	if projectsFilter == nil {
+		log.Fatalf("failed to load '%s' prompt", filterProjectsPromptName)
+	}
+
 	c := db.New("https://api.github.com/graphql")
-	projects, err := c.ListProjects(context.Background(), org)
-	if err != nil {
-		log.Fatalf("failed to get projects list for '%s' with %s", org, err)
-	}
+
 	return GitHubAgent{
 		g:      g,
 		c:      c,
-		projects: projects,
-		prompt: prompt,
+		org: org,
+		eval: eval,
+		projectsFilter: projectsFilter,
 	}
 }
 
@@ -44,25 +55,57 @@ func (a GitHubAgent) GetInfo() Info {
 }
 
 func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+	// Gather existing projects
+	projects, err := a.c.ListProjects(context.Background(), a.org)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get projects list for '%s' with %w", a.org, err)
+	}
+	projectsBlob, err := json.Marshal(projects)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize GitHub projects list with %w", err)
+	}
+
+	// Find out target projects
+	resp, err := a.projectsFilter.Execute(
+		ctx,
+		ai.WithDocs(ai.DocumentFromText(string(projectsBlob), map[string]any{})),
+		ai.WithMessages(msgs...),
+		ai.WithInput(map[string]any{"query": query}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter related GitHub projects with %w", err)
+	}
+	var targetProjects []projectInfo
+	if err := resp.Output(&targetProjects); err != nil {
+		return nil, fmt.Errorf("failed to decerialize filtered projects with %w", err)
+	}
+
 	// Fetch GitHub board state
 	columnNames := []string{"monthly plan", "ordered", "shipped"}
-	issues, err := a.c.GetOrgProject(ctx, "cyber-valley", 3, columnNames)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
+	issues := make(map[string][]db.Issue)
+	for _, info := range targetProjects {
+		tmp, err := a.c.GetOrgProject(ctx, a.org, info.Id, columnNames)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
+		}
+		issues[info.Title] = tmp
 	}
 
 	// Setup context
-	docs := make([]*ai.Document, len(issues))
-	for i, issue := range issues {
-		docs[i] = ai.DocumentFromText(issue.Body, map[string]any{
-			"title": issue.Title,
-			"url":   issue.URL,
-			"state": issue.State,
-		})
+	var docs []*ai.Document
+	for title, issues := range issues {
+		for _, issue := range issues {
+			docs = append(docs, ai.DocumentFromText(issue.Body, map[string]any{
+				"title": issue.Title,
+				"url":   issue.URL,
+				"state": issue.State,
+				"projectTitle": title,
+			}))
+		}
 	}
 
 	// Eval prompt
-	resp, err := a.prompt.Execute(
+	resp, err = a.eval.Execute(
 		ctx,
 		ai.WithDocs(docs...),
 		ai.WithMessages(msgs...),
@@ -72,4 +115,9 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 		return nil, fmt.Errorf("failed to evaluate final step with %w", err)
 	}
 	return resp, nil
+}
+
+type projectInfo struct {
+	Id int `json:"id"`
+	Title string `json:"title"`
 }
