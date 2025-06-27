@@ -16,6 +16,9 @@ import (
 //go:embed queries/project.graphql
 var projectQuery string
 
+//go:embed queries/list-projects.graphql
+var listProjectsQuery string
+
 // GraphQLQuery is the structure for a GraphQL request.
 type GraphQLQuery struct {
 	Query     string                 `json:"query"`
@@ -85,19 +88,20 @@ func New(endpoint string) *Client {
 }
 
 // DoQuery executes a GraphQL query with variables and decodes the response into result.
-func (c *Client) DoQuery(ctx context.Context, query string, variables map[string]interface{}, result interface{}) error {
+func DoQuery[T any](ctx context.Context, c *Client, query string, variables map[string]any) (T, error) {
+	var result T
 	reqBody := GraphQLQuery{
 		Query:     query,
 		Variables: variables,
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
-		return err
+		return result, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", c.Endpoint, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return result, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Content-Type", "application/json")
@@ -105,22 +109,48 @@ func (c *Client) DoQuery(ctx context.Context, query string, variables map[string
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return result, err
 	}
 	defer resp.Body.Close()
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return result, err
 	}
 
 	var gqlResp GraphQLResponse
 	if err := json.Unmarshal(b, &gqlResp); err != nil {
-		return err
+		return result, err
 	}
 	if len(gqlResp.Errors) > 0 {
-		return fmt.Errorf("failed to execute project GraphQL with %#v", gqlResp.Errors)
+		return result, fmt.Errorf("failed to execute project GraphQL with %#v", gqlResp.Errors)
 	}
-	return json.Unmarshal(gqlResp.Data, result)
+	err = json.Unmarshal(gqlResp.Data, result)
+	return result, err
+}
+
+type ListProjectsResponse struct {
+	Data struct {
+		Organization struct {
+			ProjectsV2 struct {
+				Nodes []struct {
+					Title string `json:"title"`
+					ShortDescription string `json:"shortDescription"`
+				} `json:"nodes"`
+			} `json:"projectsv2"`
+		} `json:"organization"`
+	} `json:"data"`
+}
+
+// ListProjects queries all organization's projects
+func (c *Client) ListProjects(ctx context.Context, org string) (ListProjectsResponse, error) {
+	variables := map[string]any{
+		"org":           org,
+	}
+	resp, err := DoQuery[ListProjectsResponse](ctx, c, listProjectsQuery, variables)
+	if err != nil {
+		return resp, fmt.Errorf("failed to execute GraphQL with %w", err)
+	}
+	panic("not implemented")
 }
 
 // GetOrgProject queries organization project board information.
@@ -140,8 +170,7 @@ func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber in
 			variables["after"] = after
 		}
 
-		var resp ProjectV2Response
-		err := c.DoQuery(ctx, projectQuery, variables, &resp)
+		resp, err := DoQuery[ProjectV2Response](ctx, c, projectQuery, variables)
 		if err != nil {
 			return issues, err
 		}

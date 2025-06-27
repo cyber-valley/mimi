@@ -1,0 +1,10 @@
+query GetOrganizationProjectsByName($organizationName: String!) {
+  organization(login: $organizationName) {
+    projectsV2 {
+      nodes {
+        title,
+        shortDescription
+      }
+    }
+  }
+}
