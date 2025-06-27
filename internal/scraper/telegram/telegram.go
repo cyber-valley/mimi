@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"time"
+	"log/slog"
 
 	"github.com/golang/glog"
 	"github.com/gotd/contrib/middleware/floodwait"
@@ -177,6 +178,55 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 
 		return tx.Commit(ctx)
 	})
+
+	return nil
+}
+
+func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
+	// Get required chats
+	q := persist.New(db)
+	chats, err := q.FindChannelsToFollow(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get peers to follow with %w", err)
+	}
+
+	// Fetch chat's list
+	dialogs, err := api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
+		OffsetPeer: &tg.InputPeerEmpty{},
+		Limit: 100,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get dialogs with %w", err)
+	}
+	modifiedDialogs, ok := dialogs.AsModified()
+	if !ok {
+		return fmt.Errorf("got unexpected dialogs value %#v", dialogs)
+	}
+
+	foundChats := make([]bool, len(chats))
+	for _, chat := range modifiedDialogs.GetChats() {
+		chat, ok := chat.AsNotEmpty()
+		if !ok {
+			slog.Error("chat is empty, skipping", "value", chat)
+			continue
+		}
+		chatIdx :=  slices.IndexFunc(chats, func (c persist.FindChannelsToFollowRow) bool {
+			return c.ID == chat.GetID()
+		})
+		if chatIdx < 0 {
+			slog.Info("skipping unknown chat", "title", chat.GetTitle(), "id", chat.GetID())
+			continue
+		}
+		foundChats[chatIdx] = true
+	}
+
+	for i, found := range foundChats {
+		if found {
+			continue
+		}
+
+		slog.Error("chat was not found in the current account", "chat", chats[i])
+	}
 
 	return nil
 }

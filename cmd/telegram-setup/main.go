@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"log/slog"
 	"log"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
-	"github.com/gotd/td/tg"
 	"github.com/jackc/pgx/v5"
 
 	mimitg "mimi/internal/scraper/telegram"
@@ -79,29 +77,7 @@ func run(ctx context.Context, conn *pgx.Conn) error {
 			}
 			glog.Info("Current user:", name)
 
-			// Fetch chat's list
-			dialogs, err := api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
-				OffsetPeer: &tg.InputPeerEmpty{},
-				Limit: 100,
-			})
-			if err != nil {
-				slog.Error("failed to fetch dialogs", "with", err)
-			} else {
-				dialogs, ok := dialogs.AsModified()
-				if !ok {
-					slog.Error("fetched dialogs are not modified. Stopping")
-				} else {
-					for _, chat := range dialogs.GetChats() {
-						chat, ok := chat.AsNotEmpty()
-						if !ok {
-							slog.Error("chat is empty, skipping", "value", chat)
-							continue
-						}
-						slog.Info("fetched chat", "title", chat.GetTitle(), "id", chat.GetID())
-					}
-				}
-			}
-			return nil
+			return mimitg.CheckDialogs(ctx, api, conn)
 		}); err != nil {
 			return err
 		}

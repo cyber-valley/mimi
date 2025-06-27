@@ -1,3 +1,4 @@
+-- TODO: Rename channels part
 -- name: FindChannelsToFollow :many
 SELECT
     id,
