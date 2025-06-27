@@ -15,7 +15,7 @@ format:
 	sleek ./sql/migrations/*
 	sleek ./sql/queries/*
 
-lint: format
+vet: format
 	go vet ./...
 	staticcheck ./...
 
