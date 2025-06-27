@@ -24,6 +24,9 @@ pre-commit: lint
 test:
 	go test -v ./...
 
+run-telegram-setup: lint
+	go run cmd/telegram-setup/main.go
+
 run-telegram-bot: lint
 	air --build.cmd "go build -o tmp/bot cmd/bot/main.go" --build.bin "./bin/bot"
 

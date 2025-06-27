@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"log/slog"
 	"time"
 
 	"github.com/golang/glog"
@@ -62,7 +61,7 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 
 	setupDispatcher(ctx, &dispatcher, client, conn, session)
 
-	flow := auth.NewFlow(terminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
+	flow := auth.NewFlow(TerminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
 	return waiter.Run(ctx, func(ctx context.Context) error {
 		if err := client.Run(ctx, func(ctx context.Context) error {
@@ -80,16 +79,6 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 				name = fmt.Sprintf("%s (@%s)", name, self.Username)
 			}
 			glog.Info("Current user:", name)
-
-			// Fetch chat's list
-			dialogs, err := api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
-				Limit: 100,
-			})
-			if err != nil {
-				slog.Error("failed to fetch dialogs", "with", err)
-			} else {
-				slog.Info("fetched dialogs", "value", dialogs)
-			}
 
 			return gaps.Run(ctx, api, self.ID, updates.AuthOptions{
 				OnStart: func(ctx context.Context) {

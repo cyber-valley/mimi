@@ -20,19 +20,19 @@ import (
 //
 // This is only example implementation, you should not use it in your code.
 // Copy it and modify to fit your needs.
-type terminalUserAuthenticator struct {
+type TerminalUserAuthenticator struct {
 	PhoneNumber string // optional, will be prompted if empty
 }
 
-func (terminalUserAuthenticator) SignUp(ctx context.Context) (auth.UserInfo, error) {
+func (TerminalUserAuthenticator) SignUp(ctx context.Context) (auth.UserInfo, error) {
 	return auth.UserInfo{}, errors.New("signing up not implemented in Terminal")
 }
 
-func (terminalUserAuthenticator) AcceptTermsOfService(ctx context.Context, tos tg.HelpTermsOfService) error {
+func (TerminalUserAuthenticator) AcceptTermsOfService(ctx context.Context, tos tg.HelpTermsOfService) error {
 	return &auth.SignUpRequired{TermsOfService: tos}
 }
 
-func (terminalUserAuthenticator) Code(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
+func (TerminalUserAuthenticator) Code(ctx context.Context, sentCode *tg.AuthSentCode) (string, error) {
 	fmt.Print("Enter code: ")
 	code, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil {
@@ -41,7 +41,7 @@ func (terminalUserAuthenticator) Code(ctx context.Context, sentCode *tg.AuthSent
 	return strings.TrimSpace(code), nil
 }
 
-func (a terminalUserAuthenticator) Phone(_ context.Context) (string, error) {
+func (a TerminalUserAuthenticator) Phone(_ context.Context) (string, error) {
 	if a.PhoneNumber != "" {
 		return a.PhoneNumber, nil
 	}
@@ -53,7 +53,7 @@ func (a terminalUserAuthenticator) Phone(_ context.Context) (string, error) {
 	return strings.TrimSpace(phone), nil
 }
 
-func (terminalUserAuthenticator) Password(_ context.Context) (string, error) {
+func (TerminalUserAuthenticator) Password(_ context.Context) (string, error) {
 	fmt.Print("Enter 2FA password: ")
 	bytePwd, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
