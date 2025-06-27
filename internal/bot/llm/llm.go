@@ -39,7 +39,7 @@ func New(q *persist.Queries, graph logseq.RegexGraph) LLM {
 		agent.NewLogseqAgent(g, db.New()),
 		agent.NewLogseqQueryAgent(graph),
 		agent.NewFallbackAgent(g),
-		agent.NewGitHubAgent(g),
+		agent.NewGitHubAgent(g, "cyber-valley"),
 	}
 
 	router := genkit.LookupPrompt(g, "router")

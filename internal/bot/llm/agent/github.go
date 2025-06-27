@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -14,16 +15,23 @@ type GitHubAgent struct {
 	g      *genkit.Genkit
 	c      *db.Client
 	prompt *ai.Prompt
+	projects db.ListProjectsResponse
 }
 
-func NewGitHubAgent(g *genkit.Genkit) GitHubAgent {
+func NewGitHubAgent(g *genkit.Genkit, org string) GitHubAgent {
 	prompt := genkit.LookupPrompt(g, "supply-state")
 	if prompt == nil {
 		panic("failed to load 'supply-state' prompt")
 	}
+	c := db.New("https://api.github.com/graphql")
+	projects, err := c.ListProjects(context.Background(), org)
+	if err != nil {
+		log.Fatalf("failed to get projects list for '%s' with %s", org, err)
+	}
 	return GitHubAgent{
 		g:      g,
-		c:      db.New("https://api.github.com/graphql"),
+		c:      c,
+		projects: projects,
 		prompt: prompt,
 	}
 }
