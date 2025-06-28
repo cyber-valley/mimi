@@ -211,12 +211,20 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 			slog.Error("chat is empty, skipping", "value", chat)
 			continue
 		}
-		chatIdx :=  slices.IndexFunc(chats, func (c persist.FindTelegramPeersRow) bool {
+		chatIdx := slices.IndexFunc(chats, func (c persist.FindTelegramPeersRow) bool {
 			return c.ID == chat.GetID()
 		})
 		if chatIdx < 0 {
 			slog.Info("skipping unknown chat", "title", chat.GetTitle(), "id", chat.GetID())
 			continue
+		}
+		channel, ok := chat.(*tg.Channel)
+		if ok {
+			_, err := getForumTopics(ctx, api, channel.ID, channel.AccessHash)
+			if err != nil {
+				slog.Error("chat", "value", fmt.Sprintf("%#v", chat))
+				return err
+			}
 		}
 		foundChats[chatIdx] = true
 	}
@@ -235,4 +243,26 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 
 	slog.Info("all required chats were found")
 	return nil
+}
+
+func getForumTopics(ctx context.Context, api *tg.Client, chatID, accessHash int64) ([]*tg.ForumTopic, error) {
+	resp, err := api.ChannelsGetForumTopics(ctx, &tg.ChannelsGetForumTopicsRequest{
+		Channel: &tg.InputChannel{
+			ChannelID:  chatID,
+			AccessHash: accessHash,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list channel topics with %w", err)
+	}
+	slog.Info("resolved topics", "length", len(resp.Topics))
+	topics := make([]*tg.ForumTopic, len(resp.Topics))
+	for i, topic := range resp.Topics {
+		topic, ok := topic.(*tg.ForumTopic)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type of forum topic: %#v", topic)
+		}
+		topics[i] = topic
+	}
+	return topics, nil
 }
