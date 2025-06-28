@@ -15,7 +15,9 @@ import (
 	"github.com/gotd/td/telegram/updates"
 	"github.com/gotd/td/telegram/updates/hook"
 	"golang.org/x/time/rate"
-
+	"github.com/firebase/genkit/go/ai"
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/tg"
@@ -27,6 +29,7 @@ import (
 
 const (
 	tgPhone = "TG_PHONE"
+	telegramTopicDescriptionPrompt = "telegram-topic-description"
 )
 
 func Run(ctx context.Context, conn *pgx.Conn) error {
@@ -155,7 +158,8 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		qtx := q.WithTx(tx)
 
 		// Save topic if does not exists
-		if found {
+		if !found {
+			// TODO: Use separate function to save new telegram topic
 			err = qtx.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
 				ID: topicID,
 				PeerID: channel.ChannelID,
@@ -183,6 +187,19 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 }
 
 func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
+	// Init LLM
+	g, err := genkit.Init(ctx,
+		genkit.WithPlugins(&googlegenai.GoogleAI{}),
+		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
+		)
+	if err != nil {
+		return fmt.Errorf("could not initialize Genkit: %w", err)
+	}
+	prompt := genkit.LookupPrompt(g, telegramTopicDescriptionPrompt)
+	if prompt == nil {
+		return fmt.Errorf("no prompt named '%s' found", telegramTopicDescriptionPrompt)
+	}
+
 	// Get required chats
 	q := persist.New(db)
 	chats, err := q.FindTelegramPeers(ctx)
@@ -238,8 +255,10 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 				case nil:
 					// Description was already generated and saved
 				case pgx.ErrNoRows:
-					// Generate and save description
-					resp, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
+					// Topic's description should be generated and saved
+
+					// Get topic's messages
+					msgReplies, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
 						Peer: &tg.InputPeerChannel{
 							ChannelID: channel.ID,
 							AccessHash: channel.AccessHash,
@@ -251,7 +270,48 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					if err != nil {
 						return fmt.Errorf("failed to get forum topic's messages. topic '%s', chat '%s', with %w", topic.Title, channel.Title, err)
 					}
-					slog.Info("got topic messages", "value", fmt.Sprintf("%#v", resp))
+					topicMessages, ok := msgReplies.(*tg.MessagesChannelMessages)
+					if !ok {
+						return fmt.Errorf("unexpected topic messages response type %#v", msgReplies)
+					}
+
+					// Prepare LLM prompt input
+					var input telegramTopicDescriptionInput
+					for _, msg := range topicMessages.Messages {
+						msg, ok := msg.(*tg.Message)
+						if !ok {
+							slog.Warn("got unexpected message type", "value", fmt.Sprintf("%#v", msg))
+							continue
+						}
+						if msg.Message == "" {
+							slog.Warn("got empty message text")
+							continue
+						}
+						input.Messages = append(input.Messages, topicMessage{From: msg.FromID.String(), Text: msg.Message})
+					}
+					slog.Info("topic messages collected", "amount", len(input.Messages))
+
+					// Evaluate LLM prompt
+					resp, err := prompt.Execute(ctx, ai.WithInput(input))
+					if err != nil {
+						return fmt.Errorf("failed to describe topic's messages '%#v' with %w", input, err)
+					}
+					var output telegramTopicDescriptionOutput
+					if err := resp.Output(&output); err != nil {
+						return fmt.Errorf("failed to deserialize LLM output with %w", err)
+					}
+					slog.Info("got topic's description", "output", output, "topicTitle", topic.Title, "channelTitle", channel.Title)
+
+					// Save topic
+					err = q.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
+						PeerID: channel.ID,
+						ID: int32(topic.ID),
+						Title: topic.Title,
+						Description: output.Description,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to save telegram topic description with %w", err)
+					}
 				}
 			}
 		}
@@ -294,4 +354,17 @@ func getForumTopics(ctx context.Context, api *tg.Client, chatID, accessHash int6
 		topics[i] = topic
 	}
 	return topics, nil
+}
+
+type telegramTopicDescriptionInput struct {
+	Messages []topicMessage `json:"messages"`
+}
+
+type telegramTopicDescriptionOutput struct {
+	Description string `json:"description"`
+}
+
+type topicMessage struct {
+	From string `json:"from"`
+	Text string `json:"text"`
 }

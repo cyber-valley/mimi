@@ -61,9 +61,9 @@ type FindTelegramTopicDescriptionParams struct {
 	ID     int32
 }
 
-func (q *Queries) FindTelegramTopicDescription(ctx context.Context, arg FindTelegramTopicDescriptionParams) (pgtype.Text, error) {
+func (q *Queries) FindTelegramTopicDescription(ctx context.Context, arg FindTelegramTopicDescriptionParams) (string, error) {
 	row := q.db.QueryRow(ctx, findTelegramTopicDescription, arg.PeerID, arg.ID)
-	var description pgtype.Text
+	var description string
 	err := row.Scan(&description)
 	return description, err
 }
@@ -88,42 +88,28 @@ func (q *Queries) SaveTelegramMessage(ctx context.Context, arg SaveTelegramMessa
 
 const saveTelegramTopic = `-- name: SaveTelegramTopic :exec
 INSERT INTO
-    telegram_topic (id, peer_id, title)
+    telegram_topic (id, peer_id, title, description)
 VALUES
-    ($1, $2, $3) ON conflict (id, peer_id) DO
+    ($1, $2, $3, $4) ON conflict (id, peer_id) DO
 UPDATE
 SET
-    title = excluded.title
+    title = excluded.title,
+    description = excluded.description
 `
 
 type SaveTelegramTopicParams struct {
-	ID     int32
-	PeerID int64
-	Title  string
+	ID          int32
+	PeerID      int64
+	Title       string
+	Description string
 }
 
 func (q *Queries) SaveTelegramTopic(ctx context.Context, arg SaveTelegramTopicParams) error {
-	_, err := q.db.Exec(ctx, saveTelegramTopic, arg.ID, arg.PeerID, arg.Title)
-	return err
-}
-
-const saveTelegramTopicDescription = `-- name: SaveTelegramTopicDescription :exec
-UPDATE
-    telegram_topic
-SET
-    description = $3
-WHERE
-    peer_id = $1
-    AND id = $2
-`
-
-type SaveTelegramTopicDescriptionParams struct {
-	PeerID      int64
-	ID          int32
-	Description pgtype.Text
-}
-
-func (q *Queries) SaveTelegramTopicDescription(ctx context.Context, arg SaveTelegramTopicDescriptionParams) error {
-	_, err := q.db.Exec(ctx, saveTelegramTopicDescription, arg.PeerID, arg.ID, arg.Description)
+	_, err := q.db.Exec(ctx, saveTelegramTopic,
+		arg.ID,
+		arg.PeerID,
+		arg.Title,
+		arg.Description,
+	)
 	return err
 }

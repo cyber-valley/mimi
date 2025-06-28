@@ -9,12 +9,13 @@ WHERE
 
 -- name: SaveTelegramTopic :exec
 INSERT INTO
-    telegram_topic (id, peer_id, title)
+    telegram_topic (id, peer_id, title, description)
 VALUES
-    ($1, $2, $3) ON conflict (id, peer_id) DO
+    ($1, $2, $3, $4) ON conflict (id, peer_id) DO
 UPDATE
 SET
-    title = excluded.title;
+    title = excluded.title,
+    description = excluded.description;
 
 -- name: SaveTelegramMessage :exec
 INSERT INTO
@@ -27,15 +28,6 @@ SELECT
     description
 FROM
     telegram_topic
-WHERE
-    peer_id = $1
-    AND id = $2;
-
--- name: SaveTelegramTopicDescription :exec
-UPDATE
-    telegram_topic
-SET
-    description = $3
 WHERE
     peer_id = $1
     AND id = $2;

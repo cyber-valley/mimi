@@ -30,5 +30,5 @@ type TelegramTopic struct {
 	ID          int32
 	PeerID      int64
 	Title       string
-	Description pgtype.Text
+	Description string
 }
