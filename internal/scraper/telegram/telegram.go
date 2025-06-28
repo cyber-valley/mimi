@@ -203,6 +203,7 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 		return fmt.Errorf("got unexpected dialogs value %#v", dialogs)
 	}
 
+	// Check properly added chats to the current account
 	foundChats := make([]bool, len(chats))
 	for _, chat := range modifiedDialogs.GetChats() {
 		chat, ok := chat.AsNotEmpty()
@@ -220,13 +221,18 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 		foundChats[chatIdx] = true
 	}
 
+	// Log missing chats
+	var errs []error
 	for i, found := range foundChats {
 		if found {
 			continue
 		}
-
-		slog.Error("chat was not found in the current account", "chat", chats[i])
+		errs = append(errs, fmt.Errorf("chat was not found in the current account: %#v", chats[i]))
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
+	slog.Info("all required chats were found")
 	return nil
 }
