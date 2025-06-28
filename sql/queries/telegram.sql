@@ -1,5 +1,4 @@
--- TODO: Rename channels part
--- name: FindChannelsToFollow :many
+-- name: FindTelegramPeers :many
 SELECT
     id,
     chat_name

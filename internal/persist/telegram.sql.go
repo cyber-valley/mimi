@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const findChannelsToFollow = `-- name: FindChannelsToFollow :many
+const findTelegramPeers = `-- name: FindTelegramPeers :many
 SELECT
     id,
     chat_name
@@ -21,20 +21,20 @@ WHERE
     enabled
 `
 
-type FindChannelsToFollowRow struct {
+type FindTelegramPeersRow struct {
 	ID       int64
 	ChatName string
 }
 
-func (q *Queries) FindChannelsToFollow(ctx context.Context) ([]FindChannelsToFollowRow, error) {
-	rows, err := q.db.Query(ctx, findChannelsToFollow)
+func (q *Queries) FindTelegramPeers(ctx context.Context) ([]FindTelegramPeersRow, error) {
+	rows, err := q.db.Query(ctx, findTelegramPeers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []FindChannelsToFollowRow
+	var items []FindTelegramPeersRow
 	for rows.Next() {
-		var i FindChannelsToFollowRow
+		var i FindTelegramPeersRow
 		if err := rows.Scan(&i.ID, &i.ChatName); err != nil {
 			return nil, err
 		}

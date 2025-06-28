@@ -95,7 +95,7 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 
 func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Client, db *pgx.Conn, s *session) error {
 	q := persist.New(db)
-	subscribeTo, err := q.FindChannelsToFollow(ctx)
+	subscribeTo, err := q.FindTelegramPeers(ctx)
 	if err != nil {
 		glog.Error("failed to find peers to subscribe ", err)
 		return err
@@ -117,7 +117,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		}
 
 		// Process only subscribed channels / groups
-		if slices.IndexFunc(subscribeTo, func(s persist.FindChannelsToFollowRow) bool {
+		if slices.IndexFunc(subscribeTo, func(s persist.FindTelegramPeersRow) bool {
 			return s.ID == channel.ChannelID
 		}) == -1 {
 			return nil
@@ -185,7 +185,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 	// Get required chats
 	q := persist.New(db)
-	chats, err := q.FindChannelsToFollow(ctx)
+	chats, err := q.FindTelegramPeers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get peers to follow with %w", err)
 	}
@@ -211,7 +211,7 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 			slog.Error("chat is empty, skipping", "value", chat)
 			continue
 		}
-		chatIdx :=  slices.IndexFunc(chats, func (c persist.FindChannelsToFollowRow) bool {
+		chatIdx :=  slices.IndexFunc(chats, func (c persist.FindTelegramPeersRow) bool {
 			return c.ID == chat.GetID()
 		})
 		if chatIdx < 0 {
