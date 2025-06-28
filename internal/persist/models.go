@@ -27,7 +27,8 @@ type TelegramPeer struct {
 }
 
 type TelegramTopic struct {
-	ID     int32
-	PeerID int64
-	Title  string
+	ID          int32
+	PeerID      int64
+	Title       string
+	Description pgtype.Text
 }

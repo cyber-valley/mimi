@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS telegram_topic (
     id int,
     peer_id bigint NOT NULL REFERENCES telegram_peer(id) ON DELETE CASCADE,
     title text NOT NULL,
+    description text,
     PRIMARY KEY (id, peer_id)
 );
 

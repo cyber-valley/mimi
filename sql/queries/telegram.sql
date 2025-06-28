@@ -21,3 +21,21 @@ INSERT INTO
     telegram_message (peer_id, topic_id, message)
 VALUES
     ($1, $2, $3);
+
+-- name: FindTelegramTopicDescription :one
+SELECT
+    description
+FROM
+    telegram_topic
+WHERE
+    peer_id = $1
+    AND id = $2;
+
+-- name: SaveTelegramTopicDescription :exec
+UPDATE
+    telegram_topic
+SET
+    description = $3
+WHERE
+    peer_id = $1
+    AND id = $2;

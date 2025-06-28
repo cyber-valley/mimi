@@ -220,10 +220,39 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 		}
 		channel, ok := chat.(*tg.Channel)
 		if ok {
-			_, err := getForumTopics(ctx, api, channel.ID, channel.AccessHash)
+			topics, err := getForumTopics(ctx, api, channel.ID, channel.AccessHash)
 			if err != nil {
 				slog.Error("chat", "value", fmt.Sprintf("%#v", chat))
 				return err
+			}
+
+			for _, topic := range topics {
+				_, err := q.FindTelegramTopicDescription(ctx, persist.FindTelegramTopicDescriptionParams{
+					PeerID: channel.ID,
+					ID: int32(topic.ID),
+				})
+				switch err {
+				default:
+					// Unexpected error
+					return fmt.Errorf("failed to find telegram topic description with %w", err)
+				case nil:
+					// Description was already generated and saved
+				case pgx.ErrNoRows:
+					// Generate and save description
+					resp, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
+						Peer: &tg.InputPeerChannel{
+							ChannelID: channel.ID,
+							AccessHash: channel.AccessHash,
+						},
+						MsgID: topic.ID,
+						Limit: 10,
+					})
+					time.Sleep(1 * time.Second)
+					if err != nil {
+						return fmt.Errorf("failed to get forum topic's messages. topic '%s', chat '%s', with %w", topic.Title, channel.Title, err)
+					}
+					slog.Info("got topic messages", "value", fmt.Sprintf("%#v", resp))
+				}
 			}
 		}
 		foundChats[chatIdx] = true
