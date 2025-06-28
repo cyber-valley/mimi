@@ -6,6 +6,7 @@ import (
 	"os"
 	"log"
 	"time"
+	"log/slog"
 
 	"github.com/golang/glog"
 	"github.com/gotd/contrib/middleware/floodwait"
@@ -75,7 +76,7 @@ func run(ctx context.Context, conn *pgx.Conn) error {
 			if self.Username != "" {
 				name = fmt.Sprintf("%s (@%s)", name, self.Username)
 			}
-			glog.Info("Current user:", name)
+			slog.Info("Current user", "name", name)
 
 			return mimitg.CheckDialogs(ctx, api, conn)
 		}); err != nil {
