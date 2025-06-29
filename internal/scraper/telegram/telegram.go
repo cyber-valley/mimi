@@ -317,9 +317,20 @@ func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					// Description was already generated and saved
 				case pgx.ErrNoRows:
 					// Topic's description should be generated and saved
-					_, err = processNewTopic(ctx, g, q, api, channel, topic)
+					messages, err := processNewTopic(ctx, g, q, api, channel, topic)
 					if err != nil {
 						return fmt.Errorf("failed to process new topic with %w", err)
+					}
+					for _, msg := range messages {
+						// TODO: Use transaction
+						err = q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+							TopicID: pgtype.Int4{Int32: int32(topic.ID), Valid: true},
+							PeerID: channel.ID,
+							Message: msg.Message, // Message isn't empty which is ensured my `processNewTopic` impl
+						})
+						if err != nil {
+							return fmt.Errorf("failed to save topic message %#v with %w", msg, err)
+						}
 					}
 					time.Sleep(7 * time.Second)
 				}
