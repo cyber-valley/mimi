@@ -304,6 +304,14 @@ func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 				return err
 			}
 
+			tx, err := db.Begin(ctx)
+			if err != nil {
+				return fmt.Errorf("faield to begin transaction with %w", err)
+			}
+			defer tx.Rollback(ctx)
+
+			qtx := q.WithTx(tx)
+
 			for _, topic := range topics {
 				_, err := q.TelegramTopicExists(ctx, persist.TelegramTopicExistsParams{
 					PeerID: channel.ID,
@@ -317,13 +325,12 @@ func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					// Description was already generated and saved
 				case pgx.ErrNoRows:
 					// Topic's description should be generated and saved
-					messages, err := processNewTopic(ctx, g, q, api, channel, topic)
+					messages, err := processNewTopic(ctx, g, qtx, api, channel, topic)
 					if err != nil {
 						return fmt.Errorf("failed to process new topic with %w", err)
 					}
 					for _, msg := range messages {
-						// TODO: Use transaction
-						err = q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+						err = qtx.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
 							TopicID: pgtype.Int4{Int32: int32(topic.ID), Valid: true},
 							PeerID: channel.ID,
 							Message: msg.Message, // Message isn't empty which is ensured my `processNewTopic` impl
@@ -334,6 +341,9 @@ func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					}
 					time.Sleep(7 * time.Second)
 				}
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return fmt.Errorf("failed to commit new topic transaction with %w", err)
 			}
 		}
 		foundChats[chatIdx] = true
