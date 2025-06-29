@@ -214,6 +214,36 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		return tx.Commit(ctx)
 	})
 
+	d.OnNewMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
+		// Validate types
+		msg, ok := u.Message.(*tg.Message)
+		if !ok {
+			return nil
+		}
+		chat, ok := msg.PeerID.(*tg.PeerChat)
+		if !ok {
+			return fmt.Errorf("unexpected chat message peer %#v", msg)
+		}
+
+		// Process only subscribed channels / groups
+		if slices.IndexFunc(subscribeTo, func(s persist.FindTelegramPeersRow) bool {
+			return s.ID == chat.ChatID
+		}) == -1 {
+			return nil
+		}
+
+		// Persist message
+		err = q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+			PeerID:  chat.ChatID,
+			Message: msg.Message,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to save telegram message with %w", err)
+		}
+
+		return nil
+	})
+
 	return nil
 }
 
