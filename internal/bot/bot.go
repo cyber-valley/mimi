@@ -39,22 +39,25 @@ func Start(ctx context.Context, token string, logseqPath string) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	udpates := bot.GetUpdatesChan(u)
+	updates := bot.GetUpdatesChan(u)
 
-	for update := range udpates {
-		if update.Message != nil && len(update.Message.Text) > 0 {
-			ctx, cancel := context.WithCancel(ctx)
-			go func() {
-				if err := handler.handleMessage(ctx, update.Message); err != nil {
-					slog.Error("failed to handle message", "with", err)
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, err.Error())
-					_, err = bot.Send(msg)
-					if err != nil {
-						slog.Error("failed to answer after failed message handling", "with", err)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case update := <-updates:
+			if update.Message != nil && len(update.Message.Text) > 0 {
+				go func() {
+					if err := handler.handleMessage(ctx, update.Message); err != nil {
+						slog.Error("failed to handle message", "with", err)
+						msg := tgbotapi.NewMessage(update.Message.Chat.ID, err.Error())
+						_, err = bot.Send(msg)
+						if err != nil {
+							slog.Error("failed to answer after failed message handling", "with", err)
+						}
 					}
-				}
-				cancel()
-			}()
+				}()
+			}
 		}
 	}
 }
