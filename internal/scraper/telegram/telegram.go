@@ -189,7 +189,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 				}
 
 				// Process new topic
-				err = processNewTopic(ctx, g, qtx, api, channel, topic)
+				_, err = processNewTopic(ctx, g, qtx, api, channel, topic)
 				if err != nil {
 					return fmt.Errorf("failed to save telegram topic with %w", err)
 				}
@@ -250,6 +250,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 // Validate runs checks and saved required data into db
 // 1. Ensures all required chats exist in the current Telegram account
 // 2. Generates descriptions for the topics and persists them
+// 3. Save last messages if they wasn't persisted
 func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 	// Init LLM
 	g, err := genkit.Init(ctx,
@@ -316,7 +317,7 @@ func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					// Description was already generated and saved
 				case pgx.ErrNoRows:
 					// Topic's description should be generated and saved
-					err = processNewTopic(ctx, g, q, api, channel, topic)
+					_, err = processNewTopic(ctx, g, q, api, channel, topic)
 					if err != nil {
 						return fmt.Errorf("failed to process new topic with %w", err)
 					}
@@ -366,7 +367,8 @@ func getForumTopics(ctx context.Context, api *tg.Client, chatID, accessHash int6
 }
 
 // processNewTopic retrieves last messages from the given topic, generates description based on them and persist topic entity
-func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, api *tg.Client, channel *tg.Channel, topic *tg.ForumTopic) error {
+// returns all processed messages
+func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, api *tg.Client, channel *tg.Channel, topic *tg.ForumTopic) ([]*tg.Message, error) {
 	// Get topic's messages
 	msgReplies, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
 		Peer: &tg.InputPeerChannel{
@@ -374,20 +376,20 @@ func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, 
 			AccessHash: channel.AccessHash,
 		},
 		MsgID: topic.ID,
-		Limit: 10,
+		Limit: 50,
 	})
 	time.Sleep(1 * time.Second)
 	if err != nil {
-		return fmt.Errorf("failed to get forum topic's messages. topic '%s', chat '%s', with %w", topic.Title, channel.Title, err)
+		return nil, fmt.Errorf("failed to get forum topic's messages. topic '%s', chat '%s', with %w", topic.Title, channel.Title, err)
 	}
 	topicMessages, ok := msgReplies.(*tg.MessagesChannelMessages)
 	if !ok {
-		return fmt.Errorf("unexpected topic messages response type %#v", msgReplies)
+		return nil, fmt.Errorf("unexpected topic messages response type %#v", msgReplies)
 	}
 
-	description, err := extractMessagesSummary(ctx, g, topicMessages.Messages)
+	summary, err := extractMessagesSummary(ctx, g, topicMessages.Messages)
 	if err != nil {
-		return fmt.Errorf("failed to extract messages summary with %w", err)
+		return nil, fmt.Errorf("failed to extract messages summary with %w", err)
 	}
 
 	// Save topic
@@ -395,20 +397,25 @@ func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, 
 		PeerID: channel.ID,
 		ID: int32(topic.ID),
 		Title: topic.Title,
-		Description: description,
+		Description: summary.Description,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to save telegram topic description with %w", err)
+		return nil, fmt.Errorf("failed to save telegram topic description with %w", err)
 	}
 
-	return nil
+	return summary.Messages, nil
 }
 
-func extractMessagesSummary(ctx context.Context, g *genkit.Genkit, messages []tg.MessageClass) (string, error) {
+type messagesSummary struct {
+	Description string
+	Messages []*tg.Message
+}
+
+func extractMessagesSummary(ctx context.Context, g *genkit.Genkit, messages []tg.MessageClass) (summary messagesSummary, _ error) {
 	// Lookup prompt
 	prompt := genkit.LookupPrompt(g, telegramTopicDescriptionPrompt)
 	if prompt == nil {
-		return "", fmt.Errorf("no prompt named '%s' found", telegramTopicDescriptionPrompt)
+		return summary, fmt.Errorf("no prompt named '%s' found", telegramTopicDescriptionPrompt)
 	}
 
 	// Prepare LLM prompt input
@@ -420,6 +427,7 @@ loop:
 			if msg.Message == "" {
 				continue loop
 			}
+			summary.Messages = append(summary.Messages, msg)
 			input.Messages = append(input.Messages, topicMessage{From: msg.FromID.String(), Text: msg.Message})
 		case *tg.MessageService:
 			// Someone was invited, kicked, etc.
@@ -432,14 +440,15 @@ loop:
 	// Evaluate LLM prompt
 	resp, err := prompt.Execute(ctx, ai.WithInput(input))
 	if err != nil {
-		return "", fmt.Errorf("failed to describe messages '%#v' with %w", input, err)
+		return summary, fmt.Errorf("failed to describe messages '%#v' with %w", input, err)
 	}
 	var output telegramTopicDescriptionOutput
 	if err := resp.Output(&output); err != nil {
-		return "", fmt.Errorf("failed to deserialize LLM output with %w", err)
+		return summary, fmt.Errorf("failed to deserialize LLM output with %w", err)
 	}
+	summary.Description = output.Description
 
-	return output.Description, nil
+	return summary, nil
 }
 
 
