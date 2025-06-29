@@ -28,7 +28,7 @@ run-telegram-setup: lint
 	go run cmd/telegram-setup/main.go
 
 run-telegram-bot: lint
-	air --build.cmd "go build -o tmp/bot cmd/bot/main.go" --build.bin "./bin/bot"
+	go run cmd/bot/main.go
 
 run-telegram-scraper: lint
 	go run cmd/scraper/telegram.go
