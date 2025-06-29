@@ -78,7 +78,7 @@ func run(ctx context.Context, conn *pgx.Conn) error {
 			}
 			slog.Info("Current user", "name", name)
 
-			return mimitg.CheckDialogs(ctx, api, conn)
+			return mimitg.Validate(ctx, api, conn)
 		}); err != nil {
 			return err
 		}

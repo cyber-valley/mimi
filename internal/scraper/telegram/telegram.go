@@ -104,6 +104,10 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 	})
 }
 
+// setupDispatcher adds listeners for the telegram updates
+// 1. Forum topics. If a new topic created, it should have a comprehensive description of itself as a first message
+// 		otherwise LLM wouldn't generate a good enough description
+// 2. Groups. Simple message persistence
 func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Client, g *genkit.Genkit, db *pgx.Conn, s *session) error {
 	q := persist.New(db)
 	subscribeTo, err := q.FindTelegramPeers(ctx)
@@ -213,7 +217,10 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 	return nil
 }
 
-func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
+// Validate runs checks and saved required data into db
+// 1. Ensures all required chats exist in the current Telegram account
+// 2. Generates descriptions for the topics and persists them
+func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 	// Init LLM
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
@@ -328,6 +335,7 @@ func getForumTopics(ctx context.Context, api *tg.Client, chatID, accessHash int6
 	return topics, nil
 }
 
+// processNewTopic retrieves last messages from the given topic, generates description based on them and persist topic entity
 func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, api *tg.Client, channel *tg.Channel, topic *tg.ForumTopic) error {
 	// Lookup prompt
 	prompt := genkit.LookupPrompt(g, telegramTopicDescriptionPrompt)
