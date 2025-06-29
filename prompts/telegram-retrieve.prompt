@@ -3,10 +3,8 @@ system: "Given an input question, create a syntatically correct PostgreSQL query
 input:
   schema:
     query: string
-		schema: string
+    schema: string
 output:
   schema:
-		sql: string
+    sql: string
 ---
-
-

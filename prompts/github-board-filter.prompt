@@ -6,8 +6,8 @@ input:
 output:
   schema:
     projects(array):
-		  id: integer
-			title: string
+      id: integer
+      title: string
 ---
 
 {{query}}

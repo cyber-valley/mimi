@@ -1,11 +1,13 @@
 ---
-system: "You provided with list of last messages from the telegram topic. Generate description based on their content."
 input:
   schema:
     messages(array):
-			from: string
-			text: string
+      from: string
+      text: string
 output:
   schema:
-		description: string
+    description: string
 ---
+You provided with a list of last messages from the telegram topic. Generate description based on their content.
+
+{{messages}}
