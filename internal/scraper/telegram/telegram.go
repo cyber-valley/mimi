@@ -418,12 +418,13 @@ loop:
 		switch msg := msg.(type) {
 		case *tg.Message:
 			if msg.Message == "" {
-				slog.Warn("got empty message text")
 				continue loop
 			}
 			input.Messages = append(input.Messages, topicMessage{From: msg.FromID.String(), Text: msg.Message})
+		case *tg.MessageService:
+			// Someone was invited, kicked, etc.
 		default:
-			return "", fmt.Errorf("got unexpected message type %#v", msg)
+			slog.Warn("got unexpected message type", "value", fmt.Sprintf("%#v", msg))
 		}
 	}
 	slog.Info("extracting summary from non empty messages", "amount", len(input.Messages))
