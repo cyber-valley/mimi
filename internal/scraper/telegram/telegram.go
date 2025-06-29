@@ -203,6 +203,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 			topicID.Valid = true
 		}
 		err = qtx.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+			ID: int32(msg.ID),
 			PeerID:  channel.ChannelID,
 			TopicID: topicID,
 			Message: msg.Message,
@@ -234,6 +235,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 
 		// Persist message
 		err = q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+			ID: int32(msg.ID),
 			PeerID:  chat.ChatID,
 			Message: msg.Message,
 		})
@@ -331,6 +333,7 @@ func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					}
 					for _, msg := range messages {
 						err = qtx.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
+							ID: int32(msg.ID),
 							TopicID: pgtype.Int4{Int32: int32(topic.ID), Valid: true},
 							PeerID: channel.ID,
 							Message: msg.Message, // Message isn't empty which is ensured my `processNewTopic` impl

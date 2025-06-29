@@ -18,11 +18,14 @@ CREATE TABLE IF NOT EXISTS telegram_topic (
 
 -- Each telegram peer contains multiple messages
 CREATE TABLE IF NOT EXISTS telegram_message (
-    peer_id bigint PRIMARY KEY REFERENCES telegram_peer(id) ON DELETE CASCADE,
-    topic_id int NULL,
+    id int,
+    peer_id bigint NOT NULL,
+    topic_id int,
     message text NOT NULL,
     created_at timestamp WITH time zone DEFAULT NOW(),
-    FOREIGN KEY (peer_id, topic_id) REFERENCES telegram_topic(peer_id, id) ON DELETE CASCADE
+    PRIMARY KEY (id, peer_id),
+    FOREIGN KEY (topic_id, peer_id) REFERENCES telegram_topic(id, peer_id) ON DELETE CASCADE,
+    FOREIGN KEY (peer_id) REFERENCES telegram_peer(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS llm_chat (

@@ -14,6 +14,7 @@ type LlmChat struct {
 }
 
 type TelegramMessage struct {
+	ID        int32
 	PeerID    int64
 	TopicID   pgtype.Int4
 	Message   string
@@ -21,9 +22,10 @@ type TelegramMessage struct {
 }
 
 type TelegramPeer struct {
-	ID       int64
-	ChatName string
-	Enabled  bool
+	ID          int64
+	ChatName    string
+	Description pgtype.Text
+	Enabled     bool
 }
 
 type TelegramTopic struct {
