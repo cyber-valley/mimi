@@ -189,7 +189,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 				}
 
 				// Process new topic
-				err = processNewTopic(ctx, g, q, api, channel, topic)
+				err = processNewTopic(ctx, g, qtx, api, channel, topic)
 				if err != nil {
 					return fmt.Errorf("failed to save telegram topic with %w", err)
 				}
