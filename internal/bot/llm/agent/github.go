@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	githubEvalPromptName = "github-board-eval.prompt"
-	filterProjectsPromptName = "github-board-filter.prompt"
+	githubEvalPromptName = "github-board-eval"
+	filterProjectsPromptName = "github-board-filter"
 )
 
 type GitHubAgent struct {

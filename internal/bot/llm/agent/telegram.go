@@ -16,7 +16,7 @@ import (
 const (
 	retrievePromptName = "telegram-retrieve"
 	evalPromptName = "telegram-eval"
-	telegramSchemaPath = "sql/migrations/000001_telegram.up.sql"
+	telegramSchemaPath = "sql/migrations/000001_init.up.sql"
 )
 
 type TelegramAgent struct {
