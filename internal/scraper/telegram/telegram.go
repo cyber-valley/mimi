@@ -38,6 +38,14 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 		return fmt.Errorf("phone env variable %s is missing", tgPhone)
 	}
 
+	g, err := genkit.Init(ctx,
+		genkit.WithPlugins(&googlegenai.GoogleAI{}),
+		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
+		)
+	if err != nil {
+		return fmt.Errorf("could not initialize Genkit: %w", err)
+	}
+
 	dispatcher := tg.NewUpdateDispatcher()
 
 	gaps := updates.New(updates.Config{
@@ -63,7 +71,7 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 	api := client.API()
 	session := newSession()
 
-	setupDispatcher(ctx, &dispatcher, client, conn, session)
+	setupDispatcher(ctx, &dispatcher, client, g, conn, session)
 
 	flow := auth.NewFlow(TerminalUserAuthenticator{PhoneNumber: phone}, auth.SendCodeOptions{})
 
@@ -96,7 +104,7 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 	})
 }
 
-func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Client, db *pgx.Conn, s *session) error {
+func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Client, g *genkit.Genkit, db *pgx.Conn, s *session) error {
 	q := persist.New(db)
 	subscribeTo, err := q.FindTelegramPeers(ctx)
 	if err != nil {
@@ -132,20 +140,14 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
 			return nil
 		}
-		var (
-			topicID int32
-			topicTitle string
-			found   bool
-		)
+		var topic *tg.ForumTopic
 		if replyTo.ForumTopic {
 			t, err := s.resolveTopic(ctx, tg.NewClient(c), channel.ChannelID, replyTo.ReplyToMsgID)
 			if err != nil {
 				glog.Error("failed to resolve topic with: ", err)
 				return err
 			}
-			topicID = int32(t.ID)
-			topicTitle = t.Title
-			found = true
+			topic = t
 		}
 
 		// Begin transaction
@@ -158,22 +160,43 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 		qtx := q.WithTx(tx)
 
 		// Save topic if does not exists
-		if !found {
+		if topic != nil {
 			// TODO: Use separate function to save new telegram topic
-			err = qtx.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
-				ID: topicID,
-				PeerID: channel.ChannelID,
-				Title: topicTitle,
-			})
+
+			api := c.API()
+			// Resolve channel peer
+			inputChannel := &tg.InputChannel{
+				ChannelID:  channel.ChannelID,
+				AccessHash: 0,
+			}
+			channels, err := api.ChannelsGetChannels(ctx, []tg.InputChannelClass{inputChannel})
+			if err != nil {
+				return fmt.Errorf("failed to resolve channel %d with %w", channel.ChannelID, err)
+			}
+			if len(channels.GetChats()) == 0 {
+				return fmt.Errorf("no channels found")
+			}
+			channel, ok := channels.GetChats()[0].(*tg.Channel)
+			if !ok {
+				return fmt.Errorf("unexpected resolved channel type %#v", channels)
+			}
+
+			// Process new topic
+			err = processNewTopic(ctx, g, q, api, channel, topic)
 			if err != nil {
 				return fmt.Errorf("failed to save telegram topic with %w", err)
 			}
 		}
 
 		// Save message
+		var topicID pgtype.Int4
+		if topic != nil {
+			topicID.Int32 = int32(topic.ID)
+			topicID.Valid = true
+		}
 		err = qtx.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
 			PeerID:  channel.ChannelID,
-			TopicID: pgtype.Int4{Int32: topicID, Valid: found},
+			TopicID: topicID,
 			Message: msg.Message,
 		})
 		if err != nil {
@@ -194,10 +217,6 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 		)
 	if err != nil {
 		return fmt.Errorf("could not initialize Genkit: %w", err)
-	}
-	prompt := genkit.LookupPrompt(g, telegramTopicDescriptionPrompt)
-	if prompt == nil {
-		return fmt.Errorf("no prompt named '%s' found", telegramTopicDescriptionPrompt)
 	}
 
 	// Get required chats
@@ -256,61 +275,9 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					// Description was already generated and saved
 				case pgx.ErrNoRows:
 					// Topic's description should be generated and saved
-
-					// Get topic's messages
-					msgReplies, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
-						Peer: &tg.InputPeerChannel{
-							ChannelID: channel.ID,
-							AccessHash: channel.AccessHash,
-						},
-						MsgID: topic.ID,
-						Limit: 10,
-					})
-					time.Sleep(1 * time.Second)
+					err = processNewTopic(ctx, g, q, api, channel, topic)
 					if err != nil {
-						return fmt.Errorf("failed to get forum topic's messages. topic '%s', chat '%s', with %w", topic.Title, channel.Title, err)
-					}
-					topicMessages, ok := msgReplies.(*tg.MessagesChannelMessages)
-					if !ok {
-						return fmt.Errorf("unexpected topic messages response type %#v", msgReplies)
-					}
-
-					// Prepare LLM prompt input
-					var input telegramTopicDescriptionInput
-					for _, msg := range topicMessages.Messages {
-						msg, ok := msg.(*tg.Message)
-						if !ok {
-							slog.Warn("got unexpected message type", "value", fmt.Sprintf("%#v", msg))
-							continue
-						}
-						if msg.Message == "" {
-							slog.Warn("got empty message text")
-							continue
-						}
-						input.Messages = append(input.Messages, topicMessage{From: msg.FromID.String(), Text: msg.Message})
-					}
-					slog.Info("topic messages collected", "amount", len(input.Messages))
-
-					// Evaluate LLM prompt
-					resp, err := prompt.Execute(ctx, ai.WithInput(input))
-					if err != nil {
-						return fmt.Errorf("failed to describe topic's messages '%#v' with %w", input, err)
-					}
-					var output telegramTopicDescriptionOutput
-					if err := resp.Output(&output); err != nil {
-						return fmt.Errorf("failed to deserialize LLM output with %w", err)
-					}
-					slog.Info("got topic's description", "output", output, "topicTitle", topic.Title, "channelTitle", channel.Title)
-
-					// Save topic
-					err = q.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
-						PeerID: channel.ID,
-						ID: int32(topic.ID),
-						Title: topic.Title,
-						Description: output.Description,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to save telegram topic description with %w", err)
+						return fmt.Errorf("failed to process new topic with %w", err)
 					}
 				}
 			}
@@ -354,6 +321,72 @@ func getForumTopics(ctx context.Context, api *tg.Client, chatID, accessHash int6
 		topics[i] = topic
 	}
 	return topics, nil
+}
+
+func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, api *tg.Client, channel *tg.Channel, topic *tg.ForumTopic) error {
+	// Lookup prompt
+	prompt := genkit.LookupPrompt(g, telegramTopicDescriptionPrompt)
+	if prompt == nil {
+		return fmt.Errorf("no prompt named '%s' found", telegramTopicDescriptionPrompt)
+	}
+
+	// Get topic's messages
+	msgReplies, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
+		Peer: &tg.InputPeerChannel{
+			ChannelID: channel.ID,
+			AccessHash: channel.AccessHash,
+		},
+		MsgID: topic.ID,
+		Limit: 10,
+	})
+	time.Sleep(1 * time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to get forum topic's messages. topic '%s', chat '%s', with %w", topic.Title, channel.Title, err)
+	}
+	topicMessages, ok := msgReplies.(*tg.MessagesChannelMessages)
+	if !ok {
+		return fmt.Errorf("unexpected topic messages response type %#v", msgReplies)
+	}
+
+	// Prepare LLM prompt input
+	var input telegramTopicDescriptionInput
+	for _, msg := range topicMessages.Messages {
+		msg, ok := msg.(*tg.Message)
+		if !ok {
+			slog.Warn("got unexpected message type", "value", fmt.Sprintf("%#v", msg))
+			continue
+		}
+		if msg.Message == "" {
+			slog.Warn("got empty message text")
+			continue
+		}
+		input.Messages = append(input.Messages, topicMessage{From: msg.FromID.String(), Text: msg.Message})
+	}
+	slog.Info("topic messages collected", "amount", len(input.Messages))
+
+	// Evaluate LLM prompt
+	resp, err := prompt.Execute(ctx, ai.WithInput(input))
+	if err != nil {
+		return fmt.Errorf("failed to describe topic's messages '%#v' with %w", input, err)
+	}
+	var output telegramTopicDescriptionOutput
+	if err := resp.Output(&output); err != nil {
+		return fmt.Errorf("failed to deserialize LLM output with %w", err)
+	}
+	slog.Info("got topic's description", "output", output, "topicTitle", topic.Title, "channelTitle", channel.Title)
+
+	// Save topic
+	err = q.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
+		PeerID: channel.ID,
+		ID: int32(topic.ID),
+		Title: topic.Title,
+		Description: output.Description,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to save telegram topic description with %w", err)
+	}
+
+	return nil
 }
 
 type telegramTopicDescriptionInput struct {
