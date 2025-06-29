@@ -23,9 +23,9 @@ INSERT INTO
 VALUES
     ($1, $2, $3);
 
--- name: FindTelegramTopicDescription :one
+-- name: TelegramTopicExists :one
 SELECT
-    description
+    1
 FROM
     telegram_topic
 WHERE

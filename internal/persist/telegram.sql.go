@@ -46,28 +46,6 @@ func (q *Queries) FindTelegramPeers(ctx context.Context) ([]FindTelegramPeersRow
 	return items, nil
 }
 
-const findTelegramTopicDescription = `-- name: FindTelegramTopicDescription :one
-SELECT
-    description
-FROM
-    telegram_topic
-WHERE
-    peer_id = $1
-    AND id = $2
-`
-
-type FindTelegramTopicDescriptionParams struct {
-	PeerID int64
-	ID     int32
-}
-
-func (q *Queries) FindTelegramTopicDescription(ctx context.Context, arg FindTelegramTopicDescriptionParams) (string, error) {
-	row := q.db.QueryRow(ctx, findTelegramTopicDescription, arg.PeerID, arg.ID)
-	var description string
-	err := row.Scan(&description)
-	return description, err
-}
-
 const saveTelegramMessage = `-- name: SaveTelegramMessage :exec
 INSERT INTO
     telegram_message (peer_id, topic_id, message)
@@ -112,4 +90,26 @@ func (q *Queries) SaveTelegramTopic(ctx context.Context, arg SaveTelegramTopicPa
 		arg.Description,
 	)
 	return err
+}
+
+const telegramTopicExists = `-- name: TelegramTopicExists :one
+SELECT
+    1
+FROM
+    telegram_topic
+WHERE
+    peer_id = $1
+    AND id = $2
+`
+
+type TelegramTopicExistsParams struct {
+	PeerID int64
+	ID     int32
+}
+
+func (q *Queries) TelegramTopicExists(ctx context.Context, arg TelegramTopicExistsParams) (int32, error) {
+	row := q.db.QueryRow(ctx, telegramTopicExists, arg.PeerID, arg.ID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }

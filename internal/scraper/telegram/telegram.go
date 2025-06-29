@@ -161,30 +161,34 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 
 		// Save topic if does not exists
 		if topic != nil {
-			// TODO: Use separate function to save new telegram topic
+			_, err := q.TelegramTopicExists(ctx, persist.TelegramTopicExistsParams{
+				ID: int32(topic.ID),
+				PeerID: channel.ChannelID,
+			})
+			if err == pgx.ErrNoRows {
+				api := c.API()
+				// Resolve channel peer
+				inputChannel := &tg.InputChannel{
+					ChannelID:  channel.ChannelID,
+					AccessHash: 0,
+				}
+				channels, err := api.ChannelsGetChannels(ctx, []tg.InputChannelClass{inputChannel})
+				if err != nil {
+					return fmt.Errorf("failed to resolve channel %d with %w", channel.ChannelID, err)
+				}
+				if len(channels.GetChats()) == 0 {
+					return fmt.Errorf("no channels found")
+				}
+				channel, ok := channels.GetChats()[0].(*tg.Channel)
+				if !ok {
+					return fmt.Errorf("unexpected resolved channel type %#v", channels)
+				}
 
-			api := c.API()
-			// Resolve channel peer
-			inputChannel := &tg.InputChannel{
-				ChannelID:  channel.ChannelID,
-				AccessHash: 0,
-			}
-			channels, err := api.ChannelsGetChannels(ctx, []tg.InputChannelClass{inputChannel})
-			if err != nil {
-				return fmt.Errorf("failed to resolve channel %d with %w", channel.ChannelID, err)
-			}
-			if len(channels.GetChats()) == 0 {
-				return fmt.Errorf("no channels found")
-			}
-			channel, ok := channels.GetChats()[0].(*tg.Channel)
-			if !ok {
-				return fmt.Errorf("unexpected resolved channel type %#v", channels)
-			}
-
-			// Process new topic
-			err = processNewTopic(ctx, g, q, api, channel, topic)
-			if err != nil {
-				return fmt.Errorf("failed to save telegram topic with %w", err)
+				// Process new topic
+				err = processNewTopic(ctx, g, q, api, channel, topic)
+				if err != nil {
+					return fmt.Errorf("failed to save telegram topic with %w", err)
+				}
 			}
 		}
 
@@ -263,7 +267,7 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 			}
 
 			for _, topic := range topics {
-				_, err := q.FindTelegramTopicDescription(ctx, persist.FindTelegramTopicDescriptionParams{
+				_, err := q.TelegramTopicExists(ctx, persist.TelegramTopicExistsParams{
 					PeerID: channel.ID,
 					ID: int32(topic.ID),
 				})
