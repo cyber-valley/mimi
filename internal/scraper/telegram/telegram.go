@@ -283,6 +283,7 @@ func CheckDialogs(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 					if err != nil {
 						return fmt.Errorf("failed to process new topic with %w", err)
 					}
+					time.Sleep(7 * time.Second)
 				}
 			}
 		}
@@ -397,11 +398,11 @@ type telegramTopicDescriptionInput struct {
 	Messages []topicMessage `json:"messages"`
 }
 
-type telegramTopicDescriptionOutput struct {
-	Description string `json:"description"`
-}
-
 type topicMessage struct {
 	From string `json:"from"`
 	Text string `json:"text"`
+}
+
+type telegramTopicDescriptionOutput struct {
+	Description string `json:"description"`
 }
