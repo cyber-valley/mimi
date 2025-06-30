@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS telegram_peer (
     id bigint PRIMARY KEY,
     chat_name text NOT NULL,
+    description text,
     -- Set to false if given peer should not be used
     enabled boolean NOT NULL DEFAULT TRUE
 );
