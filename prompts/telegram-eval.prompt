@@ -3,5 +3,5 @@ input:
   schema:
     query: string
 ---
-Given related database rows to the user's query, generate a proper answer to it
+You provided with related messages to the user's query. Answer it and translate facts by default instead of general descriptions.
 query: {{query}}
