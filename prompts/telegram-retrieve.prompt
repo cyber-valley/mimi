@@ -4,10 +4,8 @@ input:
   schema:
     query: string
     schema: string
-output:
-  schema:
-    data: string
 ---
-Using provided schema and tool `executeQuery` output all required information to answer user's query. It will be provided to another agent, so make all field names clear and descriptive. You can append any related text info to the result as well
-query: {query}
-schema: {schema}
+Your provided with PostgreSQL schema. Analyze user's request and query all related information with `queryDB` tool. Probably u'll need to query DB several times to get clues about all required information. Output actual responses from `queryDB` tool and append any useful commentaries about data for the further processing in another agent
+
+request: {{query}}
+schema: {{schema}}

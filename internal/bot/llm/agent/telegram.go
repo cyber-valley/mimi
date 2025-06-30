@@ -42,13 +42,21 @@ func NewTelegramAgent(g *genkit.Genkit, conn *pgx.Conn) TelegramAgent {
   genkit.DefineTool(
     g, "queryDB", "Executes given PostgreSQL query and returns results",
     func(ctx *ai.ToolContext, input sqlQuery) (string, error) {
+			// Execute query
 			rows, err := conn.Query(ctx, input.SQL)
 			if err != nil {
 				return "", fmt.Errorf("failed to execute generated SQL query '%s' with %w", input.SQL, err)
 			}
-			data, err := pgx.CollectRows(rows, pgx.RowTo[[]any])
-			if err != nil {
-				return "", fmt.Errorf("failed to collect rows from generated SQL query '%s' with %w", input.SQL, err)
+			defer rows.Close()
+
+			// Scan rows
+			var data [][]any
+			for rows.Next() {
+				row, err := rows.Values()
+				if err != nil {
+					return "", fmt.Errorf("failed to scan row with %w", err)
+				}
+				data = append(data, row)
 			}
 			slog.Info("retrieved rows from generated SQL query", "query", input.SQL, "length", len(data))
 
@@ -65,6 +73,7 @@ func NewTelegramAgent(g *genkit.Genkit, conn *pgx.Conn) TelegramAgent {
 	if err != nil {
 		log.Fatalf("failed to read schema from %s with %s", telegramSchemaPath, err)
 	}
+	slog.Info("read SQL schema", "value", schema)
 
 	return TelegramAgent{
 		conn:              conn,
@@ -87,7 +96,7 @@ func (a TelegramAgent) GetInfo() Info {
 }
 
 func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
-	// Generate SQL query for the request
+	// Retrieve related DB info
 	resp, err := a.retrievePrompt.Execute(
 		ctx,
 		ai.WithMessages(msgs...),
@@ -97,16 +106,12 @@ func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Messag
 		return nil, fmt.Errorf("LLM request failed with %w", err)
 	}
 
-	// Execute generated query
-	var data telegramData
-	if err := resp.Output(&data); err != nil {
-		return nil, fmt.Errorf("failed to parse LLM output with %w", err)
-	}
+	slog.Info("retrieved telegram data", "value", resp.Text())
 
 	// Generate response based on fetched rows
 	resp, err = a.evalPrompt.Execute(
 		ctx,
-		ai.WithDocs(ai.DocumentFromText(data.Data, map[string]any{})),
+		ai.WithDocs(ai.DocumentFromText(resp.Text(), map[string]any{})),
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
@@ -115,8 +120,3 @@ func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Messag
 
 	return resp, nil
 }
-
-type telegramData struct {
-	Data string `json:"data"`
-}
-
