@@ -8,7 +8,6 @@ import (
 	"time"
 	"log/slog"
 
-	"github.com/golang/glog"
 	"github.com/gotd/contrib/middleware/floodwait"
 	"github.com/gotd/contrib/middleware/ratelimit"
 	"golang.org/x/time/rate"
@@ -32,6 +31,7 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
+	slog.Info("Running setup")
 	if err := run(ctx, conn); err != nil {
 		log.Fatalf("failed with %s", err)
 	}
@@ -44,7 +44,7 @@ func run(ctx context.Context, conn *pgx.Conn) error {
 	}
 
 	waiter := floodwait.NewWaiter().WithCallback(func(ctx context.Context, wait floodwait.FloodWait) {
-		glog.Warning("got FLOOD_WAIT. Will retry after", wait.Duration)
+		slog.Warn("got FLOOD_WAIT", "Will retry after", wait.Duration)
 	})
 
 	client, err := telegram.ClientFromEnvironment(telegram.Options{
@@ -54,7 +54,7 @@ func run(ctx context.Context, conn *pgx.Conn) error {
 		},
 	})
 	if err != nil {
-		glog.Error("failed to init client with ", err)
+		slog.Error("failed to init client", "with", err)
 		return err
 	}
 	api := client.API()
