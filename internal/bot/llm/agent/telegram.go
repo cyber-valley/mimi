@@ -111,6 +111,7 @@ func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Messag
 	// Generate response based on fetched rows
 	resp, err = a.evalPrompt.Execute(
 		ctx,
+		ai.WithMessages(msgs...),
 		ai.WithDocs(ai.DocumentFromText(resp.Text(), map[string]any{})),
 		ai.WithInput(map[string]any{"query": query}),
 	)

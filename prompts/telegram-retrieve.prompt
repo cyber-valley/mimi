@@ -5,7 +5,7 @@ input:
     query: string
     schema: string
 ---
-Your provided with PostgreSQL schema. Analyze user's request and query all related information with `queryDB` tool. Probably u'll need to query DB several times to get clues about all required information. Output actual responses from `queryDB` tool and append any useful commentaries about data for the further processing in another agent
+Your provided with PostgreSQL schema. Analyze user's request and query all related information with `queryDB` tool. Probably u'll need to query DB several times to get clues about all required information. Output actual responses from `queryDB` tool and append any useful commentaries about data for the further processing in another agent. Always finish only if u got actual messages text. Only u can access them
 
 request: {{query}}
 schema: {{schema}}
