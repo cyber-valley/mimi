@@ -25,8 +25,9 @@ type LLM struct {
 	router *ai.Prompt
 }
 
-func New(q *persist.Queries, graph logseq.RegexGraph) LLM {
+func New(conn *pgx.Conn, graph logseq.RegexGraph) LLM {
 	ctx := context.Background()
+	q := persist.New(conn)
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
 		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
@@ -40,6 +41,7 @@ func New(q *persist.Queries, graph logseq.RegexGraph) LLM {
 		agent.NewLogseqQueryAgent(graph),
 		agent.NewFallbackAgent(g),
 		agent.NewGitHubAgent(g, "cyber-valley"),
+		agent.NewTelegramAgent(g, conn),
 	}
 
 	router := genkit.LookupPrompt(g, "router")

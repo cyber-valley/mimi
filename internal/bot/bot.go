@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"mimi/internal/bot/llm"
-	"mimi/internal/persist"
 	"mimi/internal/scraper/logseq"
 )
 
@@ -30,12 +29,11 @@ func Start(ctx context.Context, token string, logseqPath string) {
 	}
 	defer conn.Close(ctx)
 
-	q := persist.New(conn)
 	g := logseq.NewRegexGraph(logseqPath)
 	handler := UpdateHandler{
 		bot: bot,
 		g:   g,
-		llm: llm.New(q, g),
+		llm: llm.New(conn, g),
 	}
 
 	u := tgbotapi.NewUpdate(0)

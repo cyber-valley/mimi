@@ -1,10 +1,13 @@
 ---
-system: "Given an input question, create a syntatically correct PostgreSQL query to run to help find the answer"
+tools: [queryDB]
 input:
   schema:
     query: string
     schema: string
 output:
   schema:
-    sql: string
+    data: string
 ---
+Using provided schema and tool `executeQuery` output all required information to answer user's query. It will be provided to another agent, so make all field names clear and descriptive. You can append any related text info to the result as well
+query: {query}
+schema: {schema}
