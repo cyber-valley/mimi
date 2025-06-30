@@ -367,12 +367,6 @@ func getForumTopics(ctx context.Context, api *tg.Client, chatID, accessHash int6
 
 // processNewTopic retrieves last messages from the given topic, generates description based on them and persist topic entity
 func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, api *tg.Client, channel *tg.Channel, topic *tg.ForumTopic) error {
-	// Lookup prompt
-	prompt := genkit.LookupPrompt(g, telegramTopicDescriptionPrompt)
-	if prompt == nil {
-		return fmt.Errorf("no prompt named '%s' found", telegramTopicDescriptionPrompt)
-	}
-
 	// Get topic's messages
 	msgReplies, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
 		Peer: &tg.InputPeerChannel{
@@ -391,39 +385,17 @@ func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, 
 		return fmt.Errorf("unexpected topic messages response type %#v", msgReplies)
 	}
 
-	// Prepare LLM prompt input
-	var input telegramTopicDescriptionInput
-	for _, msg := range topicMessages.Messages {
-		msg, ok := msg.(*tg.Message)
-		if !ok {
-			slog.Warn("got unexpected message type", "value", fmt.Sprintf("%#v", msg))
-			continue
-		}
-		if msg.Message == "" {
-			slog.Warn("got empty message text")
-			continue
-		}
-		input.Messages = append(input.Messages, topicMessage{From: msg.FromID.String(), Text: msg.Message})
-	}
-	slog.Info("topic messages collected", "amount", len(input.Messages))
-
-	// Evaluate LLM prompt
-	resp, err := prompt.Execute(ctx, ai.WithInput(input))
+	description, err := extractMessagesSummary(ctx, g, topicMessages.Messages)
 	if err != nil {
-		return fmt.Errorf("failed to describe topic's messages '%#v' with %w", input, err)
+		return fmt.Errorf("failed to extract messages summary with %w", err)
 	}
-	var output telegramTopicDescriptionOutput
-	if err := resp.Output(&output); err != nil {
-		return fmt.Errorf("failed to deserialize LLM output with %w", err)
-	}
-	slog.Info("got topic's description", "output", output, "topicTitle", topic.Title, "channelTitle", channel.Title)
 
 	// Save topic
 	err = q.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
 		PeerID: channel.ID,
 		ID: int32(topic.ID),
 		Title: topic.Title,
-		Description: output.Description,
+		Description: description,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to save telegram topic description with %w", err)
@@ -431,6 +403,44 @@ func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, 
 
 	return nil
 }
+
+func extractMessagesSummary(ctx context.Context, g *genkit.Genkit, messages []tg.MessageClass) (string, error) {
+	// Lookup prompt
+	prompt := genkit.LookupPrompt(g, telegramTopicDescriptionPrompt)
+	if prompt == nil {
+		return "", fmt.Errorf("no prompt named '%s' found", telegramTopicDescriptionPrompt)
+	}
+
+	// Prepare LLM prompt input
+	var input telegramTopicDescriptionInput
+loop:
+	for _, msg := range messages {
+		switch msg := msg.(type) {
+		case *tg.Message:
+			if msg.Message == "" {
+				slog.Warn("got empty message text")
+				continue loop
+			}
+			input.Messages = append(input.Messages, topicMessage{From: msg.FromID.String(), Text: msg.Message})
+		default:
+			return "", fmt.Errorf("got unexpected message type %#v", msg)
+		}
+	}
+	slog.Info("extracting summary from non empty messages", "amount", len(input.Messages))
+
+	// Evaluate LLM prompt
+	resp, err := prompt.Execute(ctx, ai.WithInput(input))
+	if err != nil {
+		return "", fmt.Errorf("failed to describe messages '%#v' with %w", input, err)
+	}
+	var output telegramTopicDescriptionOutput
+	if err := resp.Output(&output); err != nil {
+		return "", fmt.Errorf("failed to deserialize LLM output with %w", err)
+	}
+
+	return output.Description, nil
+}
+
 
 type telegramTopicDescriptionInput struct {
 	Messages []topicMessage `json:"messages"`
