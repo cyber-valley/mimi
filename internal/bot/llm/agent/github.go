@@ -75,7 +75,7 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter related GitHub projects with %w", err)
 	}
-	var targetProjects []projectInfo
+	var targetProjects struct{Projects []projectInfo `json:"projects"`}
 	if err := resp.Output(&targetProjects); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal filtered projects '%s' with %w", resp.Text(), err)
 	}
@@ -83,7 +83,7 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	// Fetch GitHub board state
 	columnNames := []string{"monthly plan", "ordered", "shipped"}
 	issues := make(map[string][]db.Issue)
-	for _, info := range targetProjects {
+	for _, info := range targetProjects.Projects {
 		tmp, err := a.c.GetOrgProject(ctx, a.org, info.Id, columnNames)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
