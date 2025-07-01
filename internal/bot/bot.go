@@ -10,7 +10,7 @@ import (
 
 	"github.com/ai-shift/tgmd"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/bot/llm"
 	"mimi/internal/scraper/logseq"
@@ -23,17 +23,16 @@ func Start(ctx context.Context, token string, logseqPath string) {
 	}
 	slog.Info("Authorized account", "username", bot.Self.UserName)
 
-	conn, err := pgx.Connect(ctx, os.Getenv("DATABASE_URL"))
+	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to postgres with: %s", err)
 	}
-	defer conn.Close(ctx)
 
 	g := logseq.NewRegexGraph(logseqPath)
 	handler := UpdateHandler{
 		bot: bot,
 		g:   g,
-		llm: llm.New(conn, g),
+		llm: llm.New(pool, g),
 	}
 
 	u := tgbotapi.NewUpdate(0)

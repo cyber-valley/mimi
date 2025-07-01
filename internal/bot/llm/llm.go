@@ -12,6 +12,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/bot/llm/agent"
 	"mimi/internal/persist"
@@ -26,9 +27,9 @@ type LLM struct {
 	router *ai.Prompt
 }
 
-func New(conn *pgx.Conn, graph logseq.RegexGraph) LLM {
+func New(pgPool *pgxpool.Pool, graph logseq.RegexGraph) LLM {
 	ctx := context.Background()
-	q := persist.New(conn)
+	q := persist.New(pgPool)
 	g, err := genkit.Init(ctx,
 		genkit.WithPlugins(&googlegenai.GoogleAI{}),
 		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
@@ -43,7 +44,7 @@ func New(conn *pgx.Conn, graph logseq.RegexGraph) LLM {
 		agent.NewFallbackAgent(g),
 	}
 	ghAgent := agent.NewGitHubAgent(g, "cyber-valley")
-	tgAgent := agent.NewTelegramAgent(g, conn)
+	tgAgent := agent.NewTelegramAgent(g, pgPool)
 	summaryAgent := agent.NewSummaryAgent(g, "", tgAgent, ghAgent)
 	agents = slices.Concat(agents, []agent.Agent{ghAgent, tgAgent, summaryAgent})
 

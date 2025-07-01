@@ -10,7 +10,9 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"mimi/internal/persist"
 )
 
 const (
@@ -20,14 +22,14 @@ const (
 )
 
 type TelegramAgent struct {
-	conn              *pgx.Conn
+	pgPool *pgxpool.Pool
 	retrievePrompt *ai.Prompt
 	evalPrompt     *ai.Prompt
 	sqlSchema string
 	thinkingMaxIterations int
 }
 
-func NewTelegramAgent(g *genkit.Genkit, conn *pgx.Conn) TelegramAgent {
+func NewTelegramAgent(g *genkit.Genkit, pgPool *pgxpool.Pool) TelegramAgent {
 	// Fail fast if prompt wasn't found
 	retrieve := genkit.LookupPrompt(g, retrievePromptName)
 	if retrieve == nil {
@@ -43,7 +45,7 @@ func NewTelegramAgent(g *genkit.Genkit, conn *pgx.Conn) TelegramAgent {
     g, "queryDB", "Executes given PostgreSQL query and returns results",
     func(ctx *ai.ToolContext, input sqlQuery) (string, error) {
 			// Execute query
-			rows, err := conn.Query(ctx, input.SQL)
+			rows, err := pgPool.Query(ctx, input.SQL)
 			if err != nil {
 				return "", fmt.Errorf("failed to execute generated SQL query '%s' with %w", input.SQL, err)
 			}
@@ -76,7 +78,7 @@ func NewTelegramAgent(g *genkit.Genkit, conn *pgx.Conn) TelegramAgent {
 	slog.Info("read SQL schema", "value", schema)
 
 	return TelegramAgent{
-		conn:              conn,
+		pgPool:              pgPool,
 		retrievePrompt: retrieve,
 		evalPrompt:     eval,
 		sqlSchema: string(schema),
@@ -96,9 +98,19 @@ func (a TelegramAgent) GetInfo() Info {
 }
 
 func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+	q := persist.New(a.pgPool)
+	info, err := q.FindTelegramPeersWithTopics(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch initial info for telegram agent run with %w", err)
+	}
+	blob, err := json.Marshal(info)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal telegram info with %w", err)
+	}
 	// Retrieve related DB info
 	resp, err := a.retrievePrompt.Execute(
 		ctx,
+		ai.WithDocs(ai.DocumentFromText(string(blob), map[string]any{"info": "current telegram chats and topics"})),
 		ai.WithMessages(msgs...),
 		ai.WithInput(map[string]any{"query": query, "schema": a.sqlSchema}),
 	)
