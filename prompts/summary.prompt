@@ -7,15 +7,14 @@ input:
 
 period ∈ {день, неделя, месяц}. Mentioned in the user's query or `week` otherwise
 
-Utilize `githubAgent` tool to query {devops force, rockets, inventory} projects and all required information for `🚀 Статус проектов и задач
+Utilize `githubAgent` to query issues from {devops force, rockets, inventory} projects for `🚀 Статус проектов и задач` section.
 
-Utilize `githubAgent` tool for `📦 Инвентарь и поставки` and query {supply} project
+Utilize `githubAgent` to query issues from {supply} project for `📦 Инвентарь и поставки` section.
 
-Utilize `telegramAgent` tool to query all required information for:
+Utilize `telegramAgent` to find all messages and generate summary for:
 - `💬 Основные темы и решения в чатах`
 - `📢 Обсуждаемые темы`
 - `✅ Принятые решения`
-Do not ask to filter messages in any way, u r capable of processing the whole possible output
 
 Utilize `logseqDiff` tool to get `git diff` changes from the given date and generate content for `🌱 Изменения в LogSeq`
 
