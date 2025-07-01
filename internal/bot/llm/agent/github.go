@@ -77,7 +77,7 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	}
 	var targetProjects []projectInfo
 	if err := resp.Output(&targetProjects); err != nil {
-		return nil, fmt.Errorf("failed to decerialize filtered projects with %w", err)
+		return nil, fmt.Errorf("failed to unmarshal filtered projects '%s' with %w", resp.Text(), err)
 	}
 
 	// Fetch GitHub board state
