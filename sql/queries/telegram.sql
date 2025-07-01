@@ -7,6 +7,20 @@ FROM
 WHERE
     enabled;
 
+-- name: FindTelegramPeersWithTopics :many
+SELECT
+    p.id AS chat_id,
+    p.chat_name AS chat_name,
+    p.description AS chat_description,
+    t.id AS topic_id,
+    t.title AS topic_title,
+    t.description AS topic_description
+FROM
+    telegram_peer p
+    JOIN telegram_topic t ON t.peer_id = p.id
+WHERE
+    p.enabled;
+
 -- name: SaveTelegramTopic :exec
 INSERT INTO
     telegram_topic (id, peer_id, title, description)

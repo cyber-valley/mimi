@@ -46,6 +46,57 @@ func (q *Queries) FindTelegramPeers(ctx context.Context) ([]FindTelegramPeersRow
 	return items, nil
 }
 
+const findTelegramPeersWithTopics = `-- name: FindTelegramPeersWithTopics :many
+SELECT
+    p.id AS chat_id,
+    p.chat_name AS chat_name,
+    p.description AS chat_description,
+    t.id AS topic_id,
+    t.title AS topic_title,
+    t.description AS topic_description
+FROM
+    telegram_peer p
+    JOIN telegram_topic t ON t.peer_id = p.id
+WHERE
+    p.enabled
+`
+
+type FindTelegramPeersWithTopicsRow struct {
+	ChatID           int64
+	ChatName         string
+	ChatDescription  pgtype.Text
+	TopicID          int32
+	TopicTitle       string
+	TopicDescription string
+}
+
+func (q *Queries) FindTelegramPeersWithTopics(ctx context.Context) ([]FindTelegramPeersWithTopicsRow, error) {
+	rows, err := q.db.Query(ctx, findTelegramPeersWithTopics)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindTelegramPeersWithTopicsRow
+	for rows.Next() {
+		var i FindTelegramPeersWithTopicsRow
+		if err := rows.Scan(
+			&i.ChatID,
+			&i.ChatName,
+			&i.ChatDescription,
+			&i.TopicID,
+			&i.TopicTitle,
+			&i.TopicDescription,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const saveTelegramMessage = `-- name: SaveTelegramMessage :exec
 INSERT INTO
     telegram_message (id, peer_id, topic_id, message)
