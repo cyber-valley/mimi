@@ -11,6 +11,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const findTelegramMessages = `-- name: FindTelegramMessages :many
+SELECT
+    m.message,
+    p.chat_name AS chat_name,
+    t.title AS topic_title
+FROM
+    telegram_message m
+    INNER JOIN telegram_peer p ON m.peer_id = p.id
+    JOIN telegram_topic t ON m.topic_id = t.id
+`
+
+type FindTelegramMessagesRow struct {
+	Message    string
+	ChatName   string
+	TopicTitle string
+}
+
+func (q *Queries) FindTelegramMessages(ctx context.Context) ([]FindTelegramMessagesRow, error) {
+	rows, err := q.db.Query(ctx, findTelegramMessages)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindTelegramMessagesRow
+	for rows.Next() {
+		var i FindTelegramMessagesRow
+		if err := rows.Scan(&i.Message, &i.ChatName, &i.TopicTitle); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findTelegramPeers = `-- name: FindTelegramPeers :many
 SELECT
     id,

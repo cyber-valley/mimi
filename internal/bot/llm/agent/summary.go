@@ -4,9 +4,15 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"fmt"
+	"encoding/json"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"mimi/internal/persist"
+	"mimi/internal/scraper/github/db"
 )
 
 const (
@@ -15,50 +21,22 @@ const (
 
 type SummaryAgent struct {
 	evalPrompt     *ai.Prompt
+	ghClient *db.Client
+	ghOrg string
+	pgPool *pgxpool.Pool
 }
 
-func NewSummaryAgent(g *genkit.Genkit, logseqRepoPath string, tgAgent, ghAgent Agent) SummaryAgent {
+func NewSummaryAgent(g *genkit.Genkit, pgPool *pgxpool.Pool, ghOrg string, logseqRepoPath string) SummaryAgent {
 	// Fail fast if prompt wasn't found
 	eval := genkit.LookupPrompt(g, evalSummaryPrompt)
 	if eval == nil {
 		log.Fatalf("no prompt named '%s' found", evalSummaryPrompt)
 	}
 
-	type inputQuery struct {
-		Query string `json:"query" json_schema:"natural language query to the LLM agent"`
-	}
-
-	// Define tools
-  genkit.DefineTool(
-    g, "logseqDiff", "Returns `git diff` from the given date to the latest commit",
-    func(ctx *ai.ToolContext, input logseqDiffInput) (string, error) {
-			slog.Info("calling 'logseqDiff' tool", "input", input)
-			return fetchLogseqDiff(ctx, logseqRepoPath, input)
-		})
-
-  genkit.DefineTool(
-    g, "githubAgent", "Natural language interface to access GitHub projects. Capable of processing multiple projects in one call",
-    func(ctx *ai.ToolContext, input inputQuery) (string, error) {
-			slog.Info("calling 'githubAgent' tool", "input", input)
-			resp, err := tgAgent.Run(ctx, input.Query)
-			if err != nil {
-				return "", err
-			}
-			return resp.Text(), nil
-		})
-
-  genkit.DefineTool(
-    g, "telegramAgent", "Natural language interface to access Telegram chats. Requires mention of the period to be queried",
-    func(ctx *ai.ToolContext, input inputQuery) (string, error) {
-			slog.Info("calling 'telegramAgent' tool", "input", input)
-			resp, err := ghAgent.Run(ctx, input.Query)
-			if err != nil {
-				return "", err
-			}
-			return resp.Text(), nil
-		})
-
 	return SummaryAgent{
+		pgPool: pgPool,
+		ghClient: db.New("https://api.github.com/graphql"),
+		ghOrg: ghOrg,
 		evalPrompt:     eval,
 	}
 }
@@ -71,13 +49,43 @@ func (a SummaryAgent) GetInfo() Info {
 }
 
 func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
-	return a.evalPrompt.Execute(ctx, ai.WithInput(map[string]any{"query": query}))
-}
+	var docs []*ai.Document
 
-type logseqDiffInput struct {
-	Period string `json:"period" jsonschema_description:"day, week, or month"`
-}
+	issues := make(map[string][]db.Issue)
+	// TODO: Probably should be moved into `GetOrgProject`
+	columnNames := []string{"monthly plan", "ordered", "shipped"}
+	projects := map[string]int{
+		"rockets": 2,
+		"supply": 3,
+		"inventory": 24,
+		"devops force": 33,
+	}
+	for title, projID := range projects {
+		tmp, err := a.ghClient.GetOrgProject(ctx, a.ghOrg, projID, columnNames)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
+		}
+		slog.Info("fetched GitHub issues", "project", title, "lenght", len(tmp))
+		issues[title] = tmp
+	}
+	blob, err := json.Marshal(issues)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal GitHub projects info with %w", err)
+	}
+	docs = append(docs, ai.DocumentFromText(string(blob), map[string]any{"info": "GitHub projects issues"}))
 
-func fetchLogseqDiff(ctx *ai.ToolContext, logseqRepoPah string, input logseqDiffInput) (string, error) {
-	return "not implemented", nil
+	// Retrieve Telegram info
+	q := persist.New(a.pgPool)
+	messages, err := q.FindTelegramMessages(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve Telegram message from DB with %w", err)
+	}
+	slog.Info("retrieved Telegram messages", "length", len(messages))
+	blob, err = json.Marshal(messages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal Telegram messages with %w", err)
+	}
+	docs = append(docs, ai.DocumentFromText(string(blob), map[string]any{"info": "Related telegram messages"}))
+
+	return a.evalPrompt.Execute(ctx, ai.WithDocs(docs...))
 }

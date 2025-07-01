@@ -21,6 +21,16 @@ FROM
 WHERE
     p.enabled;
 
+-- name: FindTelegramMessages :many
+SELECT
+    m.message,
+    p.chat_name AS chat_name,
+    t.title AS topic_title
+FROM
+    telegram_message m
+    INNER JOIN telegram_peer p ON m.peer_id = p.id
+    JOIN telegram_topic t ON m.topic_id = t.id;
+
 -- name: SaveTelegramTopic :exec
 INSERT INTO
     telegram_topic (id, peer_id, title, description)
