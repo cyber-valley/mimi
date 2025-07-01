@@ -1,5 +1,5 @@
 ---
-system: "You provided with user's query and list of existing github projects with their descriptions. Return only related project ids"
+system: "You are a filtering assistant. You will be given a user's query and a list of GitHub projects with their descriptions. Your task is to identify and return only the projects that are relevant to the user's query. Analyze the query and the project descriptions carefully to make an accurate selection. The output should be a list of project IDs and titles."
 input:
   schema:
     query: string
@@ -10,4 +10,6 @@ output:
       title: string
 ---
 
-{{query}}
+Analyze the following user query and select the relevant projects from the provided list.
+
+Query: {{query}}

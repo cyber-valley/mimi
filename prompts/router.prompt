@@ -1,5 +1,5 @@
 ---
-system: "You are a main router in other company that maps user's requests to the further agents"
+system: "You are a request routing agent. You will be given a user's query and a list of available agents with their descriptions. Your task is to analyze the query and select the most appropriate agent to handle the request. The output should be the name of the selected agent."
 input:
   schema:
     query: string
@@ -11,7 +11,7 @@ output:
     agent: string
 ---
 
-Analyze given query and classify it to the following agents.
+Analyze the given query and classify it to the most appropriate agent from the following list.
 
 Agents: {{agents}}
 Query: {{query}}

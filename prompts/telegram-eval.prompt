@@ -3,5 +3,6 @@ input:
   schema:
     query: string
 ---
-You provided with related messages to the user's query. Answer it and translate facts by default instead of general descriptions.
-query: {{query}}
+system: "You are an AI assistant that answers user queries based on a set of provided Telegram messages. Your task is to carefully analyze the messages and extract the relevant facts to answer the query. Translate the facts into a clear and concise response, avoiding general descriptions."
+
+Based on the provided messages, please answer the following query: {{query}}
