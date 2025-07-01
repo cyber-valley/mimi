@@ -83,8 +83,6 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 
 	// Retrieve GitHub projects statuses
 	issues := make(map[string][]db.Issue)
-	// TODO: Probably should be moved into `GetOrgProject`
-	columnNames := []string{"monthly plan", "ordered", "shipped"}
 	// TODO: Should it be persisted in DB?
 	projects := map[string]int{
 		"rockets": 2,
@@ -94,7 +92,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	}
 	// Fetch issues for each project
 	for title, projID := range projects {
-		tmp, err := a.ghClient.GetOrgProject(ctx, a.ghOrg, projID, columnNames)
+		tmp, err := a.ghClient.GetOrgProject(ctx, a.ghOrg, projID, since)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
 		}

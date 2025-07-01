@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"encoding/json"
+	"time"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -81,10 +82,9 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	}
 
 	// Fetch GitHub board state
-	columnNames := []string{"monthly plan", "ordered", "shipped"}
 	issues := make(map[string][]db.Issue)
 	for _, info := range targetProjects.Projects {
-		tmp, err := a.c.GetOrgProject(ctx, a.org, info.Id, columnNames)
+		tmp, err := a.c.GetOrgProject(ctx, a.org, info.Id, time.Now().AddDate(-1, 0, 0))
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
 		}
