@@ -6,7 +6,6 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -14,11 +13,10 @@ const (
 )
 
 type SummaryAgent struct {
-	conn              *pgx.Conn
 	evalPrompt     *ai.Prompt
 }
 
-func NewSummaryAgent(g *genkit.Genkit, conn *pgx.Conn) SummaryAgent {
+func NewSummaryAgent(g *genkit.Genkit, logseqRepoPath string, tgAgent, ghAgent Agent) SummaryAgent {
 	// Fail fast if prompt wasn't found
 	eval := genkit.LookupPrompt(g, evalSummaryPrompt)
 	if eval == nil {
@@ -28,24 +26,31 @@ func NewSummaryAgent(g *genkit.Genkit, conn *pgx.Conn) SummaryAgent {
 	// Define tools
   genkit.DefineTool(
     g, "logseqDiff", "Returns `git diff` from the given date to the latest commit",
-    func(ctx *ai.ToolContext, input any) (string, error) {
-			panic("not implemented")
+    func(ctx *ai.ToolContext, input logseqDiffInput) (string, error) {
+			return fetchLogseqDiff(ctx, logseqRepoPath, input)
 		})
 
   genkit.DefineTool(
     g, "githubAgent", "Natural language interface to access GitHub projects",
-    func(ctx *ai.ToolContext, input any) (string, error) {
-			panic("not implemented")
+    func(ctx *ai.ToolContext, input string) (string, error) {
+			resp, err := tgAgent.Run(ctx, input)
+			if err != nil {
+				return "", err
+			}
+			return resp.Text(), nil
 		})
 
   genkit.DefineTool(
     g, "telegramAgent", "Natural language interface to access Telegram chats",
-    func(ctx *ai.ToolContext, input any) (string, error) {
-			panic("not implemented")
+    func(ctx *ai.ToolContext, input string) (string, error) {
+			resp, err := ghAgent.Run(ctx, input)
+			if err != nil {
+				return "", err
+			}
+			return resp.Text(), nil
 		})
 
 	return SummaryAgent{
-		conn:              conn,
 		evalPrompt:     eval,
 	}
 }
@@ -61,3 +66,10 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	panic("not implemented")
 }
 
+type logseqDiffInput struct {
+	Period string `json:"period" jsonschema_description:"day, week, or month"`
+}
+
+func fetchLogseqDiff(ctx *ai.ToolContext, logseqRepoPah string, input logseqDiffInput) (string, error) {
+	return "not implemented", nil
+}
