@@ -1,4 +1,4 @@
-.PHONY: format lint
+.PHONY: format vet
 include .env.example
 -include .env
 db-container = mimi-db
