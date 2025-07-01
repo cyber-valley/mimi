@@ -48,18 +48,25 @@ func (a SummaryAgent) GetInfo() Info {
 	}
 }
 
+// TODO: Most of the retrieving could be executed in parallel
 func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+	// TODO: Extract period from the query
+	// TODO: Filter Telegram messages by period
+	// TODO: Filter GitHub messages by period
 	var docs []*ai.Document
 
+	// Retrieve GitHub projects statuses
 	issues := make(map[string][]db.Issue)
 	// TODO: Probably should be moved into `GetOrgProject`
 	columnNames := []string{"monthly plan", "ordered", "shipped"}
+	// TODO: Should it be persisted in DB?
 	projects := map[string]int{
 		"rockets": 2,
 		"supply": 3,
 		"inventory": 24,
 		"devops force": 33,
 	}
+	// Fetch issues for each project
 	for title, projID := range projects {
 		tmp, err := a.ghClient.GetOrgProject(ctx, a.ghOrg, projID, columnNames)
 		if err != nil {
