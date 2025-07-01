@@ -1,0 +1,59 @@
+---
+tools: [logseqDiff, githubAgent, telegramAgent]
+input:
+  schema:
+    query: string
+		currentDate: string
+		githubProjects(array): string
+		telegramChats(array): string
+---
+
+period ∈ {день, неделя, месяц}. Mentioned in the user's query or `week` otherwise
+
+Utilize `githubAgent` tool to query all required information for `🚀 Статус проектов и задач
+
+Utilize `telegramAgent` tool to query all required information for:
+- `💬 Основные темы и решения в чатах`
+- `📢 Обсуждаемые темы`
+- `✅ Принятые решения`
+
+Utilize `logseqDiff` tool to get `git diff` changes from the given date and generate content for `🌱 Изменения в LogSeq`
+
+Output format:
+```text
+📅 Саммари событий Cyber Valley
+Период отчета: <period> {{currentDate}}
+
+🚀 Статус проектов и задач
+{%for project in githubProjects%}
+<Title>
+
+✅ Завершённые задачи:
+ • <issueName>: <labels>
+
+🔄 Текущие задачи:
+ • <issueName>: <status, fields, summary>
+{%endfor%}
+
+📦 Инвентарь и поставки
+ • <taskName>: <amount, summary>
+
+🌱 Изменения в LogSeq:
+<diff summary>
+
+💬 Основные темы и решения в чатах
+
+{%for chat in telegramChats%}
+<Title>
+
+📢 Обсуждаемые темы:
+• <theme>: <short summary>
+
+✅ Принятые решения:
+• <decision>: <short summary and consequences>
+{%endfor%}
+
+```
+
+query: {{query}}
+
