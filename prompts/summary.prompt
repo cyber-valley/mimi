@@ -18,8 +18,8 @@ Utilize `telegramAgent` tool to query all required information for:
 
 Utilize `logseqDiff` tool to get `git diff` changes from the given date and generate content for `🌱 Изменения в LogSeq`
 
-Output format:
-```text
+Fill the fields and output in the following format:
+{%begin template%}
 📅 Саммари событий Cyber Valley
 Период отчета: <period>
 
@@ -51,8 +51,6 @@ Output format:
 ✅ Принятые решения:
 • <decision>: <short summary and consequences>
 {%endfor%}
+{%end template%}
 
-```
-
-query: {{query}}
-
+user's query: {{query}}

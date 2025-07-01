@@ -23,6 +23,10 @@ func NewSummaryAgent(g *genkit.Genkit, logseqRepoPath string, tgAgent, ghAgent A
 		log.Fatalf("no prompt named '%s' found", evalSummaryPrompt)
 	}
 
+	type inputQuery struct {
+		Query string `json:"query" json_schema:"natural language query to the LLM agent"`
+	}
+
 	// Define tools
   genkit.DefineTool(
     g, "logseqDiff", "Returns `git diff` from the given date to the latest commit",
@@ -32,8 +36,8 @@ func NewSummaryAgent(g *genkit.Genkit, logseqRepoPath string, tgAgent, ghAgent A
 
   genkit.DefineTool(
     g, "githubAgent", "Natural language interface to access GitHub projects",
-    func(ctx *ai.ToolContext, input string) (string, error) {
-			resp, err := tgAgent.Run(ctx, input)
+    func(ctx *ai.ToolContext, input inputQuery) (string, error) {
+			resp, err := tgAgent.Run(ctx, input.Query)
 			if err != nil {
 				return "", err
 			}
@@ -42,8 +46,8 @@ func NewSummaryAgent(g *genkit.Genkit, logseqRepoPath string, tgAgent, ghAgent A
 
   genkit.DefineTool(
     g, "telegramAgent", "Natural language interface to access Telegram chats",
-    func(ctx *ai.ToolContext, input string) (string, error) {
-			resp, err := ghAgent.Run(ctx, input)
+    func(ctx *ai.ToolContext, input inputQuery) (string, error) {
+			resp, err := ghAgent.Run(ctx, input.Query)
 			if err != nil {
 				return "", err
 			}
