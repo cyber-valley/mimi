@@ -19,26 +19,26 @@ vet: format
 	go vet ./...
 	staticcheck ./...
 
-pre-commit: lint
+pre-commit: vet
 
 test:
 	go test -v ./...
 
-run-telegram-setup: lint
+run-telegram-setup: vet
 	go run cmd/telegram-setup/main.go
 
-run-telegram-bot: lint
+run-telegram-bot: vet
 	go run cmd/bot/main.go
 
-run-telegram-scraper: lint
+run-telegram-scraper: vet
 	go run cmd/scraper/telegram.go
 
-run-telegram-scraper-live-reload: lint
+run-telegram-scraper-live-reload: vet
 	air \
 		--build.cmd "go build -o bin/scraper/telegram cmd/scraper/telegram.go" \
 		--build.bin "./bin/scraper/telegram"
 
-run-logseq-scraper: lint
+run-logseq-scraper: vet
 	go run cmd/scraper/logseq/main.go
 
 sqlc-generate:
