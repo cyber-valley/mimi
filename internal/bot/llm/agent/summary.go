@@ -63,7 +63,7 @@ func (a SummaryAgent) GetInfo() Info {
 }
 
 func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
-	panic("not implemented")
+	return a.evalPrompt.Execute(ctx, ai.WithInput(map[string]any{"query": query}))
 }
 
 type logseqDiffInput struct {

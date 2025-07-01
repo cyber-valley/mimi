@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"slices"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -40,9 +41,11 @@ func New(conn *pgx.Conn, graph logseq.RegexGraph) LLM {
 		agent.NewLogseqAgent(g, db.New()),
 		agent.NewLogseqQueryAgent(graph),
 		agent.NewFallbackAgent(g),
-		agent.NewGitHubAgent(g, "cyber-valley"),
-		agent.NewTelegramAgent(g, conn),
 	}
+	ghAgent := agent.NewGitHubAgent(g, "cyber-valley")
+	tgAgent := agent.NewTelegramAgent(g, conn)
+	summaryAgent := agent.NewSummaryAgent(g, "", tgAgent, ghAgent)
+	agents = slices.Concat(agents, []agent.Agent{ghAgent, tgAgent, summaryAgent})
 
 	router := genkit.LookupPrompt(g, "router")
 	if router == nil {
