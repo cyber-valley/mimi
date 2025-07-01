@@ -49,8 +49,9 @@ type ProjectV2Response struct {
 			} `json:"fields"`
 			Items struct {
 				Nodes []struct {
-					ID      string `json:"id"`
-					Content struct {
+					ID        string    `json:"id"`
+					UpdatedAt time.Time `json:"updatedAt"`
+					Content   struct {
 						Title string `json:"title"`
 						URL   string `json:"url"`
 						State string `json:"state"`
@@ -155,7 +156,7 @@ func (c *Client) ListProjects(ctx context.Context, org string) (projects []Proje
 }
 
 // GetOrgProject queries organization project board information.
-func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber int, columnNames []string) ([]Issue, error) {
+func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber int, since time.Time) ([]Issue, error) {
 	var issues []Issue
 	after := ""
 	var times int
@@ -164,7 +165,6 @@ func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber in
 		variables := map[string]interface{}{
 			"org":           org,
 			"projectNumber": projectNumber,
-			"columnNames":   columnNames,
 			"after":         nil,
 		}
 		if after != "" {
@@ -178,6 +178,9 @@ func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber in
 
 		nodes := resp.Organization.ProjectV2.Items.Nodes
 		for _, node := range nodes {
+			if !node.UpdatedAt.IsZero() && node.UpdatedAt.Before(since) {
+				continue
+			}
 			content := node.Content
 			issues = append(issues, Issue{
 				Title: content.Title,

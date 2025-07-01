@@ -12,6 +12,7 @@ query GetOrgProjectWithComments(
       url
       items(first: 100, after: $after) {
         nodes {
+          updatedAt
           content {
             ... on Issue {
               title

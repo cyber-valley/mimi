@@ -2,12 +2,13 @@ package db
 
 import (
 	"testing"
+	"time"
 )
 
 func TestQueryProjectV2(t *testing.T) {
 	client := New("https://api.github.com/graphql")
-	columnNames := []string{"monthly plan", "ordered", "shipped"}
-	issues, err := client.GetOrgProject(t.Context(), "cyber-valley", 3, columnNames)
+	since := time.Now().Add(-24 * time.Hour)
+	issues, err := client.GetOrgProject(t.Context(), "cyber-valley", 3, since)
 	if err != nil {
 		t.Error(err)
 	}
