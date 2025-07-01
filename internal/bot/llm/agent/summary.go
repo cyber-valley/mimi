@@ -66,16 +66,16 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	}
 	period := resp.Text()
 	slog.Info("generating summary", "period", period)
-	until := time.Now()
+	since := time.Now()
 	switch period {
 	default:
 		return nil, fmt.Errorf("unexpected period '%s'", period)
 	case "month":
-		until = until.AddDate(0, 0, -30)
+		since = since.AddDate(0, 0, -30)
 	case "week":
-		until = until.AddDate(0, 0, -7)
+		since = since.AddDate(0, 0, -7)
 	case "day":
-		until = until.AddDate(0, 0, -1)
+		since = since.AddDate(0, 0, -1)
 	}
 	// TODO: Filter Telegram messages by period
 	// TODO: Filter GitHub messages by period
@@ -109,7 +109,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 
 	// Retrieve Telegram info
 	q := persist.New(a.pgPool)
-	messages, err := q.FindTelegramMessages(ctx, pgtype.Timestamptz{Time: until, Valid: true})
+	messages, err := q.FindTelegramMessages(ctx, pgtype.Timestamptz{Time: since, Valid: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Telegram message from DB with %w", err)
 	}
