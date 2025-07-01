@@ -1,0 +1,10 @@
+---
+system: "Read user's query and extract period from it (month, week, or day). If there is no period output day by default"
+input:
+  schema:
+    query: string
+output:
+  schema:
+    period: string
+---
+{{query}}

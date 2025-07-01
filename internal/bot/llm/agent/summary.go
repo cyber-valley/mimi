@@ -17,10 +17,12 @@ import (
 
 const (
 	evalSummaryPrompt = "summary"
+	periodExtractorPrompt = "period-extractor"
 )
 
 type SummaryAgent struct {
 	evalPrompt     *ai.Prompt
+	periodExtractor     *ai.Prompt
 	ghClient *db.Client
 	ghOrg string
 	pgPool *pgxpool.Pool
@@ -33,11 +35,17 @@ func NewSummaryAgent(g *genkit.Genkit, pgPool *pgxpool.Pool, ghOrg string, logse
 		log.Fatalf("no prompt named '%s' found", evalSummaryPrompt)
 	}
 
+	periodExtractor := genkit.LookupPrompt(g, periodExtractorPrompt)
+	if periodExtractor == nil {
+		log.Fatalf("no prompt named '%s' found", periodExtractorPrompt)
+	}
+
 	return SummaryAgent{
 		pgPool: pgPool,
 		ghClient: db.New("https://api.github.com/graphql"),
 		ghOrg: ghOrg,
 		evalPrompt:     eval,
+		periodExtractor: periodExtractor,
 	}
 }
 
@@ -50,7 +58,12 @@ func (a SummaryAgent) GetInfo() Info {
 
 // TODO: Most of the retrieving could be executed in parallel
 func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
-	// TODO: Extract period from the query
+	resp, err := a.periodExtractor.Execute(ctx, ai.WithInput(map[string]any{"query": query}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract period from query '%s' with %w", query, err)
+	}
+	period := resp.Text()
+	slog.Info("generating summary", "period", period)
 	// TODO: Filter Telegram messages by period
 	// TODO: Filter GitHub messages by period
 	var docs []*ai.Document
