@@ -20,6 +20,8 @@ FROM
     telegram_message m
     INNER JOIN telegram_peer p ON m.peer_id = p.id
     JOIN telegram_topic t ON m.topic_id = t.id
+WHERE
+    m.created_at >= $1
 `
 
 type FindTelegramMessagesRow struct {
@@ -28,8 +30,8 @@ type FindTelegramMessagesRow struct {
 	TopicTitle string
 }
 
-func (q *Queries) FindTelegramMessages(ctx context.Context) ([]FindTelegramMessagesRow, error) {
-	rows, err := q.db.Query(ctx, findTelegramMessages)
+func (q *Queries) FindTelegramMessages(ctx context.Context, createdAt pgtype.Timestamptz) ([]FindTelegramMessagesRow, error) {
+	rows, err := q.db.Query(ctx, findTelegramMessages, createdAt)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,9 @@ SELECT
 FROM
     telegram_message m
     INNER JOIN telegram_peer p ON m.peer_id = p.id
-    JOIN telegram_topic t ON m.topic_id = t.id;
+    JOIN telegram_topic t ON m.topic_id = t.id
+WHERE
+    m.created_at >= $1;
 
 -- name: SaveTelegramTopic :exec
 INSERT INTO
