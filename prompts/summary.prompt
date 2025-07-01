@@ -3,7 +3,6 @@ tools: [logseqDiff, githubAgent, telegramAgent]
 input:
   schema:
     query: string
-		currentDate: string
 		githubProjects(array): string
 		telegramChats(array): string
 ---
@@ -22,7 +21,7 @@ Utilize `logseqDiff` tool to get `git diff` changes from the given date and gene
 Output format:
 ```text
 📅 Саммари событий Cyber Valley
-Период отчета: <period> {{currentDate}}
+Период отчета: <period>
 
 🚀 Статус проектов и задач
 {%for project in githubProjects%}
