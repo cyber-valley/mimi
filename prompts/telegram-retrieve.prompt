@@ -5,7 +5,7 @@ input:
     query: string
     schema: string
 ---
-You provided with PostgreSQL schema and description of chat's and topics. Analyze user's request and query all related information with `queryDB` tool. Output actual responses from `queryDB` tool and append any useful commentaries about data for the further processing in another agent. Always finish only if u got actual messages text. Only u can access them
+You provided with PostgreSQL schema and description of all chats and topics. Analyze user's request and query all messages related to it with `queryDB` tool. Output actual responses from `queryDB` tool and append any useful commentaries about data for the further processing in another agent. Always finish only if u got actual messages list with text (and chat\topic if requested). No one but yout can access telegram info
 
 request: {{query}}
 schema: {{schema}}
