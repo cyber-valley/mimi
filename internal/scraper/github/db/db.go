@@ -51,11 +51,24 @@ type ProjectV2Response struct {
 				Nodes []struct {
 					ID        string    `json:"id"`
 					UpdatedAt time.Time `json:"updatedAt"`
-					Content   struct {
+					FieldValues struct {
+						Nodes []struct {
+							Name  string `json:"name"`
+							Field struct {
+								Name string `json:"name"`
+							} `json:"field"`
+						} `json:"nodes"`
+					} `json:"fieldValues"`
+					Content struct {
 						Title string `json:"title"`
 						URL   string `json:"url"`
 						State string `json:"state"`
 						Body  string `json:"body"`
+						Labels struct {
+							Nodes []struct {
+								Name string `json:"name"`
+							} `json:"nodes"`
+						} `json:"labels"`
 					} `json:"content"`
 				} `json:"nodes"`
 				PageInfo struct {
@@ -181,12 +194,28 @@ func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber in
 			if !node.UpdatedAt.IsZero() && node.UpdatedAt.Before(since) {
 				continue
 			}
+
+			var status string
+			for _, fieldValue := range node.FieldValues.Nodes {
+				if fieldValue.Field.Name == "Status" {
+					status = fieldValue.Name
+					break
+				}
+			}
+
+			var labels []string
+			for _, label := range node.Content.Labels.Nodes {
+				labels = append(labels, label.Name)
+			}
+
 			content := node.Content
 			issues = append(issues, Issue{
-				Title: content.Title,
-				URL:   content.URL,
-				State: content.State,
-				Body:  content.Body,
+				Title:  content.Title,
+				URL:    content.URL,
+				State:  content.State,
+				Body:   content.Body,
+				Labels: labels,
+				Status: status,
 			})
 		}
 
@@ -202,8 +231,10 @@ func (c *Client) GetOrgProject(ctx context.Context, org string, projectNumber in
 }
 
 type Issue struct {
-	Title string `json:"title"`
-	URL   string `json:"url"`
-	State string `json:"state"`
-	Body  string `json:"body"`
+	Title  string   `json:"title"`
+	URL    string   `json:"url"`
+	State  string   `json:"state"`
+	Body   string   `json:"body"`
+	Labels []string `json:"labels"`
+	Status string   `json:"status"`
 }

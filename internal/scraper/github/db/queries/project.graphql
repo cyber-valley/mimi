@@ -1,4 +1,4 @@
-query GetOrgProjectWithComments(
+query GetOrgProject(
   $org: String!, 
   $projectNumber: Int!, 
   $after: String
@@ -13,12 +13,29 @@ query GetOrgProjectWithComments(
       items(first: 100, after: $after) {
         nodes {
           updatedAt
+          fieldValues(first: 10) {
+            nodes {
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                name
+                field {
+                  ... on ProjectV2SingleSelectField {
+                    name
+                  }
+                }
+              }
+            }
+          }
           content {
             ... on Issue {
               title
               url
               state
               body
+              labels(first: 10) {
+                nodes {
+                  name
+                }
+              }
             }
           }
         }
