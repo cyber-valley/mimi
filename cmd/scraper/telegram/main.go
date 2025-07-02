@@ -1,8 +1,6 @@
 package main
 
-import (
-	
-)
+import ()
 
 func main() {
 	// flag.Lookup("stderrthreshold").Value.Set("INFO")

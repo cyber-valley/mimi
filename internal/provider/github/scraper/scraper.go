@@ -2,9 +2,9 @@ package scraper
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
-	"fmt"
 
 	"github.com/golang/glog"
 	"github.com/google/go-github/v72/github"
@@ -58,4 +58,3 @@ func (m eventMonitor) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusCreated)
 }
-

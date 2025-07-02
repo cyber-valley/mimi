@@ -4,18 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
-	"log/slog"
 
-	"github.com/golang/glog"
-	"github.com/gotd/td/tg"
-	"github.com/gotd/td/telegram/updates"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/golang/glog"
+	"github.com/gotd/td/telegram/updates"
+	"github.com/gotd/td/tg"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/persist"
 	"mimi/internal/provider/telegram"
@@ -33,7 +33,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, g *genkit.Genkit) error {
 		err := Setup(ctx, api, pool, g)
 		if err != nil {
 			return fmt.Errorf("failed to setup Telegram scraper with %w", err)
-		} 
+		}
 
 		// Listen for updated
 		setupDispatcher(ctx, &s.Dispatcher, s.Client.API(), g, pool, newSession())
@@ -46,9 +46,9 @@ func Run(ctx context.Context, pool *pgxpool.Pool, g *genkit.Genkit) error {
 }
 
 // setupDispatcher adds listeners for the telegram updates
-// 1. Forum topics. If a new topic created, it should have a comprehensive description of itself as a first message
-// 		otherwise LLM wouldn't generate a good enough description
-// 2. Groups. Simple message persistence
+//  1. Forum topics. If a new topic created, it should have a comprehensive description of itself as a first message
+//     otherwise LLM wouldn't generate a good enough description
+//  2. Groups. Simple message persistence
 func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client, g *genkit.Genkit, pool *pgxpool.Pool, s *session) error {
 	q := persist.New(pool)
 	subscribeTo, err := q.FindTelegramPeers(ctx)
@@ -107,7 +107,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 		// Save topic if does not exists
 		if topic != nil {
 			_, err := q.TelegramTopicExists(ctx, persist.TelegramTopicExistsParams{
-				ID: int32(topic.ID),
+				ID:     int32(topic.ID),
 				PeerID: channel.ChannelID,
 			})
 			if err == pgx.ErrNoRows {
@@ -143,10 +143,10 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 			topicID.Valid = true
 		}
 		err = qtx.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
-			ID: int32(msg.ID),
-			PeerID:  channel.ChannelID,
-			TopicID: topicID,
-			Message: msg.Message,
+			ID:        int32(msg.ID),
+			PeerID:    channel.ChannelID,
+			TopicID:   topicID,
+			Message:   msg.Message,
 			CreatedAt: pgtype.Timestamptz{Time: time.Unix(int64(msg.Date), 0), Valid: true},
 		})
 		if err != nil {
@@ -176,9 +176,9 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 
 		// Persist message
 		err = q.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
-			ID: int32(msg.ID),
-			PeerID:  chat.ChatID,
-			Message: msg.Message,
+			ID:        int32(msg.ID),
+			PeerID:    chat.ChatID,
+			Message:   msg.Message,
 			CreatedAt: pgtype.Timestamptz{Time: time.Unix(int64(msg.Date), 0), Valid: true},
 		})
 		if err != nil {
@@ -206,7 +206,7 @@ func Setup(ctx context.Context, api *tg.Client, db *pgxpool.Pool, g *genkit.Genk
 	// Fetch chat's list
 	dialogs, err := api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
 		OffsetPeer: &tg.InputPeerEmpty{},
-		Limit: 100,
+		Limit:      100,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get dialogs with %w", err)
@@ -224,7 +224,7 @@ func Setup(ctx context.Context, api *tg.Client, db *pgxpool.Pool, g *genkit.Genk
 			slog.Error("chat is empty, skipping", "value", chat)
 			continue
 		}
-		chatIdx := slices.IndexFunc(chats, func (c persist.FindTelegramPeersRow) bool {
+		chatIdx := slices.IndexFunc(chats, func(c persist.FindTelegramPeersRow) bool {
 			return c.ID == chat.GetID()
 		})
 		if chatIdx < 0 {
@@ -250,7 +250,7 @@ func Setup(ctx context.Context, api *tg.Client, db *pgxpool.Pool, g *genkit.Genk
 			for _, topic := range topics {
 				_, err := q.TelegramTopicExists(ctx, persist.TelegramTopicExistsParams{
 					PeerID: channel.ID,
-					ID: int32(topic.ID),
+					ID:     int32(topic.ID),
 				})
 				switch err {
 				default:
@@ -266,10 +266,10 @@ func Setup(ctx context.Context, api *tg.Client, db *pgxpool.Pool, g *genkit.Genk
 					}
 					for _, msg := range messages {
 						err = qtx.SaveTelegramMessage(ctx, persist.SaveTelegramMessageParams{
-							ID: int32(msg.ID),
-							TopicID: pgtype.Int4{Int32: int32(topic.ID), Valid: true},
-							PeerID: channel.ID,
-							Message: msg.Message, // Message isn't empty which is ensured my `processNewTopic` impl
+							ID:        int32(msg.ID),
+							TopicID:   pgtype.Int4{Int32: int32(topic.ID), Valid: true},
+							PeerID:    channel.ID,
+							Message:   msg.Message, // Message isn't empty which is ensured my `processNewTopic` impl
 							CreatedAt: pgtype.Timestamptz{Time: time.Unix(int64(msg.Date), 0), Valid: true},
 						})
 						if err != nil {
@@ -330,7 +330,7 @@ func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, 
 	// Get topic's messages
 	msgReplies, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
 		Peer: &tg.InputPeerChannel{
-			ChannelID: channel.ID,
+			ChannelID:  channel.ID,
 			AccessHash: channel.AccessHash,
 		},
 		MsgID: topic.ID,
@@ -352,9 +352,9 @@ func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, 
 
 	// Save topic
 	err = q.SaveTelegramTopic(ctx, persist.SaveTelegramTopicParams{
-		PeerID: channel.ID,
-		ID: int32(topic.ID),
-		Title: topic.Title,
+		PeerID:      channel.ID,
+		ID:          int32(topic.ID),
+		Title:       topic.Title,
 		Description: summary.Description,
 	})
 	if err != nil {
@@ -366,7 +366,7 @@ func processNewTopic(ctx context.Context, g *genkit.Genkit, q *persist.Queries, 
 
 type messagesSummary struct {
 	Description string
-	Messages []*tg.Message
+	Messages    []*tg.Message
 }
 
 func extractMessagesSummary(ctx context.Context, g *genkit.Genkit, messages []tg.MessageClass) (summary messagesSummary, _ error) {
@@ -409,7 +409,6 @@ loop:
 	return summary, nil
 }
 
-
 type telegramTopicDescriptionInput struct {
 	Messages []topicMessage `json:"messages"`
 }
@@ -422,4 +421,3 @@ type topicMessage struct {
 type telegramTopicDescriptionOutput struct {
 	Description string `json:"description"`
 }
-

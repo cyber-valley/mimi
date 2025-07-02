@@ -49,8 +49,8 @@ type ProjectV2Response struct {
 			} `json:"fields"`
 			Items struct {
 				Nodes []struct {
-					ID        string    `json:"id"`
-					UpdatedAt time.Time `json:"updatedAt"`
+					ID          string    `json:"id"`
+					UpdatedAt   time.Time `json:"updatedAt"`
 					FieldValues struct {
 						Nodes []struct {
 							Name  string `json:"name"`
@@ -60,10 +60,10 @@ type ProjectV2Response struct {
 						} `json:"nodes"`
 					} `json:"fieldValues"`
 					Content struct {
-						Title string `json:"title"`
-						URL   string `json:"url"`
-						State string `json:"state"`
-						Body  string `json:"body"`
+						Title  string `json:"title"`
+						URL    string `json:"url"`
+						State  string `json:"state"`
+						Body   string `json:"body"`
 						Labels struct {
 							Nodes []struct {
 								Name string `json:"name"`
@@ -151,15 +151,15 @@ type listProjectsResponse struct {
 }
 
 type ProjectInfo struct {
-	Id int `json:"number"`
-	Title string `json:"title"`
+	Id               int    `json:"number"`
+	Title            string `json:"title"`
 	ShortDescription string `json:"shortDescription"`
 }
 
 // ListProjects queries all organization's projects
 func (c *Client) ListProjects(ctx context.Context, org string) (projects []ProjectInfo, _ error) {
 	variables := map[string]any{
-		"orgName":           org,
+		"orgName": org,
 	}
 	resp, err := DoQuery[listProjectsResponse](ctx, c, listProjectsQuery, variables)
 	if err != nil {

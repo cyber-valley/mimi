@@ -95,9 +95,9 @@ func sendLongMessage(bot *tgbotapi.BotAPI, chatID int64, text string) error {
 	var buf []string
 	var curLen int
 	for _, line := range strings.Split(text, "\n") {
-		if curLen + len(line) <= 4096 {
+		if curLen+len(line) <= 4096 {
 			// Under the limit, continue accumulating
-			buf = append(buf, line)	
+			buf = append(buf, line)
 			curLen += len(line)
 			continue
 		}

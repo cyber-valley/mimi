@@ -20,6 +20,7 @@ vet: format
 	staticcheck ./...
 
 format:
+	go fmt ./...
 	sleek ./sql/migrations/*
 	sleek ./sql/queries/*
 

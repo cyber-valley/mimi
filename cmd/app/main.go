@@ -11,12 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/bot"
-	tgscraper "mimi/internal/provider/telegram/scraper"
 	ghscraper "mimi/internal/provider/github/scraper"
+	tgscraper "mimi/internal/provider/telegram/scraper"
 )
 
 const (
-	logseqGraphEnv = "LOGSEQ_GRAPH_PATH"
+	logseqGraphEnv      = "LOGSEQ_GRAPH_PATH"
 	telegramBotTokenEnv = "TELEGRAM_BOT_API_TOKEN"
 )
 
