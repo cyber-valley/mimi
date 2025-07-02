@@ -1,53 +1,42 @@
 .PHONY: format vet
 include .env.example
 -include .env
-db-container = mimi-db
+
+run: vet
+	go run cmd/app/main.go
 
 install:
-	wget -O $(HOME)/.local/bin/sleek \
-		https://github.com/nrempel/sleek/releases/download/v0.5.0/sleek-linux-x86_64
+	wget -O $(HOME)/.local/bin/sleek https://github.com/nrempel/sleek/releases/download/v0.5.0/sleek-linux-x86_64 &
+	wget -O $(HOME)/.local/bin/geni https://github.com/emilpriver/geni/releases/download/v1.1.6/geni-linux-amd64 &
+	wait
 	chmod +x $(HOME)/.local/bin/sleek
+	chmod +x $(HOME)/.local/bin/geni
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 	go install github.com/air-verse/air@latest
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-
-format:
-	sleek ./sql/migrations/*
-	sleek ./sql/queries/*
 
 vet: format
 	go vet ./...
 	staticcheck ./...
 
-pre-commit: vet
+format:
+	sleek ./sql/migrations/*
+	sleek ./sql/queries/*
 
-test:
+test: vet
 	go test -v ./...
 
-run-telegram-setup: vet
-	go run cmd/telegram-setup/main.go
-
-run-telegram-bot: vet
-	go run cmd/bot/main.go
-
-run-telegram-scraper: vet
-	go run cmd/scraper/telegram.go
-
-run-telegram-scraper-live-reload: vet
-	air \
-		--build.cmd "go build -o bin/scraper/telegram cmd/scraper/telegram.go" \
-		--build.bin "./bin/scraper/telegram"
-
-run-logseq-scraper: vet
-	go run cmd/scraper/logseq/main.go
-
-sqlc-generate:
+sqlc: format
 	sqlc generate
 
-migrate:
-	go run ./cmd/migrate/main.go
+migrate-up:
+	geni up
 
-podman-db:
+migrate-down:
+	geni down
+
+db-container = mimi-db
+dev-db:
 	test -n "$(DB_USER)" || exit 1
 	test -n "$(DB_PASSWORD)" || exit 1
 	test -n "$(DB_NAME)" || exit 1
