@@ -1,18 +1,20 @@
-package github
+package scraper
 
 import (
 	"errors"
-	"github.com/golang/glog"
-	"github.com/google/go-github/v72/github"
 	"net/http"
 	"os"
+	"fmt"
+
+	"github.com/golang/glog"
+	"github.com/google/go-github/v72/github"
 )
 
 type eventMonitor struct {
 	webhookSecretKey []byte
 }
 
-func Run() error {
+func Run(port int) error {
 	glog.Info("Setting up")
 	pk := os.Getenv("GITHUB_WEBHOOK_SECRET")
 	if pk == "" {
@@ -24,7 +26,7 @@ func Run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /github/webhook", m.handleWebhook)
 	glog.Info("Starting")
-	return http.ListenAndServe(":8000", mux)
+	return http.ListenAndServe(fmt.Sprintf(":%d", port), mux)
 }
 
 func (m eventMonitor) handleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -56,3 +58,4 @@ func (m eventMonitor) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusCreated)
 }
+

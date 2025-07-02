@@ -12,6 +12,7 @@ import (
 
 	"mimi/internal/bot"
 	tgscraper "mimi/internal/provider/telegram/scraper"
+	ghscraper "mimi/internal/provider/github/scraper"
 )
 
 const (
@@ -46,8 +47,9 @@ func main() {
 		log.Fatalf("failed to connect to postgres with: %s", err)
 	}
 
-	// TODO: Run scrapers
+	// Run scrapers
 	go tgscraper.Run(ctx, pool, g)
+	go ghscraper.Run(8000)
 
 	// Run Telegram bot
 	bot.Start(ctx, tgBotToken, logseqPath)
