@@ -19,6 +19,7 @@ WORKDIR /app
 COPY --from=build /app/app .
 COPY prompts prompts
 COPY cozo.db .
+COPY sql/migrations sql/migrations
 
 RUN apk upgrade
 RUN apk --no-cache add gcompat ca-certificates tzdata nodejs npm
