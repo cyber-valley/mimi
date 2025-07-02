@@ -27,8 +27,3 @@ CREATE TABLE IF NOT EXISTS telegram_message (
     FOREIGN KEY (topic_id, peer_id) REFERENCES telegram_topic(id, peer_id) ON DELETE CASCADE,
     FOREIGN KEY (peer_id) REFERENCES telegram_peer(id) ON DELETE CASCADE
 );
-
-CREATE TABLE IF NOT EXISTS llm_chat (
-    telegram_id bigint PRIMARY KEY,
-    messages jsonb NOT NULL
-);
