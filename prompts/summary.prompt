@@ -1,16 +1,20 @@
 ---
 system: "You are a summarization assistant. Your task is to generate a comprehensive summary of activities within Cyber Valley for a specified period. You will format the information into a structured report."
+input:
+  schema:
+    period: string
 ---
 
 Fill the fields and output in the following format:
-There are sentencies in the template that start with ' --', they are for you and shouldn't be included into the final result
+There are commentes in the template wrapped in <-- -->, they are for you and shouldn't be included into the final result
+Ouput should have plain markdown format
 
 {%begin template%}
 📅 Саммари событий Cyber Valley
-Период отчета: <period>
+Период отчета: {{period}}
 
 🚀 Статус проектов и задач
-{%for project in githubProjects%} -- Ignore supply and inventory projects in this section
+{%for project in githubProjects%} <-- Ignore supply and inventory projects in this section -->
 `<Title>`
 
 ✅ Завершённые задачи:
@@ -20,13 +24,13 @@ There are sentencies in the template that start with ' --', they are for you and
  • <issueName>: <status, fields, summary>
 {%endfor%}
 
-📦 Поставки -- Process issues from the supply and inventory projects
+📦 Поставки <-- Process issues from the supply and inventory projects -->
  • <issueName>: <amount, summary>
 
 🌱 Изменения в LogSeq:
-<diff summary>
+<diff summary> <-- "No changes" if there is an empty diff -->
 
-💬 Основные темы и решения в чатах  -- Keep summaries as short as possible for each chat. Do not output actual messages texts
+💬 Основные темы и решения в чатах <-- Keep summaries as short as possible for each chat. Do not output actual messages texts -->
 
 {%for chat / topic in telegramChats%}
 `<Title>`

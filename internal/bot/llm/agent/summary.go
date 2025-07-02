@@ -118,7 +118,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	}
 	docs = append(docs, ai.DocumentFromText(string(blob), map[string]any{"info": "Related telegram messages"}))
 
-	resp, err = a.evalPrompt.Execute(ctx, ai.WithDocs(docs...))
+	resp, err = a.evalPrompt.Execute(ctx, ai.WithDocs(docs...), ai.WithInput(map[string]any{"period": period}))
 	if err != nil {
 		return nil, err
 	}
