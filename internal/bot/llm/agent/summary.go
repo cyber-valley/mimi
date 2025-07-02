@@ -120,5 +120,10 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	}
 	docs = append(docs, ai.DocumentFromText(string(blob), map[string]any{"info": "Related telegram messages"}))
 
-	return a.evalPrompt.Execute(ctx, ai.WithDocs(docs...))
+	resp, err := a.evalPrompt.Execute(ctx, ai.WithDocs(docs...))
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("generated summary", "text", resp.Text())
+	return resp, nil
 }
