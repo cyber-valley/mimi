@@ -79,8 +79,6 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	case "day":
 		since = since.AddDate(0, 0, -1)
 	}
-	// TODO: Filter Telegram messages by period
-	// TODO: Filter GitHub messages by period
 	var docs []*ai.Document
 
 	// Retrieve GitHub projects statuses
