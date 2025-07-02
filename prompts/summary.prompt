@@ -11,7 +11,7 @@ There are sentencies in the template that start with ' --', they are for you and
 
 🚀 Статус проектов и задач
 {%for project in githubProjects%} -- Ignore supply and inventory projects in this section
-<Title>
+`<Title>`
 
 ✅ Завершённые задачи:
  • <issueName>: <labels>
@@ -26,10 +26,10 @@ There are sentencies in the template that start with ' --', they are for you and
 🌱 Изменения в LogSeq:
 <diff summary>
 
-💬 Основные темы и решения в чатах
+💬 Основные темы и решения в чатах  -- Keep summaries as short as possible for each chat. Do not output actual messages texts
 
-{%for chat in telegramChats%}
-<Title>
+{%for chat / topic in telegramChats%}
+`<Title>`
 
 📢 Обсуждаемые темы:
 • <theme>: <short summary>
