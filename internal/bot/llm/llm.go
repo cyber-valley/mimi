@@ -14,8 +14,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/bot/llm/agent"
+	"mimi/internal/bot/llm/agent/fallback"
+	"mimi/internal/bot/llm/agent/github"
+	"mimi/internal/bot/llm/agent/logseq"
+	"mimi/internal/bot/llm/agent/logseqquery"
+	"mimi/internal/bot/llm/agent/summary"
+	"mimi/internal/bot/llm/agent/telegram"
 	"mimi/internal/persist"
-	"mimi/internal/scraper/logseq"
+	logseqscraper "mimi/internal/scraper/logseq"
 	"mimi/internal/scraper/logseq/db"
 )
 
@@ -26,7 +32,7 @@ type LLM struct {
 	router *ai.Prompt
 }
 
-func New(pgPool *pgxpool.Pool, graph logseq.RegexGraph) LLM {
+func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph) LLM {
 	ctx := context.Background()
 	q := persist.New(pgPool)
 	g, err := genkit.Init(ctx,
@@ -39,12 +45,12 @@ func New(pgPool *pgxpool.Pool, graph logseq.RegexGraph) LLM {
 
 	ghOrg := "cyber-valley"
 	agents := []agent.Agent{
-		agent.NewLogseqAgent(g, db.New()),
-		agent.NewLogseqQueryAgent(graph),
-		agent.NewFallbackAgent(g),
-		agent.NewGitHubAgent(g, ghOrg),
-		agent.NewTelegramAgent(g, pgPool),
-		agent.NewSummaryAgent(g, pgPool, ghOrg, ""),
+		logseq.New(g, db.New()),
+		logseqquery.New(graph),
+		fallback.New(g),
+		github.New(g, ghOrg),
+		telegram.New(g, pgPool),
+		summary.New(g, pgPool, ghOrg, ""),
 	}
 
 	router := genkit.LookupPrompt(g, "router")

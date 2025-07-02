@@ -1,4 +1,4 @@
-package agent
+package logseqquery
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 
+	"mimi/internal/bot/llm/agent"
 	"mimi/internal/scraper/logseq"
 	"mimi/internal/scraper/logseq/query"
 )
@@ -16,12 +17,12 @@ type LogseqQueryAgent struct {
 	graph logseq.RegexGraph
 }
 
-func NewLogseqQueryAgent(graph logseq.RegexGraph) LogseqQueryAgent {
+func New(graph logseq.RegexGraph) LogseqQueryAgent {
 	return LogseqQueryAgent{graph: graph}
 }
 
-func (a LogseqQueryAgent) GetInfo() Info {
-	return Info{
+func (a LogseqQueryAgent) GetInfo() agent.Info {
+	return agent.Info{
 		Name: "logseq-query",
 		Description: `Evaluates logseq queries of format like '{{query (property :supply "next-month")}}'. They can have additional parameters like '{{query (page-tags [[super]])}}
   query-properties:: [:page :tags :alias]

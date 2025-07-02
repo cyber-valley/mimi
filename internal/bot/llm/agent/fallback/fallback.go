@@ -1,4 +1,4 @@
-package agent
+package fallback
 
 import (
 	"context"
@@ -6,18 +6,20 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
+
+	"mimi/internal/bot/llm/agent"
 )
 
 type FallbackAgent struct {
 	g *genkit.Genkit
 }
 
-func NewFallbackAgent(g *genkit.Genkit) FallbackAgent {
+func New(g *genkit.Genkit) FallbackAgent {
 	return FallbackAgent{g: g}
 }
 
-func (a FallbackAgent) GetInfo() Info {
-	return Info{
+func (a FallbackAgent) GetInfo() agent.Info {
+	return agent.Info{
 		Name:        "fallback",
 		Description: `used if there is no any better option`,
 	}

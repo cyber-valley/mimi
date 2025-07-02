@@ -1,12 +1,12 @@
-package agent
+package summary
 
 import (
-	"strings"
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"log/slog"
-	"fmt"
-	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/firebase/genkit/go/ai"
@@ -14,47 +14,48 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"mimi/internal/bot/llm/agent"
 	"mimi/internal/persist"
 	"mimi/internal/scraper/github/db"
 )
 
 const (
-	evalSummaryPrompt = "summary"
-	periodExtractorPrompt = "period-extractor"
+	evalPrompt   = "summary"
+	periodPrompt = "period-extractor"
 )
 
 type SummaryAgent struct {
-	evalPrompt     *ai.Prompt
-	periodExtractor     *ai.Prompt
-	ghClient *db.Client
-	ghOrg string
-	pgPool *pgxpool.Pool
+	evalPrompt      *ai.Prompt
+	periodExtractor *ai.Prompt
+	ghClient        *db.Client
+	ghOrg           string
+	pgPool          *pgxpool.Pool
 }
 
-func NewSummaryAgent(g *genkit.Genkit, pgPool *pgxpool.Pool, ghOrg string, logseqRepoPath string) SummaryAgent {
+func New(g *genkit.Genkit, pgPool *pgxpool.Pool, ghOrg string, logseqRepoPath string) SummaryAgent {
 	// Fail fast if prompt wasn't found
-	eval := genkit.LookupPrompt(g, evalSummaryPrompt)
+	eval := genkit.LookupPrompt(g, evalPrompt)
 	if eval == nil {
-		log.Fatalf("no prompt named '%s' found", evalSummaryPrompt)
+		log.Fatalf("no prompt named '%s' found", evalPrompt)
 	}
 
-	periodExtractor := genkit.LookupPrompt(g, periodExtractorPrompt)
+	periodExtractor := genkit.LookupPrompt(g, periodPrompt)
 	if periodExtractor == nil {
-		log.Fatalf("no prompt named '%s' found", periodExtractorPrompt)
+		log.Fatalf("no prompt named '%s' found", periodPrompt)
 	}
 
 	return SummaryAgent{
-		pgPool: pgPool,
-		ghClient: db.New("https://api.github.com/graphql"),
-		ghOrg: ghOrg,
-		evalPrompt:     eval,
+		pgPool:          pgPool,
+		ghClient:        db.New("https://api.github.com/graphql"),
+		ghOrg:           ghOrg,
+		evalPrompt:      eval,
 		periodExtractor: periodExtractor,
 	}
 }
 
-func (a SummaryAgent) GetInfo() Info {
-	return Info{
-		Name: "summary",
+func (a SummaryAgent) GetInfo() agent.Info {
+	return agent.Info{
+		Name:        "summary",
 		Description: `Provides overall summary across all available resources`,
 	}
 }
@@ -85,9 +86,9 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	issues := make(map[string][]db.Issue)
 	// TODO: Should it be persisted in DB?
 	projects := map[string]int{
-		"rockets": 2,
-		"supply": 3,
-		"inventory": 24,
+		"rockets":      2,
+		"supply":       3,
+		"inventory":    24,
 		"devops force": 33,
 	}
 	// Fetch issues for each project

@@ -1,4 +1,4 @@
-package agent
+package logseq
 
 import (
 	"context"
@@ -10,7 +10,13 @@ import (
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 
+	"mimi/internal/bot/llm/agent"
 	"mimi/internal/scraper/logseq/db"
+)
+
+const (
+	retrievePrompt = "logseq-retrieve"
+	evalPrompt     = "logseq-eval"
 )
 
 type LogseqAgent struct {
@@ -20,15 +26,15 @@ type LogseqAgent struct {
 	evalPrompt     *ai.Prompt
 }
 
-func NewLogseqAgent(g *genkit.Genkit, q *db.Queries) LogseqAgent {
+func New(g *genkit.Genkit, q *db.Queries) LogseqAgent {
 	// Fail fast if prompt wasn't found
-	retrieve := genkit.LookupPrompt(g, "logseq-retrieve")
+	retrieve := genkit.LookupPrompt(g, retrievePrompt)
 	if retrieve == nil {
-		log.Fatal("no prompt named 'logseq-retrieve' found")
+		log.Fatalf("no prompt named '%s' found", retrievePrompt)
 	}
-	eval := genkit.LookupPrompt(g, "logseq-eval")
+	eval := genkit.LookupPrompt(g, evalPrompt)
 	if eval == nil {
-		log.Fatal("no prompt named 'logseq-eval' found")
+		log.Fatalf("no prompt named '%s' found", evalPrompt)
 	}
 
 	return LogseqAgent{
@@ -39,8 +45,8 @@ func NewLogseqAgent(g *genkit.Genkit, q *db.Queries) LogseqAgent {
 	}
 }
 
-func (a LogseqAgent) GetInfo() Info {
-	return Info{
+func (a LogseqAgent) GetInfo() agent.Info {
+	return agent.Info{
 		Name: "logseq",
 		Description: `Knows all about cyber valley's history.
 		Capable of answering to questions about flora and fauna, main goals and mindsets`,

@@ -1,49 +1,50 @@
-package agent
+package telegram
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
-	"encoding/json"
 	"os"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"mimi/internal/bot/llm/agent"
 	"mimi/internal/persist"
 )
 
 const (
-	retrievePromptName = "telegram-retrieve"
-	evalPromptName = "telegram-eval"
-	telegramSchemaPath = "sql/migrations/000001_init.up.sql"
+	retrievePrompt        = "telegram-retrieve"
+	evalPrompt            = "telegram-eval"
+	telegramSchemaPath    = "sql/migrations/000001_init.up.sql"
+	thinkingMaxItarations = 5
 )
 
 type TelegramAgent struct {
-	pgPool *pgxpool.Pool
+	pgPool         *pgxpool.Pool
 	retrievePrompt *ai.Prompt
 	evalPrompt     *ai.Prompt
-	sqlSchema string
-	thinkingMaxIterations int
+	sqlSchema      string
 }
 
-func NewTelegramAgent(g *genkit.Genkit, pgPool *pgxpool.Pool) TelegramAgent {
+func New(g *genkit.Genkit, pgPool *pgxpool.Pool) TelegramAgent {
 	// Fail fast if prompt wasn't found
-	retrieve := genkit.LookupPrompt(g, retrievePromptName)
+	retrieve := genkit.LookupPrompt(g, retrievePrompt)
 	if retrieve == nil {
-		log.Fatalf("no prompt named '%s' found", retrievePromptName)
+		log.Fatalf("no prompt named '%s' found", retrievePrompt)
 	}
-	eval := genkit.LookupPrompt(g, evalPromptName)
+	eval := genkit.LookupPrompt(g, evalPrompt)
 	if eval == nil {
-		log.Fatalf("no prompt named '%s' found", evalPromptName)
+		log.Fatalf("no prompt named '%s' found", evalPrompt)
 	}
 
 	// Define a SQL query tool
-  genkit.DefineTool(
-    g, "queryDB", "Executes given PostgreSQL query and returns results",
-    func(ctx *ai.ToolContext, input sqlQuery) (string, error) {
+	genkit.DefineTool(
+		g, "queryDB", "Executes given PostgreSQL query and returns results",
+		func(ctx *ai.ToolContext, input sqlQuery) (string, error) {
 			// Execute query
 			rows, err := pgPool.Query(ctx, input.SQL)
 			if err != nil {
@@ -78,11 +79,10 @@ func NewTelegramAgent(g *genkit.Genkit, pgPool *pgxpool.Pool) TelegramAgent {
 	slog.Info("read SQL schema", "value", schema)
 
 	return TelegramAgent{
-		pgPool:              pgPool,
+		pgPool:         pgPool,
 		retrievePrompt: retrieve,
 		evalPrompt:     eval,
-		sqlSchema: string(schema),
-		thinkingMaxIterations: 5,
+		sqlSchema:      string(schema),
 	}
 }
 
@@ -90,9 +90,9 @@ type sqlQuery struct {
 	SQL string `json:"sql" jsonschema_description:"Query to execute"`
 }
 
-func (a TelegramAgent) GetInfo() Info {
-	return Info{
-		Name: "telegram",
+func (a TelegramAgent) GetInfo() agent.Info {
+	return agent.Info{
+		Name:        "telegram",
 		Description: `Has access to telegram message and capable of providing summaries or followbacks about current devops force or rockets live statuses`,
 	}
 }
