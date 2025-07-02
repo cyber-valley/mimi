@@ -82,12 +82,42 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 
 	// Response to the user's query
 	escaped := tgmd.Telegramify(strings.ReplaceAll(answer, "\n\n", "\n"))
-	msg := tgbotapi.NewMessage(m.Chat.ID, escaped)
-	msg.ParseMode = "MarkdownV2"
-	_, err = h.bot.Send(msg)
-	if err != nil {
+	if err := sendLongMessage(h.bot, m.Chat.ID, escaped); err != nil {
 		return fmt.Errorf("failed to send LLM response with %w", err)
 	}
 
 	return nil
+}
+
+// sendLongMessage splits text into chunks and may send several messages
+// to prevent error of exceeding Telegram's limit
+func sendLongMessage(bot *tgbotapi.BotAPI, chatID int64, text string) error {
+	var buf []string
+	var curLen int
+	for _, line := range strings.Split(text, "\n") {
+		if curLen + len(line) <= 4096 {
+			// Under the limit, continue accumulating
+			buf = append(buf, line)	
+			curLen += len(line)
+			continue
+		}
+		// The time to send is come
+		if err := sendShortMessage(bot, chatID, strings.Join(buf, "\n")); err != nil {
+			return nil
+		}
+		// Clean up state
+		buf = buf[:0]
+		curLen = 0
+	}
+	if len(buf) == 0 {
+		return nil
+	}
+	return sendShortMessage(bot, chatID, strings.Join(buf, "\n"))
+}
+
+func sendShortMessage(bot *tgbotapi.BotAPI, chatID int64, text string) error {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "MarkdownV2"
+	_, err := bot.Send(msg)
+	return err
 }
