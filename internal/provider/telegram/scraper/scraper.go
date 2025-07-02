@@ -13,7 +13,7 @@ import (
 	"github.com/gotd/td/telegram/updates"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -25,22 +25,23 @@ const (
 	telegramTopicDescriptionPrompt = "telegram-topic-description"
 )
 
-func Run(ctx context.Context, conn *pgx.Conn) error {
-	g, err := genkit.Init(ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{}),
-		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
-	)
-	if err != nil {
-		return fmt.Errorf("could not initialize Genkit: %w", err)
-	}
-
+func Run(ctx context.Context, pool *pgxpool.Pool, g *genkit.Genkit) error {
 	return telegram.StartClient(ctx, func(s telegram.ClientState) error {
-		setupDispatcher(ctx, &s.Dispatcher, s.Client.API(), g, conn, newSession())
-			return s.Gaps.Run(ctx, s.Client.API(), s.CurrentUser.ID, updates.AuthOptions{
-				OnStart: func(ctx context.Context) {
-					slog.Info("listening for events")
-				},
-			})
+		api := s.Client.API()
+
+		// Check account validness & generate required data
+		err := Setup(ctx, api, pool, g)
+		if err != nil {
+			return fmt.Errorf("failed to setup Telegram scraper with %w", err)
+		} 
+
+		// Listen for updated
+		setupDispatcher(ctx, &s.Dispatcher, s.Client.API(), g, pool, newSession())
+		return s.Gaps.Run(ctx, s.Client.API(), s.CurrentUser.ID, updates.AuthOptions{
+			OnStart: func(ctx context.Context) {
+				slog.Info("listening for events")
+			},
+		})
 	})
 }
 
@@ -48,8 +49,8 @@ func Run(ctx context.Context, conn *pgx.Conn) error {
 // 1. Forum topics. If a new topic created, it should have a comprehensive description of itself as a first message
 // 		otherwise LLM wouldn't generate a good enough description
 // 2. Groups. Simple message persistence
-func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client, g *genkit.Genkit, db *pgx.Conn, s *session) error {
-	q := persist.New(db)
+func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client, g *genkit.Genkit, pool *pgxpool.Pool, s *session) error {
+	q := persist.New(pool)
 	subscribeTo, err := q.FindTelegramPeers(ctx)
 	if err != nil {
 		glog.Error("failed to find peers to subscribe ", err)
@@ -95,7 +96,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 		}
 
 		// Begin transaction
-		tx, err := db.Begin(ctx)
+		tx, err := pool.Begin(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to begin transaction with %w", err)
 		}
@@ -194,16 +195,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 // 1. Ensures all required chats exist in the current Telegram account
 // 2. Generates descriptions for the topics and persists them
 // 3. Save last messages if they wasn't persisted
-func Setup(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
-	// Init LLM
-	g, err := genkit.Init(ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{}),
-		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
-		)
-	if err != nil {
-		return fmt.Errorf("could not initialize Genkit: %w", err)
-	}
-
+func Setup(ctx context.Context, api *tg.Client, db *pgxpool.Pool, g *genkit.Genkit) error {
 	// Get required chats
 	q := persist.New(db)
 	chats, err := q.FindTelegramPeers(ctx)
