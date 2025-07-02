@@ -32,9 +32,11 @@ sqlc: format
 
 migrate-up:
 	geni up
+	rm $(DATABASE_MIGRATIONS_FOLDER)/schema.sql # I found this file useless
 
 migrate-down:
 	geni down
+	rm $(DATABASE_MIGRATIONS_FOLDER)/schema.sql # I found this file useless
 
 db-container = mimi-db
 dev-db:
