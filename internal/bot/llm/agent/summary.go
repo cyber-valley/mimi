@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"strings"
 	"context"
 	"log"
 	"log/slog"
@@ -64,8 +65,9 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract period from query '%s' with %w", query, err)
 	}
-	period := resp.Text()
+	period := strings.TrimSuffix(resp.Text(), "\n")
 	slog.Info("generating summary", "period", period)
+
 	since := time.Now()
 	switch period {
 	default:

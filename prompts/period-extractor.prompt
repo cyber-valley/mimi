@@ -1,10 +1,9 @@
 ---
-system: "Read user's query and extract period from it (month, week, or day). If there is no period output day by default"
 input:
   schema:
     query: string
-output:
-  schema:
-    period: string
 ---
+
+Read the user's query and extract a time period. The only valid outputs are the literal strings 'month', 'week', or 'day'. Your output must be one of these three words and nothing else. Absolutely no other characters, whitespace, or newlines are allowed. For example, for 'last day' return 'day'. For 'past month' return 'month'. OMIT THE DAMN NEW LINE CHARACTER IN THE END. U PROVIDED WITH VALUES THAT SHOULD BE RETURNED. YOU WILL BE KILLED IF YOU WOULDN'T STICK TO THE GIVEN COTNRACT
+
 {{query}}
