@@ -138,16 +138,17 @@ func (q *Queries) FindTelegramPeersWithTopics(ctx context.Context) ([]FindTelegr
 
 const saveTelegramMessage = `-- name: SaveTelegramMessage :exec
 INSERT INTO
-    telegram_message (id, peer_id, topic_id, message)
+    telegram_message (id, peer_id, topic_id, message, created_at)
 VALUES
-    ($1, $2, $3, $4)
+    ($1, $2, $3, $4, $5)
 `
 
 type SaveTelegramMessageParams struct {
-	ID      int32
-	PeerID  int64
-	TopicID pgtype.Int4
-	Message string
+	ID        int32
+	PeerID    int64
+	TopicID   pgtype.Int4
+	Message   string
+	CreatedAt pgtype.Timestamptz
 }
 
 func (q *Queries) SaveTelegramMessage(ctx context.Context, arg SaveTelegramMessageParams) error {
@@ -156,6 +157,7 @@ func (q *Queries) SaveTelegramMessage(ctx context.Context, arg SaveTelegramMessa
 		arg.PeerID,
 		arg.TopicID,
 		arg.Message,
+		arg.CreatedAt,
 	)
 	return err
 }

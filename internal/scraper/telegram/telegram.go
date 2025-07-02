@@ -207,6 +207,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 			PeerID:  channel.ChannelID,
 			TopicID: topicID,
 			Message: msg.Message,
+			CreatedAt: pgtype.Timestamptz{Time: time.Unix(int64(msg.Date), 0), Valid: true},
 		})
 		if err != nil {
 			return fmt.Errorf("failed to save telegram message with %w", err)
@@ -238,6 +239,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, c *telegram.Cl
 			ID: int32(msg.ID),
 			PeerID:  chat.ChatID,
 			Message: msg.Message,
+			CreatedAt: pgtype.Timestamptz{Time: time.Unix(int64(msg.Date), 0), Valid: true},
 		})
 		if err != nil {
 			return fmt.Errorf("failed to save telegram message with %w", err)
@@ -337,6 +339,7 @@ func Validate(ctx context.Context, api *tg.Client, db *pgx.Conn) error {
 							TopicID: pgtype.Int4{Int32: int32(topic.ID), Valid: true},
 							PeerID: channel.ID,
 							Message: msg.Message, // Message isn't empty which is ensured my `processNewTopic` impl
+							CreatedAt: pgtype.Timestamptz{Time: time.Unix(int64(msg.Date), 0), Valid: true},
 						})
 						if err != nil {
 							return fmt.Errorf("failed to save topic message %#v with %w", msg, err)

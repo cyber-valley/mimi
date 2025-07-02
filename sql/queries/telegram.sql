@@ -45,9 +45,9 @@ SET
 
 -- name: SaveTelegramMessage :exec
 INSERT INTO
-    telegram_message (id, peer_id, topic_id, message)
+    telegram_message (id, peer_id, topic_id, message, created_at)
 VALUES
-    ($1, $2, $3, $4);
+    ($1, $2, $3, $4, $5);
 
 -- name: TelegramTopicExists :one
 SELECT
