@@ -11,3 +11,8 @@ VALUES
         2245058785,
         'chat of the head quoters'
     );
+
+INSERT INTO
+    github_repository (owner, name)
+VALUES
+    ('cyber-valley', 'cvland');

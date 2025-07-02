@@ -8,6 +8,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type GithubRepository struct {
+	Owner string
+	Name  string
+}
+
 type LlmChat struct {
 	TelegramID int64
 	Messages   []byte
