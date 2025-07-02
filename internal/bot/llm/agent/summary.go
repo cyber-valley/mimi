@@ -98,7 +98,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
 		}
-		slog.Info("fetched GitHub issues", "project", title, "lenght", len(tmp))
+		slog.Info("fetched GitHub issues", "project", title, "lenght", len(tmp), "value", tmp)
 		issues[title] = tmp
 	}
 	blob, err := json.Marshal(issues)
