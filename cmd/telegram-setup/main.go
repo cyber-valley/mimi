@@ -16,7 +16,7 @@ import (
 	"github.com/gotd/td/telegram/auth"
 	"github.com/jackc/pgx/v5"
 
-	mimitg "mimi/internal/scraper/telegram"
+	mimitg "mimi/internal/provider/telegram"
 )
 
 const (

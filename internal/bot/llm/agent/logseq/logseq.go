@@ -11,7 +11,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 
 	"mimi/internal/bot/llm/agent"
-	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/provider/logseq/db"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"mimi/internal/scraper/logseq"
+	"mimi/internal/provider/logseq"
 )
 
 const (

@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/jackc/pgx/v5"
-	"mimi/internal/scraper/telegram"
+	"mimi/internal/provider/telegram"
 )
 
 func main() {

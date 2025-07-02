@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"mimi/internal/scraper/logseq"
-	"mimi/internal/scraper/logseq/query/sexp"
+	"mimi/internal/provider/logseq"
+	"mimi/internal/provider/logseq/query/sexp"
 )
 
 type QueryResult struct {

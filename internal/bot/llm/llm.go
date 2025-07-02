@@ -21,8 +21,8 @@ import (
 	"mimi/internal/bot/llm/agent/summary"
 	"mimi/internal/bot/llm/agent/telegram"
 	"mimi/internal/persist"
-	logseqscraper "mimi/internal/scraper/logseq"
-	"mimi/internal/scraper/logseq/db"
+	logseqscraper "mimi/internal/provider/logseq"
+	"mimi/internal/provider/logseq/db"
 )
 
 type LLM struct {

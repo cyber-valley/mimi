@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/provider/logseq/db"
 )
 
 func Sync(ctx context.Context, g RegexGraph, q *db.Queries) error {

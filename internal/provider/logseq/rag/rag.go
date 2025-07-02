@@ -11,7 +11,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/compat_oai/openai"
 
-	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/provider/logseq/db"
 )
 
 type RAG struct {

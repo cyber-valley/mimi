@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/bot/llm"
-	"mimi/internal/scraper/logseq"
+	"mimi/internal/provider/logseq"
 )
 
 func Start(ctx context.Context, token string, logseqPath string) {

@@ -11,7 +11,7 @@ import (
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 
-	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/provider/logseq/db"
 )
 
 type LogseqAgent struct {

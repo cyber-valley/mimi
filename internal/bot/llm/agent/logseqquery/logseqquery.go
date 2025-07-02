@@ -9,8 +9,8 @@ import (
 	"github.com/firebase/genkit/go/ai"
 
 	"mimi/internal/bot/llm/agent"
-	"mimi/internal/scraper/logseq"
-	"mimi/internal/scraper/logseq/query"
+	"mimi/internal/provider/logseq"
+	"mimi/internal/provider/logseq/query"
 )
 
 type LogseqQueryAgent struct {

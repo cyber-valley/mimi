@@ -16,7 +16,7 @@ import (
 
 	"mimi/internal/bot/llm/agent"
 	"mimi/internal/persist"
-	"mimi/internal/scraper/github/db"
+	"mimi/internal/provider/github/db"
 )
 
 const (

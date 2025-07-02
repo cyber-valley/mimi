@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/signal"
 
-	"mimi/internal/scraper/logseq"
-	"mimi/internal/scraper/logseq/db"
+	"mimi/internal/provider/logseq"
+	"mimi/internal/provider/logseq/db"
 )
 
 func main() {
