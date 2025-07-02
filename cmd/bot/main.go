@@ -28,5 +28,9 @@ func main() {
 		log.Fatalf("env variable %s is missing", logseqGraphEnv)
 	}
 
+	// TODO: Run scrapers
+	// TODO: Run telegram setup
+
+	// Run Telegram bot
 	bot.Start(ctx, tgBotToken, logseqPath)
 }
