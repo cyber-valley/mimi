@@ -13,7 +13,6 @@ require (
 	github.com/gotd/contrib v0.21.0
 	github.com/gotd/td v0.124.0
 	github.com/jackc/pgx/v5 v5.7.2
-	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pgvector/pgvector-go v0.3.0
 	golang.org/x/term v0.32.0
 	golang.org/x/time v0.11.0

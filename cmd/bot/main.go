@@ -7,20 +7,26 @@ import (
 	"os/signal"
 
 	"mimi/internal/bot"
-	"mimi/internal/config"
 )
 
 const (
 	logseqGraphEnv = "LOGSEQ_GRAPH_PATH"
+	telegramBotTokenEnv = "TELEGRAM_BOT_API_TOKEN"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	config := config.FromEnv()
+
+	tgBotToken := os.Getenv(telegramBotTokenEnv)
+	if tgBotToken == "" {
+		log.Fatalf("env variable %s is missing", telegramBotTokenEnv)
+	}
+
 	logseqPath := os.Getenv(logseqGraphEnv)
-	if logseqPath != "" {
+	if logseqPath == "" {
 		log.Fatalf("env variable %s is missing", logseqGraphEnv)
 	}
-	bot.Start(ctx, config.TelegramBotApiToken, logseqPath)
+
+	bot.Start(ctx, tgBotToken, logseqPath)
 }
