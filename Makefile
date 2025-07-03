@@ -6,14 +6,15 @@ run: vet
 	go run cmd/app/main.go
 
 install:
-	wget -O $(HOME)/.local/bin/sleek https://github.com/nrempel/sleek/releases/download/v0.5.0/sleek-linux-x86_64 &
-	wget -O $(HOME)/.local/bin/geni https://github.com/emilpriver/geni/releases/download/v1.1.6/geni-linux-amd64 &
-	wait
+	wget -O $(HOME)/.local/bin/sleek https://github.com/nrempel/sleek/releases/download/v0.5.0/sleek-linux-x86_64
 	chmod +x $(HOME)/.local/bin/sleek
+	wget -O $(HOME)/.local/bin/geni https://github.com/emilpriver/geni/releases/download/v1.1.6/geni-linux-amd64
 	chmod +x $(HOME)/.local/bin/geni
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 	go install github.com/air-verse/air@latest
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+	./pull_libs.sh
+	go mod download
 
 vet: format
 	go vet ./...
