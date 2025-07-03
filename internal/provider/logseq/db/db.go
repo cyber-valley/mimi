@@ -7,7 +7,6 @@ import (
 	"log"
 	"log/slog"
 	"slices"
-	"strings"
 
 	"github.com/cozodb/cozo-lib-go"
 )
@@ -89,41 +88,31 @@ func (q *Queries) SavePage(p SavePageParams) error {
 
 	// Save or update page properties
 	if len(p.Props) > 0 {
-		var props []string
 		for name, value := range p.Props {
-			props = append(props, fmt.Sprintf(
-				`[%s,%s,%s]`,
-				escape(p.Title),
-				escape(name),
-				escape(value),
-			))
+			tx = append(
+				tx,
+				fmt.Sprintf(
+					`?[page_title, name, value] <- [[%s,%s,%s]] :put page_prop{page_title, name, value}`,
+					escape(p.Title),
+					escape(name),
+					escape(value),
+				),
+			)
 		}
-		tx = append(
-			tx,
-			fmt.Sprintf(
-				`?[page_title, name, value] <- [%s] :put page_prop{page_title, name, value}`,
-				strings.Join(props, ", "),
-			),
-		)
 	}
 
 	// Save or update references
 	if len(p.Refs) > 0 {
-		var refs []string
 		for _, ref := range p.Refs {
-			refs = append(refs, fmt.Sprintf(
-				`[%s,%s]`,
-				escape(p.Title),
-				escape(ref),
-			))
+			tx = append(
+				tx,
+				fmt.Sprintf(
+					`?[src, target] <- [[%s,%s]] :put page_ref{src, target}`,
+					escape(p.Title),
+					escape(ref),
+				),
+			)
 		}
-		tx = append(
-			tx,
-			fmt.Sprintf(
-				`?[src, target] <- [%s] :put page_ref{src, target}`,
-				strings.Join(refs, ", "),
-			),
-		)
 	}
 
 	// Execute queries in transaction
@@ -239,28 +228,8 @@ func (q *Queries) FindTitles() (titles []string, _ error) {
 	return titles, nil
 }
 
-func (q *Queries) FindContent(titles ...string) (contents []string, _ error) {
-	query := fmt.Sprintf(`
-		?[content] :=
-			*page{title, content},
-			title in %s
-	`, escapeSlice(titles))
-	res, err := q.db.Run(query, nil, false)
-	if err != nil {
-		return contents, fmt.Errorf("failed to find content with %w", err)
-	}
-	for _, row := range res.Rows {
-		contents = append(contents, row[0].(string))
-	}
-	return contents, nil
-}
-
 func escape(s string) string {
-	b, err := json.Marshal(strings.ReplaceAll(s, `"`, `'`))
-	if err != nil {
-		panic(err)
-	}
-	return string(b)
+	return fmt.Sprintf(`%s`, s)
 }
 
 func escapeSlice[T any](s []T) string {
@@ -275,10 +244,10 @@ func execTx(db cozo.CozoDB, queries []string) error {
 	wrapped := make([]string, len(queries))
 	for i, q := range queries {
 		wrapped[i] = fmt.Sprintf("{%s}", q)
-	}
-	_, err := db.Run(strings.Join(wrapped, "\n"), nil, false)
-	if err != nil {
-		return fmt.Errorf("failed to execute transaction with %w", err)
+		_, err := db.Run(q, nil, false)
+		if err != nil {
+			return fmt.Errorf("failed to execute transaction query '%s' with %w", q, err)
+		}
 	}
 	return nil
 }

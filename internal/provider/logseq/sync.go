@@ -38,8 +38,8 @@ func Sync(ctx context.Context, g RegexGraph, q *db.Queries) error {
 			props[prop.Name] = value
 		}
 
-		// Persist changed page
-		slog.Info("saving page", "title", p.Title())
+		// Persist page
+		slog.Debug("saving page", "title", p.Title())
 		err = q.SavePage(db.SavePageParams{
 			Title:   p.Title(),
 			Content: content,
