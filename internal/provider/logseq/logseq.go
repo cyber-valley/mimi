@@ -25,18 +25,18 @@ const (
 )
 
 type RegexGraph struct {
-	path string
+	Path string
 }
 
 func NewRegexGraph(path string) RegexGraph {
 	return RegexGraph{
-		path: path,
+		Path: path,
 	}
 }
 
 func (g RegexGraph) WalkPages() iter.Seq[Page] {
 	return func(yield func(p Page) bool) {
-		_ = filepath.Walk(g.path, func(path string, fs fs.FileInfo, err error) error {
+		_ = filepath.Walk(g.Path, func(path string, fs fs.FileInfo, err error) error {
 			if err != nil {
 				slog.Error("failed to access path", "path", path, "with", err)
 				return nil

@@ -21,20 +21,19 @@ func Pull(baseRepoPath, owner, name string) error {
 	return err
 }
 
-func DiffInterval(baseRepoPath, owner, name string, since time.Time) (string, error) {
-	cwd := filepath.Join(baseRepoPath, AsPath(owner, name))
+func DiffInterval(repoPath string, since time.Time) (string, error) {
 	sinceStr := since.Format(time.RFC3339)
 
-	commitHashBytes, err := Git(cwd, "log", "--before="+sinceStr, "-1", "--format=%H")
+	commitHashBytes, err := Git(repoPath, "log", "--before="+sinceStr, "-1", "--format=%H")
 	if err != nil {
 		return "", fmt.Errorf("failed to find commit before %s with %w", sinceStr, err)
 	}
 	commitHash := string(bytes.TrimSpace(commitHashBytes))
 	if commitHash == "" {
-		return "", fmt.Errorf("no commit found before or at %s in repository %s", sinceStr, cwd)
+		return "", fmt.Errorf("no commit found before or at %s in repository %s", sinceStr, repoPath)
 	}
 
-	diffBytes, err := Git(cwd, "diff", commitHash, "HEAD")
+	diffBytes, err := Git(repoPath, "diff", commitHash, "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("failed to get diff from %s to HEAD: %w", commitHash, err)
 	}

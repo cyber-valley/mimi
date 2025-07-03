@@ -16,6 +16,7 @@ import (
 
 	"mimi/internal/bot/llm/agent"
 	"mimi/internal/persist"
+	"mimi/internal/provider/git"
 	"mimi/internal/provider/github/db"
 )
 
@@ -30,9 +31,10 @@ type SummaryAgent struct {
 	ghClient        *db.Client
 	ghOrg           string
 	pgPool          *pgxpool.Pool
+	logseqRepoPath  string
 }
 
-func New(g *genkit.Genkit, pgPool *pgxpool.Pool, ghOrg string, logseqRepoPath string) SummaryAgent {
+func New(g *genkit.Genkit, pgPool *pgxpool.Pool, ghOrg, logseqRepoPath string) SummaryAgent {
 	// Fail fast if prompt wasn't found
 	eval := genkit.LookupPrompt(g, evalPrompt)
 	if eval == nil {
@@ -50,6 +52,7 @@ func New(g *genkit.Genkit, pgPool *pgxpool.Pool, ghOrg string, logseqRepoPath st
 		ghOrg:           ghOrg,
 		evalPrompt:      eval,
 		periodExtractor: periodExtractor,
+		logseqRepoPath:  logseqRepoPath,
 	}
 }
 
@@ -118,6 +121,13 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 		return nil, fmt.Errorf("failed to marshal Telegram messages with %w", err)
 	}
 	docs = append(docs, ai.DocumentFromText(string(blob), map[string]any{"info": "Related telegram messages"}))
+
+	// Retrieve LogSeq diff
+	diff, err := git.DiffInterval(a.logseqRepoPath, since)
+	if err != nil {
+		return nil, err
+	}
+	docs = append(docs, ai.DocumentFromText(diff, map[string]any{"info": "LogSeq git diff"}))
 
 	resp, err = a.evalPrompt.Execute(ctx, ai.WithDocs(docs...), ai.WithInput(map[string]any{"period": period}))
 	if err != nil {

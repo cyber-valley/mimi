@@ -50,7 +50,7 @@ func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph) LLM {
 		fallback.New(g),
 		github.New(g, ghOrg),
 		telegram.New(g, pgPool),
-		summary.New(g, pgPool, ghOrg, ""),
+		summary.New(g, pgPool, ghOrg, graph.Path),
 	}
 
 	router := genkit.LookupPrompt(g, "router")
