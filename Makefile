@@ -1,5 +1,5 @@
 .PHONY: format vet
-include .env.example
+include example.env
 -include .env
 
 run: vet
