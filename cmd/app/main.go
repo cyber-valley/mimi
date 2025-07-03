@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/compat_oai/openai"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -18,24 +19,38 @@ import (
 const (
 	logseqGraphEnv      = "LOGSEQ_GRAPH_PATH"
 	telegramBotTokenEnv = "TELEGRAM_BOT_API_TOKEN"
+	openrouterApiKeyEnv = "OPENROUTER_API_KEY"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
+	var missingEnvVars []string
 	tgBotToken := os.Getenv(telegramBotTokenEnv)
 	if tgBotToken == "" {
-		log.Fatalf("env variable %s is missing", telegramBotTokenEnv)
+		missingEnvVars = append(missingEnvVars, telegramBotTokenEnv)
 	}
 
 	logseqPath := os.Getenv(logseqGraphEnv)
 	if logseqPath == "" {
-		log.Fatalf("env variable %s is missing", logseqGraphEnv)
+		missingEnvVars = append(missingEnvVars, logseqGraphEnv)
+	}
+
+	openrouterApiKey := os.Getenv(openrouterApiKeyEnv)
+	if openrouterApiKey == "" {
+		missingEnvVars = append(missingEnvVars, openrouterApiKeyEnv)
+	}
+
+	if len(missingEnvVars) > 0 {
+		log.Fatalf("env variables %#v are missing", missingEnvVars)
 	}
 
 	g, err := genkit.Init(ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{}),
+		genkit.WithPlugins(
+			&googlegenai.GoogleAI{},
+			&openai.OpenAI{APIKey: openrouterApiKey},
+		),
 		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
 	)
 	if err != nil {
