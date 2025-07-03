@@ -29,9 +29,19 @@ type webhookHandler struct {
 	webhookSecretKey   []byte
 	db                 *pgxpool.Pool
 	baseRepositoryPath string
+	hooks              []PushEventHook
 }
 
-func Run(ctx context.Context, port int, db *pgxpool.Pool) error {
+type PushEventHook struct {
+	RepoName  string
+	RepoOwner string
+	Hook      func(repoPath string) error
+}
+
+// Run starts a web server on the provided `port` and listens until `ctx` will be cancelled
+// `hooks` should contain single element for each unique repository
+// otherwise only the first found will be executed
+func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook) error {
 	slog.Info("starting GitHub webhook listener")
 	// Load environment
 	pk := os.Getenv(githubWebhookSecretEnv)
@@ -50,6 +60,13 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool) error {
 	}
 	slog.Info("GitHub repositories path ensured", "path", basePath)
 
+	// Init handler
+	h := webhookHandler{
+		webhookSecretKey:   []byte(pk),
+		db:                 db,
+		baseRepositoryPath: basePath,
+	}
+
 	// Clone missing repositories
 	q := persist.New(db)
 	repos, err := q.FindGitHubRepositories(ctx)
@@ -64,20 +81,19 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool) error {
 				return fmt.Errorf("failed to stat repository path '%s' for %#v with %w", p, repo, err)
 			}
 
+			// Clone repository
 			slog.Info("cloning GitHub repository", "info", repo)
 			err := cloneRepo(basePath, repo.Owner, repo.Name)
 			if err != nil {
 				return fmt.Errorf("failed to clone repository %#v to %s with %w", repo, p, err)
 			}
+
+			// Run hook if found
+			h.runPushEventHook(repo.Owner, repo.Name)
 		}
 	}
 
 	// Setup multiplexer
-	h := webhookHandler{
-		webhookSecretKey:   []byte(pk),
-		db:                 db,
-		baseRepositoryPath: basePath,
-	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /github/webhook", h.handleWebhook)
 	slog.Info("Starting listening for GitHub webhooks", "port", port)
@@ -135,10 +151,36 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		err = h.runPushEventHook(*event.Repo.Owner.Login, *event.Repo.Name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	default:
 		glog.Warning("Got unexpected event %#v", event)
 	}
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (h webhookHandler) runPushEventHook(owner, name string) error {
+	cwd := filepath.Join(h.baseRepositoryPath, repoPath(owner, name))
+
+	// Find hook
+	hookIdx := slices.IndexFunc(h.hooks, func(h PushEventHook) bool {
+		return h.RepoOwner == owner && h.RepoName == name
+	})
+	if hookIdx == -1 {
+		slog.Info("hook not found", "cwd", cwd)
+		return nil
+	}
+
+	// Execute hook
+	if err := h.hooks[hookIdx].Hook(cwd); err != nil {
+		return fmt.Errorf("failed to run hook %d for %s with %w", hookIdx, cwd, err)
+	}
+	slog.Info("hook succeeded", "cwd", cwd)
+
+	return nil
 }
 
 func cloneRepo(baseRepoPath, owner, name string) error {
