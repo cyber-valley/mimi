@@ -34,7 +34,7 @@ type webhookHandler struct {
 type PushEventHook struct {
 	RepoName  string
 	RepoOwner string
-	Hook      func(repoPath string) error
+	Hook      func(ctx context.Context, repoPath string) error
 }
 
 // Run starts a web server on the provided `port` and listens until `ctx` will be cancelled
@@ -88,7 +88,7 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 			}
 
 			// Run hook if found
-			h.runPushEventHook(repo.Owner, repo.Name)
+			h.runPushEventHook(ctx, repo.Owner, repo.Name)
 		}
 	}
 
@@ -152,7 +152,7 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		err = h.runPushEventHook(*event.Repo.Owner.Login, *event.Repo.Name)
+		err = h.runPushEventHook(r.Context(), *event.Repo.Owner.Login, *event.Repo.Name)
 		if err != nil {
 			slog.Error("failed to execute hook for GitHub repository", "with", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -165,7 +165,7 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (h webhookHandler) runPushEventHook(owner, name string) error {
+func (h webhookHandler) runPushEventHook(ctx context.Context, owner, name string) error {
 	cwd := filepath.Join(h.baseRepositoryPath, repoPath(owner, name))
 
 	// Find hook
@@ -178,7 +178,7 @@ func (h webhookHandler) runPushEventHook(owner, name string) error {
 	}
 
 	// Execute hook
-	if err := h.hooks[hookIdx].Hook(cwd); err != nil {
+	if err := h.hooks[hookIdx].Hook(ctx, cwd); err != nil {
 		return fmt.Errorf("failed to run hook %d for %s with %w", hookIdx, cwd, err)
 	}
 	slog.Info("hook succeeded", "cwd", cwd)
