@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 
@@ -16,12 +15,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/persist"
+	"mimi/internal/provider/git"
 )
 
 const (
 	githubWebhookSecretEnv = "GITHUB_WEBHOOK_SECRET"
 	baseRepositoryPathEnv  = "GITHUB_REPOSITORY_BASE_PATH"
-	gitPath                = "/usr/bin/git"
 )
 
 type webhookHandler struct {
@@ -74,7 +73,7 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 		return fmt.Errorf("failed to read GitHub repositories with %w", err)
 	}
 	for _, repo := range repos {
-		p := filepath.Join(basePath, repoPath(repo.Owner, repo.Name))
+		p := filepath.Join(basePath, git.AsPath(repo.Owner, repo.Name))
 		if _, err := os.Stat(p); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				// Got unexpected error
@@ -83,14 +82,14 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 
 			// Repository does not exist locally
 			slog.Info("cloning GitHub repository", "info", repo)
-			err := cloneRepo(basePath, repo.Owner, repo.Name)
+			err := git.Clone(basePath, repo.Owner, repo.Name)
 			if err != nil {
 				return fmt.Errorf("failed to clone repository %#v to %s with %w", repo, p, err)
 			}
 		} else {
 			// Repo already cloned
 			slog.Info("pulling updates of GitHub repository", "info", repo)
-			err := pullRepo(basePath, repo.Owner, repo.Name)
+			err := git.Pull(basePath, repo.Owner, repo.Name)
 			if err != nil {
 				return fmt.Errorf("failed to pull repository %#v at %s with %w", repo, p, err)
 			}
@@ -153,7 +152,7 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("got push to unwatched GitHub repository", "event", event)
 			return
 		}
-		err = pullRepo(h.baseRepositoryPath, *event.Repo.Owner.Login, *event.Repo.Name)
+		err = git.Pull(h.baseRepositoryPath, *event.Repo.Owner.Login, *event.Repo.Name)
 		if err != nil {
 			slog.Error("failed to pull GitHub repository", "with", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -173,7 +172,7 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h webhookHandler) runPushEventHook(ctx context.Context, owner, name string) error {
-	cwd := filepath.Join(h.baseRepositoryPath, repoPath(owner, name))
+	cwd := filepath.Join(h.baseRepositoryPath, git.AsPath(owner, name))
 
 	// Find hook
 	hookIdx := slices.IndexFunc(h.hooks, func(h PushEventHook) bool {
@@ -190,32 +189,5 @@ func (h webhookHandler) runPushEventHook(ctx context.Context, owner, name string
 	}
 	slog.Info("hook succeeded", "cwd", cwd)
 
-	return nil
-}
-
-func cloneRepo(baseRepoPath, owner, name string) error {
-	return git(baseRepoPath, "clone", repoUrl(owner, name), repoPath(owner, name))
-}
-
-func pullRepo(baseRepoPath, owner, name string) error {
-	cwd := filepath.Join(baseRepoPath, repoPath(owner, name))
-	return git(cwd, "pull")
-}
-
-func repoUrl(owner, name string) string {
-	return fmt.Sprintf("http://github.com/%s/%s", owner, name)
-}
-
-func repoPath(owner, name string) string {
-	return filepath.Join(owner, name)
-}
-
-func git(cwd string, args ...string) error {
-	cmd := exec.Command("/usr/bin/git", args...)
-	cmd.Dir = cwd
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to execute '%s %s' with %w", gitPath, args, err)
-	}
 	return nil
 }
