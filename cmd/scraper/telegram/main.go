@@ -1,23 +1,36 @@
 package main
 
-import ()
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"mimi/internal/provider/telegram/scraper"
+)
 
 func main() {
-	// flag.Lookup("stderrthreshold").Value.Set("INFO")
-	// flag.Parse()
-	//
-	// ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	// defer cancel()
-	//
-	// conn, err := pgx.Connect(ctx, os.Getenv("DATABASE_URL"))
-	// if err != nil {
-	// 	glog.Fatal("failed to connect to postgres with: ", err)
-	// }
-	// defer conn.Close(ctx)
-	//
-	// if err := scraper.Run(ctx, conn); err != nil {
-	// 	glog.Fatalf("error: %+v", err)
-	// }
-	//
-	// glog.Warning("tg scraper exited without any error")
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatalf("failed to connect to postgres with %#v", err)
+	}
+
+	g, err := genkit.Init(ctx,
+		genkit.WithPlugins(&googlegenai.GoogleAI{}),
+		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
+	)
+	if err != nil {
+		log.Fatalf("could not initialize Genkit: %s", err)
+	}
+
+	if err := scraper.Run(ctx, pool, g); err != nil {
+		log.Fatalf("error: %#v", err)
+	}
 }
