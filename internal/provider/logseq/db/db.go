@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/cozodb/cozo-lib-go"
 )
@@ -101,19 +102,19 @@ func (q *Queries) SavePage(p SavePageParams) error {
 		}
 	}
 
-	// Save or update references
-	if len(p.Refs) > 0 {
-		for _, ref := range p.Refs {
-			tx = append(
-				tx,
-				fmt.Sprintf(
-					`?[src, target] <- [[%s,%s]] :put page_ref{src, target}`,
-					escape(p.Title),
-					escape(ref),
-				),
-			)
-		}
-	}
+	// // Save or update references
+	// if len(p.Refs) > 0 {
+	// 	for _, ref := range p.Refs {
+	// 		tx = append(
+	// 			tx,
+	// 			fmt.Sprintf(
+	// 				`?[src, target] <- [[%s,%s]] :put page_ref{src, target}`,
+	// 				escape(p.Title),
+	// 				escape(ref),
+	// 			),
+	// 		)
+	// 	}
+	// }
 
 	// Execute queries in transaction
 	err := execTx(q.db, tx)
@@ -142,9 +143,9 @@ func (q *Queries) FindRelatives(pageTitle string, depth int) (rows []FindRelativ
 				depth = d + 1,
 				depth <= %d
 
-		?[target, content, depth] :=
+		?[target, depth] :=
 				relatives[target, depth],
-				*page{title: target, content}
+				*page{title: target}
 		`,
 		escape(pageTitle),
 		depth,
@@ -155,25 +156,10 @@ func (q *Queries) FindRelatives(pageTitle string, depth int) (rows []FindRelativ
 	}
 	for _, row := range res.Rows {
 		rows = append(rows, FindRelativesRow{
-			Title:   row[0].(string),
-			Content: row[1].(string),
+			Title: row[0].(string),
 		})
 	}
 	return rows, nil
-}
-
-func (q *Queries) FindContentChanged(hash string) (bool, error) {
-	query := fmt.Sprintf(
-		`
-		?[title] := *page{title, hash: %s}
-		`,
-		escape(hash),
-	)
-	res, err := q.db.Run(query, nil, false)
-	if err != nil {
-		return false, fmt.Errorf("failed to check existence of page '%s' with %w", hash, err)
-	}
-	return len(res.Rows) == 0, nil
 }
 
 type SimilarPageRow struct {
@@ -229,7 +215,8 @@ func (q *Queries) FindTitles() (titles []string, _ error) {
 }
 
 func escape(s string) string {
-	return fmt.Sprintf(`%s`, s)
+	// Weird escaping happens if double quotes pased into the sequence somehow
+	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(s, `"`, "'"))
 }
 
 func escapeSlice[T any](s []T) string {

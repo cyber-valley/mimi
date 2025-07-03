@@ -17,7 +17,10 @@ func NewSyncer(q *db.Queries) Syncer {
 	}
 }
 
+// Sync persist provided logseq graph `g` in CozoDB
+// Brew some coffee, it's really slow process which takes around 30 minutes
 func Sync(ctx context.Context, g RegexGraph, q *db.Queries) error {
+	slog.Info("Starting syncing LogSeq graph")
 	props := make(map[string]string)
 
 	var errs []error
