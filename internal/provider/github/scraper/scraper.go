@@ -1,10 +1,15 @@
 package scraper
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 
 	"github.com/golang/glog"
@@ -17,6 +22,7 @@ import (
 const (
 	githubWebhookSecretEnv = "GITHUB_WEBHOOK_SECRET"
 	baseRepositoryPathEnv  = "GITHUB_REPOSITORY_BASE_PATH"
+	gitPath                = "/usr/bin/git"
 )
 
 type webhookHandler struct {
@@ -25,8 +31,8 @@ type webhookHandler struct {
 	baseRepositoryPath string
 }
 
-func Run(port int, db *pgxpool.Pool) error {
-	glog.Info("Setting up")
+func Run(ctx context.Context, port int, db *pgxpool.Pool) error {
+	slog.Info("starting GitHub webhook listener")
 	// Load environment
 	pk := os.Getenv(githubWebhookSecretEnv)
 	if pk == "" {
@@ -42,6 +48,29 @@ func Run(port int, db *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("failed to create base GitHub repository path with %w", err)
 	}
+	slog.Info("GitHub repositories path ensured", "path", basePath)
+
+	// Clone missing repositories
+	q := persist.New(db)
+	repos, err := q.FindGitHubRepositories(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read GitHub repositories with %w", err)
+	}
+	for _, repo := range repos {
+		p := filepath.Join(basePath, repoPath(repo.Owner, repo.Name))
+		if _, err := os.Stat(p); err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				// Got unexpected error
+				return fmt.Errorf("failed to stat repository path '%s' for %#v with %w", p, repo, err)
+			}
+
+			slog.Info("cloning GitHub repository", "info", repo)
+			err := cloneRepo(basePath, repo.Owner, repo.Name)
+			if err != nil {
+				return fmt.Errorf("failed to clone repository %#v to %s with %w", repo, p, err)
+			}
+		}
+	}
 
 	// Setup multiplexer
 	h := webhookHandler{
@@ -51,10 +80,27 @@ func Run(port int, db *pgxpool.Pool) error {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /github/webhook", h.handleWebhook)
-	glog.Info("Starting")
+	slog.Info("Starting listening for GitHub webhooks", "port", port)
 
 	// Serve
-	return http.ListenAndServe(fmt.Sprintf(":%d", port), mux)
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+
+	serverFailed := make(chan error, 1)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverFailed <- err
+		}
+	}()
+
+	select {
+	case err := <-serverFailed:
+		return err
+	case <-ctx.Done():
+		return server.Shutdown(ctx)
+	}
 }
 
 func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -84,8 +130,40 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		if !watched {
 			slog.Warn("got push to unwatched GitHub repository", "event", event)
 		}
+		err = pullRepo(h.baseRepositoryPath, *event.Repo.Owner.Login, *event.Repo.Name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	default:
 		glog.Warning("Got unexpected event %#v", event)
 	}
 	w.WriteHeader(http.StatusCreated)
+}
+
+func cloneRepo(baseRepoPath, owner, name string) error {
+	return git(baseRepoPath, "clone", repoUrl(owner, name), repoPath(owner, name))
+}
+
+func pullRepo(baseRepoPath, owner, name string) error {
+	cwd := filepath.Join(baseRepoPath, repoPath(owner, name))
+	return git(cwd, "pull")
+}
+
+func repoUrl(owner, name string) string {
+	return fmt.Sprintf("http://github.com/%s/%s", owner, name)
+}
+
+func repoPath(owner, name string) string {
+	return filepath.Join(owner, name)
+}
+
+func git(cwd string, args ...string) error {
+	cmd := exec.Command("/usr/bin/git", args...)
+	cmd.Dir = cwd
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute '%s %s' with %w", gitPath, args, err)
+	}
+	return nil
 }

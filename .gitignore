@@ -19,3 +19,4 @@ libs/
 .cozo*
 cozo*
 .env.production
+repos/

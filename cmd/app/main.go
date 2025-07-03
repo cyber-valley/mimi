@@ -49,7 +49,7 @@ func main() {
 
 	// Run scrapers
 	go tgscraper.Run(ctx, pool, g)
-	go ghscraper.Run(8000)
+	go ghscraper.Run(ctx, 8000, pool)
 
 	// Run Telegram bot
 	bot.Start(ctx, tgBotToken, logseqPath)
