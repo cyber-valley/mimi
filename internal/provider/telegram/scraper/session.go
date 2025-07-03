@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
+	"log/slog"
 
 	"github.com/gotd/td/tg"
 )
@@ -34,14 +34,14 @@ func (s *session) resolveTopic(ctx context.Context, raw *tg.Client, groupID int6
 	ic := &tg.InputChannel{ChannelID: groupID, AccessHash: 0}
 	resp, err := raw.ChannelsGetChannels(ctx, []tg.InputChannelClass{ic})
 	if err != nil {
-		glog.Error("failed to resolve channel peer with ", err)
+		slog.Error("failed to resolve channel peer", "error", err)
 		return nil, err
 	}
-	glog.Info("channel resolved to ", resp)
+	slog.Info("channel resolved", "value", resp)
 	chats := resp.(*tg.MessagesChats).Chats
 
 	if l := len(chats); l != 1 {
-		glog.Error("expected only one chat but got ", l)
+		slog.Error("expected only one chat", "got", l)
 		return nil, errors.New("unexpected resolve of channel")
 	}
 
@@ -59,10 +59,10 @@ func (s *session) resolveTopic(ctx context.Context, raw *tg.Client, groupID int6
 	}
 	topics, err := raw.ChannelsGetForumTopicsByID(ctx, req)
 	if err != nil {
-		glog.Error("failed to get forum topics with", err)
+		slog.Error("failed to get forum topics", "error", err)
 		return nil, err
 	}
-	glog.Info("fetched forum topics", topics)
+	slog.Info("fetched forum topics", "value", topics)
 
 	switch topic := topics.Topics[0].(type) {
 	default:

@@ -7,8 +7,6 @@ require (
 	github.com/cozodb/cozo-lib-go v0.7.5
 	github.com/firebase/genkit/go v0.6.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
-	github.com/golang-migrate/migrate/v4 v4.18.3
-	github.com/golang/glog v1.2.5
 	github.com/google/go-github/v72 v72.0.0
 	github.com/gotd/contrib v0.21.0
 	github.com/gotd/td v0.124.0
@@ -50,10 +48,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/gotd/ige v0.2.2 // indirect
 	github.com/gotd/neo v0.1.5 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
-	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect

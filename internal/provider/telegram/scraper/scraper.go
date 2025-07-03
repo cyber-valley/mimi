@@ -10,7 +10,6 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/golang/glog"
 	"github.com/gotd/td/telegram/updates"
 	"github.com/gotd/td/tg"
 	"github.com/jackc/pgx/v5"
@@ -53,12 +52,12 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 	q := persist.New(pool)
 	subscribeTo, err := q.FindTelegramPeers(ctx)
 	if err != nil {
-		glog.Error("failed to find peers to subscribe ", err)
+		slog.Error("failed to find peers to subscribe", "error", err)
 		return err
 	}
 	if len(subscribeTo) < 1 {
 		err = errors.New("got empty peers to subscribe")
-		glog.Error(err)
+		slog.Error("error", "error", err)
 		return err
 	}
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
@@ -69,7 +68,7 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 		}
 		channel, ok := msg.PeerID.(*tg.PeerChannel)
 		if !ok {
-			glog.Warning("failed to extract channel from ", msg.PeerID)
+			slog.Warn("failed to extract channel from", "peer_id", msg.PeerID)
 		}
 
 		// Process only subscribed channels / groups
@@ -82,14 +81,14 @@ func setupDispatcher(ctx context.Context, d *tg.UpdateDispatcher, api *tg.Client
 		// Extract forum topic info if exists
 		replyTo, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
 		if !ok {
-			glog.Warning("failed to extract reply to from ", msg.ReplyTo)
+			slog.Warn("failed to extract reply to from", "reply_to", msg.ReplyTo)
 			return nil
 		}
 		var topic *tg.ForumTopic
 		if replyTo.ForumTopic {
 			t, err := s.resolveTopic(ctx, api, channel.ChannelID, replyTo.ReplyToMsgID)
 			if err != nil {
-				glog.Error("failed to resolve topic with: ", err)
+				slog.Error("failed to resolve topic", "error", err)
 				return err
 			}
 			topic = t
