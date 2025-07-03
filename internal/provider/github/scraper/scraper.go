@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/golang/glog"
 	"github.com/google/go-github/v72/github"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -122,7 +121,6 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	payload, err := github.ValidatePayload(r, h.webhookSecretKey)
 	if err != nil {
-		glog.Errorf("signature validation %s", err)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -133,10 +131,11 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	switch event := event.(type) {
 	case *github.PushEvent:
-		glog.Infof("Got push event %#v", event)
+		slog.Info("Got push event")
 		q := persist.New(h.db)
 		repos, err := q.FindGitHubRepositories(r.Context())
 		if err != nil {
+			slog.Error("failed to get list of subscribed GitHub repositories", "with", err)
 			http.Error(w, err.Error(), http.StatusNotImplemented)
 			return
 		}
@@ -145,19 +144,23 @@ func (h webhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		})
 		if !watched {
 			slog.Warn("got push to unwatched GitHub repository", "event", event)
+			return
 		}
 		err = pullRepo(h.baseRepositoryPath, *event.Repo.Owner.Login, *event.Repo.Name)
 		if err != nil {
+			slog.Error("failed to pull GitHub repository", "with", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		err = h.runPushEventHook(*event.Repo.Owner.Login, *event.Repo.Name)
 		if err != nil {
+			slog.Error("failed to execute hook for GitHub repository", "with", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	default:
-		glog.Warning("Got unexpected event %#v", event)
+		slog.Warn("Got unexpected event", "value", fmt.Sprintf("%#v", event))
+		return
 	}
 	w.WriteHeader(http.StatusCreated)
 }
