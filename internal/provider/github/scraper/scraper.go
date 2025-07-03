@@ -64,6 +64,7 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 		webhookSecretKey:   []byte(pk),
 		db:                 db,
 		baseRepositoryPath: basePath,
+		hooks:              hooks,
 	}
 
 	// Clone missing repositories
@@ -80,16 +81,22 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 				return fmt.Errorf("failed to stat repository path '%s' for %#v with %w", p, repo, err)
 			}
 
-			// Clone repository
+			// Repository does not exist locally
 			slog.Info("cloning GitHub repository", "info", repo)
 			err := cloneRepo(basePath, repo.Owner, repo.Name)
 			if err != nil {
 				return fmt.Errorf("failed to clone repository %#v to %s with %w", repo, p, err)
 			}
-
-			// Run hook if found
-			h.runPushEventHook(ctx, repo.Owner, repo.Name)
+		} else {
+			// Repo already cloned
+			slog.Info("pulling updates of GitHub repository", "info", repo)
+			err := pullRepo(basePath, repo.Owner, repo.Name)
+			if err != nil {
+				return fmt.Errorf("failed to pull repository %#v at %s with %w", repo, p, err)
+			}
 		}
+
+		h.runPushEventHook(ctx, repo.Owner, repo.Name)
 	}
 
 	// Setup multiplexer
@@ -173,7 +180,7 @@ func (h webhookHandler) runPushEventHook(ctx context.Context, owner, name string
 		return h.RepoOwner == owner && h.RepoName == name
 	})
 	if hookIdx == -1 {
-		slog.Info("hook not found", "cwd", cwd)
+		slog.Info("hook not found", "cwd", cwd, "owner", owner, "name", name)
 		return nil
 	}
 
