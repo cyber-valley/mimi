@@ -24,9 +24,6 @@ func main() {
 
 	// Initialize
 	g := logseq.NewRegexGraph("/home/user/code/clone/cvland")
-	if err != nil {
-		log.Fatalf("failed to create graph with %s", err)
-	}
 
 	// Synchronize LogSeq contents
 	if err := logseq.Sync(ctx, g, q); err != nil {

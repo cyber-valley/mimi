@@ -9,6 +9,14 @@ import (
 	"mimi/internal/provider/logseq/db"
 )
 
+type Syncer = func(ctx context.Context, path string) error
+
+func NewSyncer(q *db.Queries) Syncer {
+	return func(ctx context.Context, path string) error {
+		return Sync(ctx, NewRegexGraph(path), q)
+	}
+}
+
 func Sync(ctx context.Context, g RegexGraph, q *db.Queries) error {
 	props := make(map[string]string)
 
