@@ -27,6 +27,13 @@ const (
 	periodPrompt = "period-extractor"
 )
 
+var githubProjects = map[string]int{
+	"rockets":      2,
+	"supply":       3,
+	"inventory":    24,
+	"devops force": 33,
+}
+
 type SummaryAgent struct {
 	evalPrompt      *ai.Prompt
 	periodExtractor *ai.Prompt
@@ -84,6 +91,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	case "day":
 		since = since.AddDate(0, 0, -1)
 	}
+
 	docChan := make(chan *ai.Document, 3)
 	errChan := make(chan error, 3)
 	var wg sync.WaitGroup
@@ -93,24 +101,37 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	// Retrieve GitHub projects statuses
 	go func() {
 		defer wg.Done()
-		issues := make(map[string][]db.Issue)
-		// TODO: Should it be persisted in DB?
-		projects := map[string]int{
-			"rockets":      2,
-			"supply":       3,
-			"inventory":    24,
-			"devops force": 33,
+		type msg struct {
+			project string
+			issues  []db.Issue
 		}
 
+		var projWg sync.WaitGroup
+		issueChan := make(chan msg, len(githubProjects))
+
 		// Fetch issues for each project
-		for title, projID := range projects {
-			tmp, err := a.ghClient.GetOrgProject(ctx, a.ghOrg, projID, since)
-			if err != nil {
-				errChan <- fmt.Errorf("failed to fetch supply board state with %w", err)
-				return
-			}
-			slog.Info("fetched GitHub issues", "project", title, "lenght", len(tmp), "value", tmp)
-			issues[title] = tmp
+		for title, projID := range githubProjects {
+			projWg.Add(1)
+			go func() {
+				defer projWg.Done()
+				tmp, err := a.ghClient.GetOrgProject(ctx, a.ghOrg, projID, since)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to fetch supply board state with %w", err)
+					return
+				}
+				slog.Info("fetched GitHub issues", "project", title, "lenght", len(tmp), "value", tmp)
+				issueChan <- msg{project: title, issues: tmp}
+			}()
+		}
+
+		// Wait for the fetched issues
+		projWg.Wait()
+		close(issueChan)
+
+		// Send retrieved project issues
+		issues := make(map[string][]db.Issue)
+		for msg := range issueChan {
+			issues[msg.project] = msg.issues
 		}
 		blob, err := json.Marshal(issues)
 		if err != nil {
