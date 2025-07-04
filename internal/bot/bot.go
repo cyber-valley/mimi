@@ -75,15 +75,15 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 	// Set bot typing status
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	_, _ = h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
 	go func() {
 		for {
+			_, _ = h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
 			select {
 			case <-ctx.Done():
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				_, _ = h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
+				continue
 			}
 		}
 	}()
