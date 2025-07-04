@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ai-shift/tgmd"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -72,7 +73,20 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 	slog.Info("new message", "chatId", m.Chat.ID, "text", m.Text)
 
 	// Set bot typing status
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 	_, _ = h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				_, _ = h.bot.Send(tgbotapi.NewChatAction(m.Chat.ID, tgbotapi.ChatTyping))
+			}
+		}
+	}()
 
 	// Generate LLM answer
 	answer, err := h.llm.Answer(ctx, m.Chat.ID, m.Text)
