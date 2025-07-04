@@ -3,7 +3,6 @@ package bot
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"strings"
@@ -16,16 +15,17 @@ import (
 	"mimi/internal/provider/logseq"
 )
 
-func Start(ctx context.Context, token string, logseqPath string) {
+func Start(ctx context.Context, token string, logseqPath string) error {
+	slog.Info("starting Telegram Bot")
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to initialize bot api with %w", err)
 	}
 	slog.Info("Authorized account", "username", bot.Self.UserName)
 
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
-		log.Fatalf("failed to connect to postgres with: %s", err)
+		return fmt.Errorf("failed to connect to postgres with %w", err)
 	}
 
 	g := logseq.NewRegexGraph(logseqPath)
@@ -39,14 +39,15 @@ func Start(ctx context.Context, token string, logseqPath string) {
 	u.Timeout = 60
 
 	updates := bot.GetUpdatesChan(u)
-
+	slog.Info("Telegram bot started")
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case update := <-updates:
 			if update.Message != nil && len(update.Message.Text) > 0 {
 				go func() {
+					slog.Info("got new message in Telegram bot")
 					if err := handler.handleMessage(ctx, update.Message); err != nil {
 						slog.Error("failed to handle message", "with", err)
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, err.Error())

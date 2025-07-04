@@ -36,7 +36,7 @@ func main() {
 		Hook:      logseq.NewSyncer(q),
 	})
 
-	if err := scraper.Run(ctx, 8000, pool, hooks...); err != nil {
+	if err := scraper.Run(ctx, pool, hooks...); err != nil {
 		log.Fatalf("failed to run GitHub scraper with %s", err)
 	}
 }

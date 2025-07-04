@@ -31,8 +31,8 @@ type PushEventHook struct {
 // Run starts a web server on the provided `port` and listens until `ctx` will be cancelled
 // `hooks` should contain single element for each unique repository
 // otherwise only the first found will be executed
-func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook) error {
-	slog.Info("starting GitHub webhook listener")
+func Run(ctx context.Context, db *pgxpool.Pool, hooks ...PushEventHook) error {
+	slog.Info("starting GitHub webhook listener", "hooks", hooks)
 	// Load environment
 	pk := os.Getenv(githubWebhookSecretEnv)
 	if pk == "" {
@@ -51,11 +51,13 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 	slog.Info("GitHub repositories path ensured", "path", basePath)
 
 	q := persist.New(db)
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(360 * time.Second)
 	for {
 		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			return nil
 		case <-ticker.C:
-
 			repos, err := q.FindGitHubRepositories(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to read GitHub repositories with %w", err)
@@ -92,7 +94,7 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 				})
 				if hookIdx == -1 {
 					slog.Info("hook not found", "cwd", cwd, "repo", repo)
-					return nil
+					continue
 				}
 
 				// Execute hook
@@ -101,9 +103,6 @@ func Run(ctx context.Context, port int, db *pgxpool.Pool, hooks ...PushEventHook
 				}
 				slog.Info("hook succeeded", "cwd", cwd)
 			}
-		case <-ctx.Done():
-			ticker.Stop()
-			return nil
 		}
 	}
 }

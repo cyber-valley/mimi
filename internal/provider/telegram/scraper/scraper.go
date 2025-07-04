@@ -227,7 +227,7 @@ func Setup(ctx context.Context, api *tg.Client, db *pgxpool.Pool, g *genkit.Genk
 			return c.ID == chat.GetID()
 		})
 		if chatIdx < 0 {
-			slog.Info("skipping unknown chat", "title", chat.GetTitle(), "id", chat.GetID())
+			slog.Debug("skipping unknown chat", "title", chat.GetTitle(), "id", chat.GetID())
 			continue
 		}
 		channel, ok := chat.(*tg.Channel)

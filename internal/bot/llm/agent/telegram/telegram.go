@@ -19,7 +19,7 @@ import (
 const (
 	retrievePrompt        = "telegram-retrieve"
 	evalPrompt            = "telegram-eval"
-	telegramSchemaPath    = "sql/migrations/000001_init.up.sql"
+	telegramSchemaPath    = "sql/migrations/000001_telegram.up.sql"
 	thinkingMaxItarations = 5
 )
 

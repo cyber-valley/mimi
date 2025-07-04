@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 
@@ -13,6 +14,8 @@ import (
 
 	"mimi/internal/bot"
 	ghscraper "mimi/internal/provider/github/scraper"
+	"mimi/internal/provider/logseq"
+	"mimi/internal/provider/logseq/db"
 	tgscraper "mimi/internal/provider/telegram/scraper"
 )
 
@@ -62,10 +65,43 @@ func main() {
 		log.Fatalf("failed to connect to postgres with: %s", err)
 	}
 
-	// Run scrapers
-	go tgscraper.Run(ctx, pool, g)
-	go ghscraper.Run(ctx, 8000, pool)
+	// Setup LogSeq push event hook
+	var hooks []ghscraper.PushEventHook
+	q := db.New()
+	err = q.CreateRelations()
+	if err != nil {
+		log.Fatalf("failed to create relations with %s", err)
+	}
+	hooks = append(hooks, ghscraper.PushEventHook{
+		RepoOwner: "cyber-valley",
+		RepoName:  "cvland",
+		Hook:      logseq.NewSyncer(q),
+	})
 
-	// Run Telegram bot
-	bot.Start(ctx, tgBotToken, logseqPath)
+	go func() {
+		err := tgscraper.Run(ctx, pool, g)
+		if err != nil {
+			log.Fatalf("Telegram scraper exited with %s", err)
+		} else {
+			slog.Info("Telegram scraper exited without an error")
+		}
+	}()
+	go func() {
+		err := ghscraper.Run(ctx, pool, hooks...)
+		if err != nil {
+			log.Fatalf("GitHub scraper exited with %s", err)
+		} else {
+			slog.Info("GitHub scraper exited without an error")
+		}
+	}()
+	go func() {
+		err := bot.Start(ctx, tgBotToken, logseqPath)
+		if err != nil {
+			log.Fatalf("Telegram bot exited with %s", err)
+		} else {
+			slog.Info("Telegram bot exited without an error")
+		}
+	}()
+
+	<-ctx.Done()
 }
