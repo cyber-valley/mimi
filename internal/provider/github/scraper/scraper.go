@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	githubWebhookSecretEnv = "GITHUB_WEBHOOK_SECRET"
-	baseRepositoryPathEnv  = "GITHUB_REPOSITORY_BASE_PATH"
+	baseRepositoryPathEnv = "GITHUB_REPOSITORY_BASE_PATH"
 )
 
 type PushEventHook struct {
@@ -34,10 +33,6 @@ type PushEventHook struct {
 func Run(ctx context.Context, db *pgxpool.Pool, hooks ...PushEventHook) error {
 	slog.Info("starting GitHub webhook listener", "hooks", hooks)
 	// Load environment
-	pk := os.Getenv(githubWebhookSecretEnv)
-	if pk == "" {
-		return fmt.Errorf("missing %s env variable", githubWebhookSecretEnv)
-	}
 	basePath := os.Getenv(baseRepositoryPathEnv)
 	if basePath == "" {
 		return fmt.Errorf("missing %s env variable", baseRepositoryPathEnv)

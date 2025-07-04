@@ -1,7 +1,5 @@
 FROM docker.io/golang:1.24 AS build
 
-ARG SESSION_FILE
-
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -23,10 +21,9 @@ COPY prompts prompts
 COPY sql/migrations sql/migrations
 
 # Telegram scraper session
-COPY $SESSION_FILE $SESSION_FILE
+COPY session/prod.json /app/td-session.json
 
 RUN apk upgrade
 RUN apk --no-cache add gcompat ca-certificates tzdata git
-RUN npm install --global logseq-query
 
 ENTRYPOINT ["/app/app"]

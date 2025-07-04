@@ -24,8 +24,17 @@
         recreate: true
         network: "{{ podman_network }}"
         env:
-          GEMINI_API_KEY: "{{ lookup('ansible.builtin.env', 'GEMINI_API_KEY', default=undef()) }}" 
+          GITHUB_REPOSITORY_BASE_PATH: "{{ lookup('ansible.builtin.env', 'GITHUB_REPOSITORY_BASE_PATH', default=undef()) }}"
+          OPENROUTER_API_KEY: "{{ lookup('ansible.builtin.env', 'OPENROUTER_API_KEY', default=undef()) }}"
+          OPENROUTER_API_URL: "{{ lookup('ansible.builtin.env', 'OPENROUTER_API_URL', default=undef()) }}"
+          OPENAI_API_KEY: "{{ lookup('ansible.builtin.env', 'OPENAI_API_KEY', default=undef()) }}"
+          GEMINI_API_KEY: "{{ lookup('ansible.builtin.env', 'GEMINI_API_KEY', default=undef()) }}"
+          TG_CLIENT_NAME: "{{ lookup('ansible.builtin.env', 'TG_CLIENT_NAME', default=undef()) }}"
+          APP_ID: "{{ lookup('ansible.builtin.env', 'APP_ID', default=undef()) }}"
+          APP_HASH: "{{ lookup('ansible.builtin.env', 'APP_HASH', default=undef()) }}"
           TELEGRAM_BOT_API_TOKEN: "{{ lookup('ansible.builtin.env', 'TELEGRAM_BOT_API_TOKEN', default=undef()) }}"
-          GITHUB_TOKEN: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN', default=undef()) }}"
+          TG_PHONE: "{{ lookup('ansible.builtin.env', 'TG_PHONE', default=undef()) }}"
+          SESSION_FILE: "{{ lookup('ansible.builtin.env', 'SESSION_FILE', default=undef()) }}"
           DATABASE_URL: "{{ lookup('ansible.builtin.env', 'DATABASE_URL', default=undef()) }}"
-
+          LOGSEQ_GRAPH_PATH: "{{ lookup('ansible.builtin.env', 'LOGSEQ_GRAPH_PATH', default=undef()) }}"
+          GITHUB_TOKEN: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN', default=undef()) }}"

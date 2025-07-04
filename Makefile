@@ -60,7 +60,6 @@ psql:
 build-image:
 	test -n $(IMAGE_NAME) || exit 1
 	podman build \
-		--build-arg SESSION_DIR="$(SESSION_DIR)" \
-		--build-arg SESSION_FILE="$(SESSION_FILE)" \
+		--build-arg SESSION_FILE=$(SESSION_FILE) \
 		-t $(IMAGE_NAME) \
 		.
