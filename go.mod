@@ -7,7 +7,6 @@ require (
 	github.com/cozodb/cozo-lib-go v0.7.5
 	github.com/firebase/genkit/go v0.6.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
-	github.com/google/go-github/v72 v72.0.0
 	github.com/gotd/contrib v0.21.0
 	github.com/gotd/td v0.124.0
 	github.com/jackc/pgx/v5 v5.7.2
@@ -40,7 +39,6 @@ require (
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b // indirect
 	github.com/google/dotprompt/go v0.0.0-20250611200215-bb73406b05ca // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
