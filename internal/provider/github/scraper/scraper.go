@@ -51,58 +51,59 @@ func Run(ctx context.Context, db *pgxpool.Pool, hooks ...PushEventHook) error {
 	slog.Info("GitHub repositories path ensured", "path", basePath)
 
 	q := persist.New(db)
-	ticker := time.NewTicker(360 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	for {
+		repos, err := q.FindGitHubRepositories(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to read GitHub repositories with %w", err)
+		}
+		for _, repo := range repos {
+			p := filepath.Join(basePath, git.AsPath(repo.Owner, repo.Name))
+			if _, err := os.Stat(p); err != nil {
+				if !errors.Is(err, fs.ErrNotExist) {
+					// Got unexpected error
+					return fmt.Errorf("failed to stat repository path '%s' for %#v with %w", p, repo, err)
+				}
+
+				// Repository does not exist locally
+				slog.Info("cloning GitHub repository", "info", repo)
+				err := git.Clone(basePath, repo.Owner, repo.Name)
+				if err != nil {
+					return fmt.Errorf("failed to clone repository %#v to %s with %w", repo, p, err)
+				}
+			} else {
+				// Repo already cloned
+				slog.Info("pulling updates of GitHub repository", "info", repo)
+				err := git.Pull(basePath, repo.Owner, repo.Name)
+				if err != nil {
+					return fmt.Errorf("failed to pull repository %#v at %s with %w", repo, p, err)
+				}
+			}
+
+			// Run hooks
+			cwd := filepath.Join(basePath, git.AsPath(repo.Owner, repo.Name))
+
+			// Find hook
+			hookIdx := slices.IndexFunc(hooks, func(h PushEventHook) bool {
+				return h.RepoOwner == repo.Owner && h.RepoName == repo.Name
+			})
+			if hookIdx == -1 {
+				slog.Info("hook not found", "cwd", cwd, "repo", repo)
+				continue
+			}
+
+			// Execute hook
+			if err := hooks[hookIdx].Hook(ctx, cwd); err != nil {
+				return fmt.Errorf("failed to run hook %d for %s with %w", hookIdx, cwd, err)
+			}
+			slog.Info("hook succeeded", "cwd", cwd)
+		}
 		select {
 		case <-ctx.Done():
 			ticker.Stop()
 			return nil
 		case <-ticker.C:
-			repos, err := q.FindGitHubRepositories(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to read GitHub repositories with %w", err)
-			}
-			for _, repo := range repos {
-				p := filepath.Join(basePath, git.AsPath(repo.Owner, repo.Name))
-				if _, err := os.Stat(p); err != nil {
-					if !errors.Is(err, fs.ErrNotExist) {
-						// Got unexpected error
-						return fmt.Errorf("failed to stat repository path '%s' for %#v with %w", p, repo, err)
-					}
-
-					// Repository does not exist locally
-					slog.Info("cloning GitHub repository", "info", repo)
-					err := git.Clone(basePath, repo.Owner, repo.Name)
-					if err != nil {
-						return fmt.Errorf("failed to clone repository %#v to %s with %w", repo, p, err)
-					}
-				} else {
-					// Repo already cloned
-					slog.Info("pulling updates of GitHub repository", "info", repo)
-					err := git.Pull(basePath, repo.Owner, repo.Name)
-					if err != nil {
-						return fmt.Errorf("failed to pull repository %#v at %s with %w", repo, p, err)
-					}
-				}
-
-				// Run hooks
-				cwd := filepath.Join(basePath, git.AsPath(repo.Owner, repo.Name))
-
-				// Find hook
-				hookIdx := slices.IndexFunc(hooks, func(h PushEventHook) bool {
-					return h.RepoOwner == repo.Owner && h.RepoName == repo.Name
-				})
-				if hookIdx == -1 {
-					slog.Info("hook not found", "cwd", cwd, "repo", repo)
-					continue
-				}
-
-				// Execute hook
-				if err := hooks[hookIdx].Hook(ctx, cwd); err != nil {
-					return fmt.Errorf("failed to run hook %d for %s with %w", hookIdx, cwd, err)
-				}
-				slog.Info("hook succeeded", "cwd", cwd)
-			}
+			continue
 		}
 	}
 }
