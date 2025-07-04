@@ -127,6 +127,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	if err != nil {
 		return nil, err
 	}
+	slog.Info("retrieved LogSeq diff", "length", len(diff))
 	docs = append(docs, ai.DocumentFromText(diff, map[string]any{"info": "LogSeq git diff"}))
 
 	resp, err = a.evalPrompt.Execute(ctx, ai.WithDocs(docs...), ai.WithInput(map[string]any{"period": period}))

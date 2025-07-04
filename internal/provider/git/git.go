@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -50,7 +51,8 @@ func AsPath(owner, name string) string {
 }
 
 func Git(cwd string, args ...string) ([]byte, error) {
-	cmd := exec.Command("/usr/bin/git", args...)
+	slog.Info("executing git command", "args", args)
+	cmd := exec.Command(gitPath, args...)
 	cmd.Dir = cwd
 	stdout, err := cmd.Output()
 	if err != nil {
