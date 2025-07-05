@@ -49,11 +49,13 @@ Mimi is an LLM-driven, multi-source assistant designed to unify and enrich knowl
 ### Development
 
 - **Build:**  
-  `make install`, `make dev-db`, `make run` (start bot & scrapers)
+  `make install`, `make dev-db`, `make migrate-up` `make run` (start bot & scrapers)
 - **Format/Lint/Test:**  
   `make format`, `make vet`, `make test`
 - **Migrations:**  
   `make migrate-up` / `make migrate-down` (Geni, SQLC, etc.)
+- **Deployment:**
+  `make -C ansible/ deploy-service`
 
 ### Deployment
 
