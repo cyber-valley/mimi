@@ -399,6 +399,7 @@ loop:
 	if err != nil {
 		return summary, fmt.Errorf("failed to describe messages '%#v' with %w", input, err)
 	}
+	slog.Info("got described topic", "text", resp.Text())
 	var output telegramTopicDescriptionOutput
 	if err := resp.Output(&output); err != nil {
 		return summary, fmt.Errorf("failed to deserialize LLM output with %w", err)

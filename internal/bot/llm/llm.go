@@ -9,7 +9,6 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -32,16 +31,8 @@ type LLM struct {
 	router *ai.Prompt
 }
 
-func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph) LLM {
-	ctx := context.Background()
+func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph, g *genkit.Genkit) LLM {
 	q := persist.New(pgPool)
-	g, err := genkit.Init(ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{}),
-		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
-	)
-	if err != nil {
-		log.Fatalf("could not initialize Genkit: %v", err)
-	}
 
 	ghOrg := "cyber-valley"
 	agents := []agent.Agent{

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ai-shift/tgmd"
+	"github.com/firebase/genkit/go/genkit"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -16,7 +17,7 @@ import (
 	"mimi/internal/provider/logseq"
 )
 
-func Start(ctx context.Context, token string, logseqPath string) error {
+func Start(ctx context.Context, token string, logseqPath string, g *genkit.Genkit) error {
 	slog.Info("starting Telegram Bot")
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
@@ -29,11 +30,11 @@ func Start(ctx context.Context, token string, logseqPath string) error {
 		return fmt.Errorf("failed to connect to postgres with %w", err)
 	}
 
-	g := logseq.NewRegexGraph(logseqPath)
+	graph := logseq.NewRegexGraph(logseqPath)
 	handler := UpdateHandler{
 		bot: bot,
-		g:   g,
-		llm: llm.New(pool, g),
+		g:   graph,
+		llm: llm.New(pool, graph, g),
 	}
 
 	u := tgbotapi.NewUpdate(0)

@@ -7,10 +7,11 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/compat_oai/openai"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/openai/openai-go/option"
 
 	"mimi/internal/bot"
 	ghscraper "mimi/internal/provider/github/scraper"
@@ -23,6 +24,7 @@ const (
 	logseqGraphEnv      = "LOGSEQ_GRAPH_PATH"
 	telegramBotTokenEnv = "TELEGRAM_BOT_API_TOKEN"
 	openrouterApiKeyEnv = "OPENROUTER_API_KEY"
+	openrouterApiUrlEnv = "OPENROUTER_API_URL"
 )
 
 func main() {
@@ -45,17 +47,40 @@ func main() {
 		missingEnvVars = append(missingEnvVars, openrouterApiKeyEnv)
 	}
 
+	openrouterBaseURL := os.Getenv(openrouterApiUrlEnv)
+	if openrouterBaseURL == "" {
+		missingEnvVars = append(missingEnvVars, openrouterApiUrlEnv)
+	}
+
 	if len(missingEnvVars) > 0 {
 		log.Fatalf("env variables %#v are missing", missingEnvVars)
 	}
 
+	oai := &openai.OpenAI{
+		APIKey: openrouterApiKey,
+		Opts: []option.RequestOption{
+			option.WithBaseURL(openrouterBaseURL),
+		},
+	}
+
 	g, err := genkit.Init(ctx,
-		genkit.WithPlugins(
-			&googlegenai.GoogleAI{},
-			&openai.OpenAI{APIKey: openrouterApiKey},
-		),
-		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
+		genkit.WithPlugins(oai),
+		genkit.WithDefaultModel("openai/google/gemini-2.5-flash"),
 	)
+	oai.DefineModel(g, "google/gemini-2.5-flash", ai.ModelInfo{
+		Label:    "Gemini 2.5 Flash Preview 04-17",
+		Versions: []string{"google/gemini-2.5-flash"},
+		Supports: &ai.ModelSupports{
+			Multiturn:   true,
+			Tools:       true,
+			ToolChoice:  true,
+			SystemRole:  true,
+			Media:       true,
+			Constrained: ai.ConstrainedSupportNone,
+		},
+		Stage: ai.ModelStageStable,
+	})
+
 	if err != nil {
 		log.Fatalf("could not initialize Genkit: %s", err)
 	}
@@ -95,7 +120,7 @@ func main() {
 		}
 	}()
 	go func() {
-		err := bot.Start(ctx, tgBotToken, logseqPath)
+		err := bot.Start(ctx, tgBotToken, logseqPath, g)
 		if err != nil {
 			log.Fatalf("Telegram bot exited with %s", err)
 		} else {
