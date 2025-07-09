@@ -29,7 +29,6 @@
           OPENROUTER_API_URL: "{{ lookup('ansible.builtin.env', 'OPENROUTER_API_URL', default=undef()) }}"
           OPENAI_API_KEY: "{{ lookup('ansible.builtin.env', 'OPENAI_API_KEY', default=undef()) }}"
           GEMINI_API_KEY: "{{ lookup('ansible.builtin.env', 'GEMINI_API_KEY', default=undef()) }}"
-          TG_CLIENT_NAME: "{{ lookup('ansible.builtin.env', 'TG_CLIENT_NAME', default=undef()) }}"
           APP_ID: "{{ lookup('ansible.builtin.env', 'APP_ID', default=undef()) }}"
           APP_HASH: "{{ lookup('ansible.builtin.env', 'APP_HASH', default=undef()) }}"
           TELEGRAM_BOT_API_TOKEN: "{{ lookup('ansible.builtin.env', 'TELEGRAM_BOT_API_TOKEN', default=undef()) }}"
