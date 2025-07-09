@@ -9,7 +9,6 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
-	"github.com/firebase/genkit/go/plugins/googlegenai"
 
 	"mimi/internal/provider/logseq/db"
 )
@@ -21,17 +20,7 @@ type LogseqAgent struct {
 	eval     *ai.Prompt
 }
 
-func New(ctx context.Context, q *db.Queries) LogseqAgent {
-	// Init genkit
-	g, err := genkit.Init(
-		ctx,
-		genkit.WithPlugins(&googlegenai.GoogleAI{}),
-		genkit.WithDefaultModel("googleai/gemini-2.0-flash"),
-	)
-	if err != nil {
-		log.Fatalf("could not initialize Genkit: %v", err)
-	}
-
+func New(ctx context.Context, q *db.Queries, g *genkit.Genkit) LogseqAgent {
 	// Fail fast if prompt wasn't found
 	retrieve := genkit.LookupPrompt(g, "logseq-retrieve")
 	if retrieve == nil {
