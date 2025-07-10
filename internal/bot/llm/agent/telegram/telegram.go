@@ -97,6 +97,7 @@ func (a TelegramAgent) GetInfo() agent.Info {
 	}
 }
 
+// TODO: Modify prompt to return ErrEmptyContext if nothing was found
 func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
 	q := persist.New(a.pgPool)
 	info, err := q.FindTelegramPeersWithTopics(ctx)

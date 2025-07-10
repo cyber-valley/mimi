@@ -62,6 +62,9 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get projects list for '%s' with %w", a.org, err)
 	}
+	if len(projects) == 0 {
+		return nil, agent.ErrEmptyContext
+	}
 	projectsBlob, err := json.Marshal(projects)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize GitHub projects list with %w", err)

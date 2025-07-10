@@ -2,9 +2,12 @@ package agent
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/firebase/genkit/go/ai"
 )
+
+var ErrEmptyContext = fmt.Errorf("required context is empty")
 
 type Agent interface {
 	GetInfo() Info

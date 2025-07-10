@@ -27,7 +27,7 @@ import (
 type LLM struct {
 	g      *genkit.Genkit
 	q      *persist.Queries
-	agents []agent.Agent
+	agents map[string]agent.Agent
 	router *ai.Prompt
 }
 
@@ -43,6 +43,10 @@ func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph, g *genkit.Genkit)
 		telegram.New(g, pgPool),
 		summary.New(g, pgPool, ghOrg, graph.Path),
 	}
+	mapped := make(map[string]agent.Agent, len(agents))
+	for _, agent := range agents {
+		mapped[agent.GetInfo().Name] = agent
+	}
 
 	router := genkit.LookupPrompt(g, "router")
 	if router == nil {
@@ -52,7 +56,7 @@ func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph, g *genkit.Genkit)
 	return LLM{
 		g:      g,
 		q:      q,
-		agents: agents,
+		agents: mapped,
 		router: router,
 	}
 }
@@ -88,16 +92,20 @@ func (m LLM) Answer(ctx context.Context, id int64, query string) (string, error)
 	}
 
 	// Run selected agent
-	var agent agent.Agent
-	for i, a := range m.agents {
-		if a.GetInfo().Name != output.Agent {
-			continue
-		}
-		agent = m.agents[i]
-		break
+	a, ok := m.agents[output.Agent]
+	if !ok {
+		return "", fmt.Errorf("agent with name '%s' not found", output.Agent)
 	}
-	resp, err = agent.Run(ctx, query, messages...)
-	if err != nil {
+	resp, err = a.Run(ctx, query, messages...)
+	switch err {
+	case nil:
+		break
+	case agent.ErrEmptyContext:
+		resp, err = m.agents["fallback"].Run(ctx, query, messages...)
+		if err != nil {
+			return "", fmt.Errorf("failed to run fallback agent with %s", err)
+		}
+	default:
 		return "", fmt.Errorf("failed to run agent with %w", err)
 	}
 
