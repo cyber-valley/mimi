@@ -62,18 +62,32 @@ func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph, g *genkit.Genkit,
 	}
 }
 
-func (m LLM) Answer(ctx context.Context, id int64, query string) (string, error) {
+type AnswerType = string
+
+var (
+	AnswerTypeText = "text-answer"
+	AnswerTypeFile = "file-answer"
+)
+
+type Answer struct {
+	T    AnswerType
+	Data []byte
+}
+
+func (m LLM) Answer(ctx context.Context, id int64, query string) (Answer, error) {
+	var answer Answer
+
 	// Route to the proper agent
 	resp, err := m.router.Execute(ctx, ai.WithInput(map[string]any{
 		"query":  query,
 		"agents": m.getAgentsInfo(),
 	}))
 	if err != nil {
-		return "", fmt.Errorf("initial LLM call failed with %w", err)
+		return answer, fmt.Errorf("initial LLM call failed with %w", err)
 	}
 	var output routerOutput
 	if err := resp.Output(&output); err != nil {
-		return "", fmt.Errorf("failed to parse router output with %w", err)
+		return answer, fmt.Errorf("failed to parse router output with %w", err)
 	}
 	slog.Info("router answer", "agent", output.Agent)
 
@@ -86,20 +100,27 @@ func (m LLM) Answer(ctx context.Context, id int64, query string) (string, error)
 	case nil:
 		err = json.Unmarshal(rows, &messages)
 		if err != nil {
-			return "", fmt.Errorf("failed to unmarshal messages with %w", err)
+			return answer, fmt.Errorf("failed to unmarshal messages with %w", err)
 		}
 	default:
-		return "", fmt.Errorf("failed to find message history with %w", err)
+		return answer, fmt.Errorf("failed to find message history with %w", err)
+	}
+
+	switch output.Agent {
+	case "logseqquery":
+		answer.T = AnswerTypeFile
+	default:
+		answer.T = AnswerTypeText
 	}
 
 	// Run selected agent
 	a, ok := m.agents[output.Agent]
 	if !ok {
-		return "", fmt.Errorf("agent with name '%s' not found", output.Agent)
+		return answer, fmt.Errorf("agent with name '%s' not found", output.Agent)
 	}
 	resp, err = a.Run(ctx, query, messages...)
 	if err != nil {
-		return "", fmt.Errorf("failed to run agent with %w", err)
+		return answer, fmt.Errorf("failed to run agent with %w", err)
 	}
 
 	// Update message history
@@ -107,17 +128,18 @@ func (m LLM) Answer(ctx context.Context, id int64, query string) (string, error)
 	messages = append(messages, resp.Message)
 	encoded, err := json.Marshal(messages)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal messages with %w", err)
+		return answer, fmt.Errorf("failed to marshal messages with %w", err)
 	}
 	err = m.q.SaveChatMessages(ctx, persist.SaveChatMessagesParams{
 		TelegramID: id,
 		Messages:   encoded,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to save messages with %w", err)
+		return answer, fmt.Errorf("failed to save messages with %w", err)
 	}
+	answer.Data = []byte(resp.Text())
 
-	return resp.Text(), nil
+	return answer, nil
 }
 
 func (m LLM) getAgentsInfo() (info []agent.Info) {

@@ -95,12 +95,19 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 	if err != nil {
 		return fmt.Errorf("failed to get answer from LLM with %w", err)
 	}
-	slog.Info("got LLM answer", "length", len(answer))
+	slog.Info("got LLM answer", "length", len(answer.Data))
 
-	// Response to the user's query
-	escaped := tgmd.Telegramify(strings.ReplaceAll(answer, "\n\n", "\n"))
-	if err := sendLongMessage(h.bot, m.Chat.ID, escaped); err != nil {
-		return fmt.Errorf("failed to send LLM response with %w", err)
+	switch answer.T {
+	case llm.AnswerTypeText:
+		// Response to the user's query
+		escaped := tgmd.Telegramify(strings.ReplaceAll(string(answer.Data), "\n\n", "\n"))
+		if err := sendLongMessage(h.bot, m.Chat.ID, escaped); err != nil {
+			return fmt.Errorf("failed to send LLM response with %w", err)
+		}
+	case llm.AnswerTypeFile:
+		// TODO: Send as file
+	default:
+		return fmt.Errorf("unexpected answer type '%#v'", answer)
 	}
 
 	return nil
@@ -120,7 +127,7 @@ func sendLongMessage(bot *tgbotapi.BotAPI, chatID int64, text string) error {
 		}
 		// The time to send is come
 		if err := sendShortMessage(bot, chatID, strings.Join(buf, "\n")); err != nil {
-			return nil
+			return err
 		}
 		// Clean up state
 		buf = buf[:0]
