@@ -95,7 +95,7 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 	if err != nil {
 		return fmt.Errorf("failed to get answer from LLM with %w", err)
 	}
-	slog.Info("got LLM answer", "length", len(answer.Data))
+	slog.Info("got LLM answer", "length", len(answer.Data), "type", answer.T)
 
 	switch answer.T {
 	case llm.AnswerTypeText:
@@ -106,6 +106,33 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 		}
 	case llm.AnswerTypeFile:
 		// TODO: Send as file
+		tmpfile, err := os.CreateTemp("", "*.csv")
+		if err != nil {
+			return fmt.Errorf("failed to create temporary file with %w", err)
+		}
+		defer os.Remove(tmpfile.Name())
+
+		if _, err := tmpfile.Write(answer.Data); err != nil {
+			return fmt.Errorf("failed to write to temporary file with %w", err)
+		}
+		if err := tmpfile.Close(); err != nil {
+			return fmt.Errorf("failed to close temporary file with %w", err)
+		}
+
+		tmpfile, err = os.Open(tmpfile.Name())
+		if err != nil {
+			return fmt.Errorf("failed to open temporary file after write with %w", err)
+		}
+
+		f := tgbotapi.FileReader{
+			Name:   tmpfile.Name(),
+			Reader: tmpfile,
+		}
+		req := tgbotapi.NewDocument(m.Chat.ID, f)
+		_, err = h.bot.Send(req)
+		if err != nil {
+			return fmt.Errorf("failed to send document with %w", err)
+		}
 	default:
 		return fmt.Errorf("unexpected answer type '%#v'", answer)
 	}

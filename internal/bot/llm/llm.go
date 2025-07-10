@@ -107,7 +107,7 @@ func (m LLM) Answer(ctx context.Context, id int64, query string) (Answer, error)
 	}
 
 	switch output.Agent {
-	case "logseqquery":
+	case "logseq-query":
 		answer.T = AnswerTypeFile
 	default:
 		answer.T = AnswerTypeText
