@@ -46,7 +46,7 @@ func Run(ctx context.Context, db *pgxpool.Pool, hooks ...PushEventHook) error {
 	slog.Info("GitHub repositories path ensured", "path", basePath)
 
 	q := persist.New(db)
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(1 * time.Hour)
 	for {
 		repos, err := q.FindGitHubRepositories(ctx)
 		if err != nil {
