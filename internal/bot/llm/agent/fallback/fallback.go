@@ -3,6 +3,7 @@ package fallback
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/firebase/genkit/go/ai"
@@ -11,18 +12,30 @@ import (
 	"mimi/internal/bot/llm/agent"
 )
 
+const (
+	evalPromptName = "fallback"
+)
+
 type FallbackAgent struct {
-	g *genkit.Genkit
+	g          *genkit.Genkit
+	evalPrompt *ai.Prompt
+}
+
+type fallbackInput struct {
+	Query string `json:"query" jsonschema_description:"User's original query"`
 }
 
 func New(g *genkit.Genkit) FallbackAgent {
-	type FallbackInput struct {
-		Query string `json:"query" jsonschema_description:"User's original query"`
+	// Fail fast if prompt wasn't found
+	evalPrompt := genkit.LookupPrompt(g, evalPromptName)
+	if evalPrompt == nil {
+		log.Fatalf("no prompt named '%s' found", evalPromptName)
 	}
-	ag := FallbackAgent{g: g}
+	ag := FallbackAgent{g: g, evalPrompt: evalPrompt}
+
 	genkit.DefineTool(
 		g, "fallback", "Should be used if there is not enough context info to answer user's query",
-		func(ctx *ai.ToolContext, input FallbackInput) (string, error) {
+		func(ctx *ai.ToolContext, input fallbackInput) (string, error) {
 			slog.Info("call to fallback tool")
 			resp, err := ag.Run(ctx, input.Query)
 			if err != nil {
@@ -41,11 +54,9 @@ func (a FallbackAgent) GetInfo() agent.Info {
 }
 
 func (a FallbackAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
-	resp, err := genkit.Generate(
+	resp, err := a.evalPrompt.Execute(
 		ctx,
-		a.g,
-		ai.WithPrompt(query),
-		ai.WithModelName("openai/perplexity/sonar-pro"),
+		ai.WithInput(fallbackInput{Query: query}),
 		ai.WithMessages(msgs...),
 	)
 	if err != nil {
