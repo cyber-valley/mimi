@@ -3,6 +3,7 @@ package fallback
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
@@ -15,7 +16,21 @@ type FallbackAgent struct {
 }
 
 func New(g *genkit.Genkit) FallbackAgent {
-	return FallbackAgent{g: g}
+	type FallbackInput struct {
+		Query string `json:"query" jsonschema_description:"User's original query"`
+	}
+	ag := FallbackAgent{g: g}
+	genkit.DefineTool(
+		g, "fallback", "Should be used if there is not enough context info to answer user's query",
+		func(ctx *ai.ToolContext, input FallbackInput) (string, error) {
+			slog.Info("call to fallback tool")
+			resp, err := ag.Run(ctx, input.Query)
+			if err != nil {
+				return "", err
+			}
+			return resp.Text(), nil
+		})
+	return ag
 }
 
 func (a FallbackAgent) GetInfo() agent.Info {
@@ -30,6 +45,7 @@ func (a FallbackAgent) Run(ctx context.Context, query string, msgs ...*ai.Messag
 		ctx,
 		a.g,
 		ai.WithPrompt(query),
+		ai.WithModelName("openai/perplexity/sonar-pro"),
 		ai.WithMessages(msgs...),
 	)
 	if err != nil {

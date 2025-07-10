@@ -80,6 +80,19 @@ func main() {
 		},
 		Stage: ai.ModelStageStable,
 	})
+	oai.DefineModel(g, "perplexity/sonar-pro", ai.ModelInfo{
+		Label:    "Perplexity Sonar Pro",
+		Versions: []string{},
+		Supports: &ai.ModelSupports{
+			Multiturn:   true,
+			Tools:       true,
+			ToolChoice:  true,
+			SystemRole:  true,
+			Media:       true,
+			Constrained: ai.ConstrainedSupportNone,
+		},
+		Stage: ai.ModelStageStable,
+	})
 
 	if err != nil {
 		log.Fatalf("could not initialize Genkit: %s", err)
