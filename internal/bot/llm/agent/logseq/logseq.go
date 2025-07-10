@@ -59,9 +59,6 @@ func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to answer to query with %w", err)
 	}
-	if len(titles) == 0 {
-		return nil, agent.ErrEmptyContext
-	}
 	titleDocs := make([]*ai.Document, len(titles))
 	for i, t := range titles {
 		titleDocs[i] = ai.DocumentFromText(t, map[string]any{})
@@ -104,9 +101,6 @@ func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("failed to fetch relevant pages with %w", errors.Join(errs...))
-	}
-	if len(docs) == 0 {
-		return nil, fmt.Errorf("there is no any relevant page")
 	}
 	slog.Info("relevant documents", "length", len(docs))
 

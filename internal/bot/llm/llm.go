@@ -98,15 +98,7 @@ func (m LLM) Answer(ctx context.Context, id int64, query string) (string, error)
 		return "", fmt.Errorf("agent with name '%s' not found", output.Agent)
 	}
 	resp, err = a.Run(ctx, query, messages...)
-	switch err {
-	case nil:
-		break
-	case agent.ErrEmptyContext:
-		resp, err = m.agents["fallback"].Run(ctx, query, messages...)
-		if err != nil {
-			return "", fmt.Errorf("failed to run fallback agent with %s", err)
-		}
-	default:
+	if err != nil {
 		return "", fmt.Errorf("failed to run agent with %w", err)
 	}
 
