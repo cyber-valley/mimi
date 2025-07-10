@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/cozodb/cozo-lib-go"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/firebase/genkit/go/plugins/compat_oai/openai"
@@ -89,18 +90,25 @@ func main() {
 		log.Fatalf("failed to connect to postgres with: %s", err)
 	}
 
-	// Setup LogSeq push event hook
-	var hooks []ghscraper.PushEventHook
-	q := db.New()
+	// Can be replaced to ("slite", "path/to/file", nil)
+	conn, err := cozo.New("mem", "", nil)
+	if err != nil {
+		log.Fatalf("failed to connect to cozo with %s", err)
+	}
+	q := db.New(conn)
 	err = q.CreateRelations()
 	if err != nil {
 		log.Fatalf("failed to create relations with %s", err)
 	}
-	hooks = append(hooks, ghscraper.PushEventHook{
-		RepoOwner: "cyber-valley",
-		RepoName:  "cvland",
-		Hook:      logseq.NewSyncer(q),
-	})
+
+	// Setup LogSeq push event hook
+	hooks := []ghscraper.PushEventHook{
+		ghscraper.PushEventHook{
+			RepoOwner: "cyber-valley",
+			RepoName:  "cvland",
+			Hook:      logseq.NewSyncer(q),
+		},
+	}
 
 	go func() {
 		err := ghscraper.Run(ctx, pool, hooks...)
@@ -111,7 +119,7 @@ func main() {
 		}
 	}()
 	go func() {
-		err := bot.Start(ctx, tgBotToken, logseqPath, g)
+		err := bot.Start(ctx, tgBotToken, logseqPath, g, conn)
 		if err != nil {
 			log.Fatalf("Telegram bot exited with %s", err)
 		} else {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"slices"
 	"strings"
@@ -16,11 +15,7 @@ type Queries struct {
 	db cozo.CozoDB
 }
 
-func New() *Queries {
-	db, err := cozo.New("sqlite", "cozo.db", nil)
-	if err != nil {
-		log.Fatalf("failed to connect to cozo with %s", err)
-	}
+func New(db cozo.CozoDB) *Queries {
 	return &Queries{
 		db: db,
 	}
@@ -102,19 +97,19 @@ func (q *Queries) SavePage(p SavePageParams) error {
 		}
 	}
 
-	// // Save or update references
-	// if len(p.Refs) > 0 {
-	// 	for _, ref := range p.Refs {
-	// 		tx = append(
-	// 			tx,
-	// 			fmt.Sprintf(
-	// 				`?[src, target] <- [[%s,%s]] :put page_ref{src, target}`,
-	// 				escape(p.Title),
-	// 				escape(ref),
-	// 			),
-	// 		)
-	// 	}
-	// }
+	// Save or update references
+	if len(p.Refs) > 0 {
+		for _, ref := range p.Refs {
+			tx = append(
+				tx,
+				fmt.Sprintf(
+					`?[src, target] <- [[%s,%s]] :put page_ref{src, target}`,
+					escape(p.Title),
+					escape(ref),
+				),
+			)
+		}
+	}
 
 	// Execute queries in transaction
 	err := execTx(q.db, tx)

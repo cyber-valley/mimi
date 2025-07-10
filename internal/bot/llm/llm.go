@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 
+	"github.com/cozodb/cozo-lib-go"
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
 	"github.com/jackc/pgx/v5"
@@ -31,12 +32,12 @@ type LLM struct {
 	router *ai.Prompt
 }
 
-func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph, g *genkit.Genkit) LLM {
+func New(pgPool *pgxpool.Pool, graph logseqscraper.RegexGraph, g *genkit.Genkit, conn cozo.CozoDB) LLM {
 	q := persist.New(pgPool)
 
 	ghOrg := "cyber-valley"
 	agents := []agent.Agent{
-		logseq.New(g, db.New()),
+		logseq.New(g, db.New(conn)),
 		logseqquery.New(graph),
 		fallback.New(g),
 		github.New(g, ghOrg),

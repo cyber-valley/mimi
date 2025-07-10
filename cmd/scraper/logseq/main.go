@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/cozodb/cozo-lib-go"
+
 	"mimi/internal/provider/logseq"
 	"mimi/internal/provider/logseq/db"
 )
@@ -16,8 +18,12 @@ func main() {
 	defer cancel()
 
 	// Connect to CozoDB
-	q := db.New()
-	err := q.CreateRelations()
+	conn, err := cozo.New("mem", "", nil)
+	if err != nil {
+		log.Fatalf("failed to connect to cozo with %s", err)
+	}
+	q := db.New(conn)
+	err = q.CreateRelations()
 	if err != nil {
 		log.Fatalf("failed to create relations with %s", err)
 	}

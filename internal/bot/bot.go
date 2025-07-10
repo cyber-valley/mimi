@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ai-shift/tgmd"
+	"github.com/cozodb/cozo-lib-go"
 	"github.com/firebase/genkit/go/genkit"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,7 +18,7 @@ import (
 	"mimi/internal/provider/logseq"
 )
 
-func Start(ctx context.Context, token string, logseqPath string, g *genkit.Genkit) error {
+func Start(ctx context.Context, token string, logseqPath string, g *genkit.Genkit, conn cozo.CozoDB) error {
 	slog.Info("starting Telegram Bot")
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
@@ -34,7 +35,7 @@ func Start(ctx context.Context, token string, logseqPath string, g *genkit.Genki
 	handler := UpdateHandler{
 		bot: bot,
 		g:   graph,
-		llm: llm.New(pool, graph, g),
+		llm: llm.New(pool, graph, g, conn),
 	}
 
 	u := tgbotapi.NewUpdate(0)

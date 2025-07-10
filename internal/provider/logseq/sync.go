@@ -26,6 +26,7 @@ func Sync(ctx context.Context, g RegexGraph, q *db.Queries) error {
 	props := make(map[string]string)
 
 	var errs []error
+	var synced int
 	for p := range g.WalkPages() {
 		// Get page data
 		content, err := p.Read()
@@ -56,7 +57,14 @@ func Sync(ctx context.Context, g RegexGraph, q *db.Queries) error {
 			errs = append(errs, err)
 			continue
 		}
+
+		synced++
+		if synced%100 == 0 {
+			slog.Info("synced 100 LogSeq pages")
+		}
 	}
+
+	slog.Info("LogSeq graph's sync succeeded")
 
 	return errors.Join(errs...)
 }

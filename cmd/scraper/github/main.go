@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/cozodb/cozo-lib-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/provider/github/scraper"
@@ -25,7 +26,11 @@ func main() {
 	var hooks []scraper.PushEventHook
 
 	// Setup LogSeq push event hook
-	q := db.New()
+	conn, err := cozo.New("mem", "", nil)
+	if err != nil {
+		log.Fatalf("failed to connect to cozo with %s", err)
+	}
+	q := db.New(conn)
 	err = q.CreateRelations()
 	if err != nil {
 		log.Fatalf("failed to create relations with %s", err)
