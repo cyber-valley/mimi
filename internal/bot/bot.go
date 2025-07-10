@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mimi/internal/bot/llm"
+	"mimi/internal/bot/llm/agent"
 	"mimi/internal/provider/logseq"
 )
 
@@ -91,28 +92,29 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 	}()
 
 	// Generate LLM answer
-	answer, err := h.llm.Answer(ctx, m.Chat.ID, m.Text)
+	result, err := h.llm.Answer(ctx, m.Chat.ID, m.Text)
 	if err != nil {
 		return fmt.Errorf("failed to get answer from LLM with %w", err)
 	}
-	slog.Info("got LLM answer", "length", len(answer.Data), "type", answer.T)
 
-	switch answer.T {
-	case llm.AnswerTypeText:
+	switch data := result.Data.(type) {
+	case agent.DataText:
 		// Response to the user's query
-		escaped := tgmd.Telegramify(strings.ReplaceAll(string(answer.Data), "\n\n", "\n"))
+		slog.Info("got LLM text answer", "length", len(data.Text))
+		escaped := tgmd.Telegramify(strings.ReplaceAll(data.Text, "\n\n", "\n"))
 		if err := sendLongMessage(h.bot, m.Chat.ID, escaped); err != nil {
 			return fmt.Errorf("failed to send LLM response with %w", err)
 		}
-	case llm.AnswerTypeFile:
+	case agent.DataFile:
+		slog.Info("got LLM file answer", "size", len(data.Blob))
 		// TODO: Send as file
-		tmpfile, err := os.CreateTemp("", "*.csv")
+		tmpfile, err := os.CreateTemp("", fmt.Sprintf("*-%s", data.Name))
 		if err != nil {
 			return fmt.Errorf("failed to create temporary file with %w", err)
 		}
 		defer os.Remove(tmpfile.Name())
 
-		if _, err := tmpfile.Write(answer.Data); err != nil {
+		if _, err := tmpfile.Write(data.Blob); err != nil {
 			return fmt.Errorf("failed to write to temporary file with %w", err)
 		}
 		if err := tmpfile.Close(); err != nil {
@@ -134,7 +136,7 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 			return fmt.Errorf("failed to send document with %w", err)
 		}
 	default:
-		return fmt.Errorf("unexpected answer type '%#v'", answer)
+		return fmt.Errorf("unexpected answer type '%#v'", data)
 	}
 
 	return nil

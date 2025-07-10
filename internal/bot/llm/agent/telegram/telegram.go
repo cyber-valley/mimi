@@ -98,15 +98,16 @@ func (a TelegramAgent) GetInfo() agent.Info {
 }
 
 // TODO: Modify prompt to return ErrEmptyContext if nothing was found
-func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (agent.Response, error) {
+	var result agent.Response
 	q := persist.New(a.pgPool)
 	info, err := q.FindTelegramPeersWithTopics(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch initial info for telegram agent run with %w", err)
+		return result, fmt.Errorf("failed to fetch initial info for telegram agent run with %w", err)
 	}
 	blob, err := json.Marshal(info)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal telegram info with %w", err)
+		return result, fmt.Errorf("failed to marshal telegram info with %w", err)
 	}
 	// Retrieve related DB info
 	resp, err := a.retrievePrompt.Execute(
@@ -116,7 +117,7 @@ func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Messag
 		ai.WithInput(map[string]any{"query": query, "schema": a.sqlSchema}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed with %w", err)
+		return result, fmt.Errorf("LLM request failed with %w", err)
 	}
 
 	slog.Info("retrieved telegram data", "value", resp.Text())
@@ -129,8 +130,8 @@ func (a TelegramAgent) Run(ctx context.Context, query string, msgs ...*ai.Messag
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate final step with %w", err)
+		return result, fmt.Errorf("failed to evaluate final step with %w", err)
 	}
-
-	return resp, nil
+	result = agent.NewResponse(agent.DataText{Text: resp.Text()}, resp)
+	return result, nil
 }

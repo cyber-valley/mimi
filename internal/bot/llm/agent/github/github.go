@@ -56,15 +56,16 @@ func (a GitHubAgent) GetInfo() agent.Info {
 	}
 }
 
-func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (agent.Response, error) {
+	var result agent.Response
 	// Gather existing projects
 	projects, err := a.c.ListProjects(context.Background(), a.org)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get projects list for '%s' with %w", a.org, err)
+		return result, fmt.Errorf("failed to get projects list for '%s' with %w", a.org, err)
 	}
 	projectsBlob, err := json.Marshal(projects)
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize GitHub projects list with %w", err)
+		return result, fmt.Errorf("failed to serialize GitHub projects list with %w", err)
 	}
 
 	// Find out target projects
@@ -75,13 +76,13 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to filter related GitHub projects with %w", err)
+		return result, fmt.Errorf("failed to filter related GitHub projects with %w", err)
 	}
 	var targetProjects struct {
 		Projects []projectInfo `json:"projects"`
 	}
 	if err := resp.Output(&targetProjects); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal filtered projects '%s' with %w", resp.Text(), err)
+		return result, fmt.Errorf("failed to unmarshal filtered projects '%s' with %w", resp.Text(), err)
 	}
 
 	// Fetch GitHub board state
@@ -89,7 +90,7 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 	for _, info := range targetProjects.Projects {
 		tmp, err := a.c.GetOrgProject(ctx, a.org, info.Id, time.Now().AddDate(-1, 0, 0))
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch supply board state with %w", err)
+			return result, fmt.Errorf("failed to fetch supply board state with %w", err)
 		}
 		issues[info.Title] = tmp
 	}
@@ -115,9 +116,10 @@ func (a GitHubAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate final step with %w", err)
+		return result, fmt.Errorf("failed to evaluate final step with %w", err)
 	}
-	return resp, nil
+	result = agent.NewResponse(agent.DataText{Text: resp.Text()}, resp)
+	return result, nil
 }
 
 type projectInfo struct {

@@ -34,23 +34,27 @@ func (a LogseqQueryAgent) GetInfo() agent.Info {
 	}
 }
 
-func (a LogseqQueryAgent) Run(ctx context.Context, queryS string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+func (a LogseqQueryAgent) Run(ctx context.Context, queryS string, msgs ...*ai.Message) (agent.Response, error) {
+	var result agent.Response
 	slog.Info("trying to eval logseq query")
-	result, err := query.Eval(ctx, a.graph, queryS)
+	out, err := query.Eval(ctx, a.graph, queryS)
 	if err != nil {
 		slog.Warn("failed to evaluate logseq query", "with", err)
-		return nil, fmt.Errorf("failed to evaluate query with %w", err)
+		return result, fmt.Errorf("failed to evaluate query with %w", err)
 	}
-	slog.Info("got logseq query result", "rows", len(result.Table)-1)
+	slog.Info("got logseq query result", "rows", len(out.Table)-1)
 
 	// Encode as CSV
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
-	err = writer.WriteAll(result.Table)
+	err = writer.WriteAll(out.Table)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode LogSeq query results into CSV with %w", err)
+		return result, fmt.Errorf("failed to encode LogSeq query results into CSV with %w", err)
 	}
-	return &ai.ModelResponse{
-		Message: ai.NewTextMessage(ai.RoleModel, buf.String()),
-	}, nil
+
+	result = agent.NewResponse(agent.DataFile{
+		Blob: buf.Bytes(),
+		Name: "query-result.csv",
+	}, nil)
+	return result, nil
 }

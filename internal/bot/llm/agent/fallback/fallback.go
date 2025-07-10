@@ -41,7 +41,8 @@ func New(g *genkit.Genkit) FallbackAgent {
 			if err != nil {
 				return "", err
 			}
-			return resp.Text(), nil
+			text := resp.Data.(agent.DataText)
+			return text.Text, nil
 		})
 	return ag
 }
@@ -53,14 +54,16 @@ func (a FallbackAgent) GetInfo() agent.Info {
 	}
 }
 
-func (a FallbackAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+func (a FallbackAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (agent.Response, error) {
+	var result agent.Response
 	resp, err := a.evalPrompt.Execute(
 		ctx,
 		ai.WithInput(fallbackInput{Query: query}),
 		ai.WithMessages(msgs...),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call fallback agent with %w", err)
+		return result, fmt.Errorf("failed to call fallback agent with %w", err)
 	}
-	return resp, nil
+	result = agent.NewResponse(agent.DataText{Text: resp.Text()}, resp)
+	return result, nil
 }

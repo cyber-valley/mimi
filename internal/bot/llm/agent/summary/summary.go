@@ -72,10 +72,11 @@ func (a SummaryAgent) GetInfo() agent.Info {
 	}
 }
 
-func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (agent.Response, error) {
+	var result agent.Response
 	resp, err := a.periodExtractor.Execute(ctx, ai.WithInput(map[string]any{"query": query}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract period from query '%s' with %w", query, err)
+		return result, fmt.Errorf("failed to extract period from query '%s' with %w", query, err)
 	}
 	period := strings.TrimSuffix(resp.Text(), "\n")
 	slog.Info("generating summary", "period", period)
@@ -83,7 +84,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 	since := time.Now()
 	switch period {
 	default:
-		return nil, fmt.Errorf("unexpected period '%s'", period)
+		return result, fmt.Errorf("unexpected period '%s'", period)
 	case "month":
 		since = since.AddDate(0, 0, -30)
 	case "week":
@@ -182,7 +183,7 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
-		return nil, fmt.Errorf("failed to retrieve data for summary with %w", errors.Join(errs...))
+		return result, fmt.Errorf("failed to retrieve data for summary with %w", errors.Join(errs...))
 	}
 
 	// Call LLM
@@ -193,8 +194,9 @@ func (a SummaryAgent) Run(ctx context.Context, query string, msgs ...*ai.Message
 
 	resp, err = a.evalPrompt.Execute(ctx, ai.WithDocs(docs...), ai.WithInput(map[string]any{"period": period}))
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	slog.Info("generated summary", "text", resp.Text())
-	return resp, nil
+	result = agent.NewResponse(agent.DataText{Text: resp.Text()}, resp)
+	return result, nil
 }

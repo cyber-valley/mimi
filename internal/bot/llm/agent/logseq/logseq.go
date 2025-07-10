@@ -53,11 +53,12 @@ func (a LogseqAgent) GetInfo() agent.Info {
 	}
 }
 
-func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (*ai.ModelResponse, error) {
+func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message) (agent.Response, error) {
+	var result agent.Response
 	// Find relative pages
 	titles, err := a.q.FindTitles()
 	if err != nil {
-		return nil, fmt.Errorf("failed to answer to query with %w", err)
+		return result, fmt.Errorf("failed to answer to query with %w", err)
 	}
 	titleDocs := make([]*ai.Document, len(titles))
 	for i, t := range titles {
@@ -72,11 +73,11 @@ func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed with %w", err)
+		return result, fmt.Errorf("LLM request failed with %w", err)
 	}
 	var relevantPages map[string][]string
 	if err := resp.Output(&relevantPages); err != nil {
-		return nil, fmt.Errorf("failed to parse LLM output with %w", err)
+		return result, fmt.Errorf("failed to parse LLM output with %w", err)
 	}
 	slog.Info("relevant pages", "titles", relevantPages["titles"])
 
@@ -100,7 +101,7 @@ func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 		}
 	}
 	if len(errs) > 0 {
-		return nil, fmt.Errorf("failed to fetch relevant pages with %w", errors.Join(errs...))
+		return result, fmt.Errorf("failed to fetch relevant pages with %w", errors.Join(errs...))
 	}
 	slog.Info("relevant documents", "length", len(docs))
 
@@ -111,8 +112,9 @@ func (a LogseqAgent) Run(ctx context.Context, query string, msgs ...*ai.Message)
 		ai.WithInput(map[string]any{"query": query}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate final step with %w", err)
+		return result, fmt.Errorf("failed to evaluate final step with %w", err)
 	}
 
-	return resp, nil
+	result = agent.NewResponse(agent.DataText{Text: resp.Text()}, resp)
+	return result, nil
 }
