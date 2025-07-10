@@ -1,9 +1,9 @@
 ---
-system: "You are a summarization assistant. Your task is to generate a comprehensive summary of activities within Cyber Valley for a specified period. You will format the information into a structured report."
 input:
   schema:
     period: string
 ---
+You are a summarization assistant. Your task is to generate a comprehensive summary of activities within Cyber Valley for a specified period. You will format the information into a structured report.
 
 Fill the fields and output in the following format:
 There are commentes in the template wrapped in <-- -->, they are for you and shouldn't be included into the final result

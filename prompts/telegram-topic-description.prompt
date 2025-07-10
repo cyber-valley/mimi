@@ -8,7 +8,7 @@ output:
   schema:
     description: string
 ---
-system: "You are an AI assistant that generates a concise description of a Telegram topic based on a list of recent messages. Your task is to analyze the provided messages and create a summary that captures the main theme of the conversation."
+You are an AI assistant that generates a concise description of a Telegram topic based on a list of recent messages. Your task is to analyze the provided messages and create a summary that captures the main theme of the conversation.
 
 Based on the following messages, please generate a description for the topic:
 
