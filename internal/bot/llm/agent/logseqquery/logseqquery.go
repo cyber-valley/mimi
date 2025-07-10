@@ -1,10 +1,11 @@
 package logseqquery
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/firebase/genkit/go/ai"
 
@@ -41,12 +42,15 @@ func (a LogseqQueryAgent) Run(ctx context.Context, queryS string, msgs ...*ai.Me
 		return nil, fmt.Errorf("failed to evaluate query with %w", err)
 	}
 	slog.Info("got logseq query result", "rows", len(result.Table)-1)
-	rows := make([]string, len(result.Table))
-	for i, row := range result.Table {
-		rows[i] = strings.Join(row, ",")
+
+	// Encode as CSV
+	buf := new(bytes.Buffer)
+	writer := csv.NewWriter(buf)
+	err = writer.WriteAll(result.Table)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode LogSeq query results into CSV with %w", err)
 	}
-	table := strings.Join(rows, "\n")
 	return &ai.ModelResponse{
-		Message: ai.NewTextMessage(ai.RoleModel, table),
+		Message: ai.NewTextMessage(ai.RoleModel, buf.String()),
 	}, nil
 }
