@@ -108,7 +108,9 @@ func (m LLM) Answer(ctx context.Context, id int64, query string) (agent.Response
 	if text, ok := result.Data.(agent.DataText); ok {
 		messages = append(messages, ai.NewTextMessage(ai.RoleModel, text.Text))
 	}
-	messages = messages[:20]
+	if len(messages) > 20 {
+		messages = messages[:20]
+	}
 	encoded, err := json.Marshal(messages)
 	if err != nil {
 		return result, fmt.Errorf("failed to marshal messages with %w", err)
