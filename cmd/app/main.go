@@ -18,7 +18,6 @@ import (
 	ghscraper "mimi/internal/provider/github/scraper"
 	"mimi/internal/provider/logseq"
 	"mimi/internal/provider/logseq/db"
-	tgscraper "mimi/internal/provider/telegram/scraper"
 )
 
 const (
@@ -124,14 +123,6 @@ func main() {
 		},
 	}
 
-	go func() {
-		err := tgscraper.Run(ctx, pool, g)
-		if err != nil {
-			log.Fatalf("Telegram scraper exited with %s", err)
-		} else {
-			slog.Info("Telegram scraper exited without an error")
-		}
-	}()
 	go func() {
 		err := ghscraper.Run(ctx, pool, hooks...)
 		if err != nil {
