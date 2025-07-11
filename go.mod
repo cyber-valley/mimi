@@ -3,13 +3,14 @@ module mimi
 go 1.24.3
 
 require (
-	github.com/ai-shift/tgmd v0.1.5
+	github.com/ai-shift/tgmd v0.1.6
 	github.com/cozodb/cozo-lib-go v0.7.5
 	github.com/firebase/genkit/go v0.6.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/gotd/contrib v0.21.0
 	github.com/gotd/td v0.124.0
 	github.com/jackc/pgx/v5 v5.7.2
+	github.com/openai/openai-go v0.1.0-alpha.65
 	github.com/pgvector/pgvector-go v0.3.0
 	golang.org/x/term v0.32.0
 	golang.org/x/time v0.11.0
@@ -56,7 +57,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mbleigh/raymond v0.0.0-20250414171441-6b3a58ab9e0a // indirect
 	github.com/ogen-go/ogen v1.12.0 // indirect
-	github.com/openai/openai-go v0.1.0-alpha.65 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect

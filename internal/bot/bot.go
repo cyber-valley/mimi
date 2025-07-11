@@ -101,8 +101,7 @@ func (h UpdateHandler) handleMessage(ctx context.Context, m *tgbotapi.Message) e
 	case agent.DataText:
 		// Response to the user's query
 		slog.Info("got LLM text answer", "length", len(data.Text))
-		escaped := tgmd.Telegramify(strings.ReplaceAll(data.Text, "\n\n", "\n"))
-		if err := sendLongMessage(h.bot, m.Chat.ID, escaped); err != nil {
+		if err := sendLongMessage(h.bot, m.Chat.ID, data.Text); err != nil {
 			return fmt.Errorf("failed to send LLM response with %w", err)
 		}
 	case agent.DataFile:
@@ -169,6 +168,8 @@ func sendLongMessage(bot *tgbotapi.BotAPI, chatID int64, text string) error {
 }
 
 func sendShortMessage(bot *tgbotapi.BotAPI, chatID int64, text string) error {
+	text = tgmd.Telegramify(text)
+
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "MarkdownV2"
 	_, err := bot.Send(msg)
