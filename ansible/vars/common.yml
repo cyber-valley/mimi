@@ -6,7 +6,7 @@ postgres_user: "{{ lookup('ansible.builtin.env', 'POSTGRES_USER', default=undef(
 postgres_password: "{{ lookup('ansible.builtin.env', 'POSTGRES_PASSWORD', default=undef()) }}"
 postgres_db: "{{ lookup('ansible.builtin.env', 'POSTGRES_DB', default=undef()) }}"
 postgres_port: "{{ lookup('ansible.builtin.env', 'POSTGRES_PORT', default=undef()) }}"
-podman_network: "mimi"
+podman_network: "host"
 image_name: "{{ lookup('ansible.builtin.env', 'IMAGE_NAME', default=undef()) }}"
 geni_container: "geni"
 geni_image: "ghcr.io/emilpriver/geni:latest-slim"
